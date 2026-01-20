@@ -1,0 +1,47 @@
+import type { Metadata } from 'next'
+import { Analytics } from '@vercel/analytics/next'
+import './globals.css'
+import { AppDataProvider } from '@/components/providers/app-data-provider'
+import { AuthProvider } from '@/components/providers/auth-provider'
+
+export const metadata: Metadata = {
+  title: 'Bloemist CRM',
+  description: 'Florist CRM dashboard',
+  generator: 'v0.app',
+  icons: {
+    icon: [
+      {
+        url: '/icon-light-32x32.png',
+        media: '(prefers-color-scheme: light)',
+      },
+      {
+        url: '/icon-dark-32x32.png',
+        media: '(prefers-color-scheme: dark)',
+      },
+      {
+        url: '/icon.svg',
+        type: 'image/svg+xml',
+      },
+    ],
+    apple: '/apple-icon.png',
+  },
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <html lang="en">
+      <body className="font-sans antialiased">
+        <AppDataProvider>
+          <AuthProvider>
+            {children}
+          </AuthProvider>
+        </AppDataProvider>
+        <Analytics />
+      </body>
+    </html>
+  )
+}

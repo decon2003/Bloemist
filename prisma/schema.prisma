@@ -1,0 +1,134 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  phone     String
+  role      String
+  status    String
+  avatar    String?
+  createdAt DateTime @default(now())
+
+  // Relations
+  tasksAssigned    Task[]         @relation("AssignedTasks")
+  ordersCreated    Order[]        @relation("CreatedOrders")
+  ordersAssigned   Order[]        @relation("AssignedOrders")
+  staffCheckIns    StaffCheckIn[]
+  messagesSent     Message[]      @relation("SentMessages")
+  messagesReceived Message[]      @relation("ReceivedMessages")
+}
+
+model StoreLocation {
+  id         String   @id @default(uuid())
+  label      String
+  lat        Float
+  lng        Float
+  address    String?
+  created_at DateTime @default(now())
+}
+
+model Order {
+  id                    String   @id @default(uuid())
+  code                  String   @unique
+  customerName          String
+  customerPhone         String
+  receiverName          String
+  receiverPhone         String
+  bouquetName           String
+  bouquetImage          String?
+  receiveTime           DateTime
+  deliveryType          String
+  deliveryAddress       String?
+  status                String
+  listedPrice           String
+  discount              String?
+  deliveryFee           String?
+  deliveryCoveredByShop Boolean?
+  vatPercent            Float?
+  deposit               String?
+  sellingPrice          String?
+  remainingBalance      String?
+  total                 String
+  notes                 String?
+  createdById           String?
+  createdByName         String?
+  assigneeId            String?
+  assigneeName          String?
+  new_customer          Boolean? @default(false)
+  createdAt             DateTime @default(now())
+
+  createdBy User?  @relation("CreatedOrders", fields: [createdById], references: [id])
+  assignee  User?  @relation("AssignedOrders", fields: [assigneeId], references: [id])
+  tasks     Task[]
+}
+
+model Task {
+  id                 String    @id @default(uuid())
+  orderId            String?
+  orderCode          String?
+  bouquetName        String
+  bouquetImage       String?
+  taskTitle          String
+  samplePhotoUrls    String? // JSON string
+  status             String
+  dueTime            DateTime
+  startTime          DateTime?
+  completedAt        DateTime?
+  completionProofUrl String?
+  notes              String?
+  type               String
+  quantity           Int       @default(1)
+  price              String?
+
+  order        Order?    @relation(fields: [orderId], references: [id])
+  assigneeId   String?
+  assignee     User?     @relation("AssignedTasks", fields: [assigneeId], references: [id])
+  assigneeName String?
+  
+  lastAssigneeName String?
+  lastAssignedAt   DateTime?
+  createdAt        DateTime  @default(now())
+}
+
+model StaffCheckIn {
+  id                   String    @id @default(uuid())
+  staffId              String
+  staffName            String
+  discipline           String
+  timestamp            DateTime
+  checkInAt            DateTime?
+  checkOutAt           DateTime?
+  workingHours         Float?
+  locationLabel        String
+  locationType         String
+  lat                  Float
+  lng                  Float
+  distanceFromOfficeKm Float
+  ordersTouched        Int       @default(0)
+  completedTasks       Int       @default(0)
+  notes                String?
+  requiresReview       Boolean?
+  verificationStatus   String?
+  verificationNote     String?
+
+  staff User @relation(fields: [staffId], references: [id])
+}
+
+model Message {
+  id        String   @id @default(uuid())
+  content   String
+  createdAt DateTime @default(now())
+  fromId    String
+  toId      String
+
+  from User @relation("SentMessages", fields: [fromId], references: [id])
+  to   User @relation("ReceivedMessages", fields: [toId], references: [id])
+}

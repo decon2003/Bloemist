@@ -15,10 +15,11 @@ import {
 } from 'recharts'
 import { useLocale } from '@/components/providers/locale-provider'
 import { useAppData } from '@/components/providers/app-data-provider'
+import { parseCurrencyToNumber } from '@/lib/utils'
 
 export default function BossDashboard() {
   const { t } = useLocale()
-  const { orders, tasks, checkins } = useAppData()
+  const { orders, tasks } = useAppData()
   const today = useMemo(() => new Date(), [])
   const weekAgo = useMemo(() => {
     const next = new Date(today)
@@ -35,19 +36,10 @@ export default function BossDashboard() {
     })
   }, [today])
 
-  const monthEntries = useMemo(
-    () =>
-      checkins.filter((entry) => {
-        const stamp = new Date(entry.timestamp)
-        return stamp.getFullYear() === today.getFullYear() && stamp.getMonth() === today.getMonth()
-      }),
-    [today, checkins],
-  )
-
   const totals = useMemo(
     () => ({
-      orders: monthEntries.reduce((acc, entry) => acc + entry.ordersTouched, 0),
-      tasks: monthEntries.reduce((acc, entry) => acc + entry.completedTasks, 0),
+      orders: orders.filter((o) => o.status === 'READY' || o.status === 'DELIVERED').length,
+      tasks: tasks.filter((t) => t.status === 'READY' || t.status === 'COMPLETED').length,
       readyOrders: orders.filter((order) => order.status === 'READY').length,
       weeklyOrders: orders.filter((order) => {
         const receive = new Date(order.receiveTime)
@@ -58,9 +50,9 @@ export default function BossDashboard() {
           const receive = new Date(order.receiveTime)
           return receive >= weekAgo && receive <= today
         })
-        .reduce((acc, order) => acc + parseCurrency(order.total), 0),
+        .reduce((acc, order) => acc + parseCurrencyToNumber(order.total), 0),
     }),
-    [monthEntries, orders, today, weekAgo],
+    [orders, tasks, today, weekAgo],
   )
 
   const weeklyData = useMemo(
@@ -81,7 +73,7 @@ export default function BossDashboard() {
 
         return {
           label: day.toLocaleDateString('en-US', { weekday: 'short' }),
-          sales: dailyOrders.reduce((acc, order) => acc + parseCurrency(order.total), 0),
+          sales: dailyOrders.reduce((acc, order) => acc + parseCurrencyToNumber(order.total), 0),
           tasks: dailyTasks.length,
         }
       }),
@@ -204,7 +196,4 @@ function ChartCard({ title, description, children }: ChartCardProps) {
   )
 }
 
-function parseCurrency(value: string) {
-  const numeric = parseFloat(value.replace(/[^0-9.]+/g, ''))
-  return Number.isNaN(numeric) ? 0 : numeric
-}
+

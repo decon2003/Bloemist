@@ -83,17 +83,22 @@ const useQueryClient = () => {
 
 function useQuery<T>({ queryKey, queryFn }: QueryOptions<T>) {
   const client = useQueryClient()
-  const [state, setState] = useState<QueryState<T>>({
+  const [state, setState] = useState<QueryState<T>>(() => ({
     data: client.getQueryData<T>(queryKey),
     status: client.getQueryData<T>(queryKey) ? 'success' : 'pending',
     error: null,
-  })
+  }))
 
   const keyHash = useMemo(() => hashKey(queryKey), [queryKey])
   const queryFnRef = useRef(queryFn)
+  const isFetchingRef = useRef(false)
   queryFnRef.current = queryFn
 
   const runQuery = useCallback(async () => {
+    // Prevent duplicate fetches
+    if (isFetchingRef.current) return
+    isFetchingRef.current = true
+
     setState((current) => ({ ...current, status: 'pending', error: null }))
     try {
       const data = await queryFnRef.current()
@@ -103,25 +108,31 @@ function useQuery<T>({ queryKey, queryFn }: QueryOptions<T>) {
     } catch (error) {
       setState((current) => ({ ...current, status: 'error', error: error as Error }))
       throw error
+    } finally {
+      isFetchingRef.current = false
     }
-  }, [client, queryKey])
+  }, [client, keyHash]) // Use keyHash instead of queryKey to prevent unnecessary re-runs
 
+  // Initial fetch - only runs once per queryKey
   useEffect(() => {
-    const updateFromCache = () => {
-      const cached = client.getQueryData<T>(queryKey)
-      setState((current) => ({ ...current, data: cached }))
-      if (cached === undefined) {
-        runQuery().catch(() => null)
-      }
-    }
-
-    if (!state.data) {
+    const cached = client.getQueryData<T>(queryKey)
+    if (cached !== undefined) {
+      setState({ data: cached, status: 'success', error: null })
+    } else {
       runQuery().catch(() => null)
     }
+  }, [keyHash]) // Only re-run when key changes
 
-    const unsubscribe = client.subscribe(queryKey, updateFromCache)
+  // Subscribe to cache updates from other components
+  useEffect(() => {
+    const unsubscribe = client.subscribe(queryKey, () => {
+      const cached = client.getQueryData<T>(queryKey)
+      if (cached !== undefined) {
+        setState((current) => ({ ...current, data: cached, status: 'success' }))
+      }
+    })
     return unsubscribe
-  }, [client, queryKey, runQuery, state.data, keyHash])
+  }, [client, keyHash])
 
   return {
     data: state.data,

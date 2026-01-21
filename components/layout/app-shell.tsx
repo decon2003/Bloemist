@@ -39,7 +39,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     const staffNav = [
       { href: `/${lang}/orders`, label: t('nav.orders'), icon: ShoppingBag },
       { href: `/${lang}/checkins`, label: t('nav.checkins'), icon: MapPin },
-      { href: `/${lang}/inventory`, label: t('nav.inventory'), icon: Package },
+
     ]
 
     if (user?.role === 'sales' || user?.role === 'florist') {
@@ -57,7 +57,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     if (user?.role === 'boss' || user?.role === 'admin') {
       return [
         ...managerBase,
-        { href: `/${lang}/inventory`, label: t('nav.inventory'), icon: Package },
+
         { href: `/${lang}/customers`, label: t('nav.customers'), icon: Users },
       ]
     }

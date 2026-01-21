@@ -5,61 +5,7 @@ import { User, AuthContextValue } from '@/lib/types'
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
-// Mock users database
-const mockUsers: Record<string, { password: string; user: User }> = {
-  'admin@bloemist.com': {
-    password: 'admin',
-    user: {
-      id: 'user-1',
-      name: 'Admin User',
-      email: 'admin@bloemist.com',
-      phone: '+1 555-0001',
-      role: 'boss',
-      status: 'active',
-      avatar: '👩‍💼',
-      createdAt: new Date().toISOString(),
-    },
-  },
-  'florist@bloemist.com': {
-    password: 'florist',
-    user: {
-      id: 'user-2',
-      name: 'Sarah Chen',
-      email: 'florist@bloemist.com',
-      phone: '+1 555-0002',
-      role: 'florist',
-      status: 'active',
-      avatar: '👩‍🌾',
-      createdAt: new Date().toISOString(),
-    },
-  },
-  'sales@bloemist.com': {
-    password: 'sales',
-    user: {
-      id: 'user-4',
-      name: 'Nina Patel',
-      email: 'sales@bloemist.com',
-      phone: '+1 555-0004',
-      role: 'sales',
-      status: 'active',
-      avatar: '📞',
-      createdAt: new Date().toISOString(),
-    },
-  },
-  'tech@bloemist.com': {
-    password: 'admin',
-    user: {
-      id: 'user-3',
-      name: 'Tech Admin',
-      email: 'tech@bloemist.com',
-      phone: '+1 555-0003',
-      role: 'admin',
-      status: 'active',
-      avatar: '👨‍💻',
-      createdAt: new Date().toISOString(),
-    },
-  },
-}
+
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)

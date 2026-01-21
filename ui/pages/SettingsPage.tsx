@@ -50,58 +50,7 @@ const sections = [
   },
 ]
 
-const mockUsers: User[] = [
-  {
-    id: 'user-1',
-    name: 'Admin User',
-    email: 'admin@bloemist.com',
-    phone: '+1 555-0001',
-    role: 'boss',
-    status: 'active',
-    avatar: '👩‍💼',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'user-2',
-    name: 'Sarah Chen',
-    email: 'florist@bloemist.com',
-    phone: '+1 555-0002',
-    role: 'sales',
-    status: 'active',
-    avatar: '👩‍🌾',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'user-3',
-    name: 'Tech Admin',
-    email: 'tech@bloemist.com',
-    phone: '+1 555-0003',
-    role: 'admin',
-    status: 'active',
-    avatar: '👨‍💻',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'user-4',
-    name: 'Olivia Reyes',
-    email: 'olivia@bloemist.com',
-    phone: '+1 555-0004',
-    role: 'sales',
-    status: 'active',
-    avatar: '👩',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'user-5',
-    name: 'Miguel Santos',
-    email: 'miguel@bloemist.com',
-    phone: '+1 555-0005',
-    role: 'sales',
-    status: 'disabled',
-    avatar: '👨',
-    createdAt: new Date().toISOString(),
-  },
-]
+
 
 export default function SettingsPage() {
   const { t, lang } = useLocale()

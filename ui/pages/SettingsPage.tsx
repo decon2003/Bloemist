@@ -81,28 +81,35 @@ export default function SettingsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleAddUser = async () => {
-    if (!canManageUsers) return
+    if (!canManageUsers) {
+      alert('Bạn không có quyền thêm nhân viên')
+      return
+    }
 
-    if (formData.name && formData.email && formData.phone && formData.role) {
-      setIsSubmitting(true)
-      try {
-        const { createUser } = await import('@/lib/api')
-        await createUser({
-          name: formData.name,
-          email: formData.email,
-          phone: formData.phone,
-          role: formData.role,
-        })
-        alert('Thêm nhân viên thành công! Trang sẽ tải lại.')
-        setFormData({ name: '', email: '', phone: '', role: 'sales', password: '' })
-        setShowAddUserModal(false)
-        // Refresh page to reload users
-        window.location.reload()
-      } catch (error: any) {
-        alert('Lỗi: ' + (error.message || 'Không thể thêm nhân viên'))
-      } finally {
-        setIsSubmitting(false)
-      }
+    // Validate required fields
+    if (!formData.name || !formData.email || !formData.phone || !formData.role) {
+      alert('Vui lòng điền đầy đủ thông tin: Họ tên, Email, Số điện thoại và Vai trò')
+      return
+    }
+
+    setIsSubmitting(true)
+    try {
+      const { createUser } = await import('@/lib/api')
+      await createUser({
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        role: formData.role,
+      })
+      alert('Thêm nhân viên thành công! Trang sẽ tải lại.')
+      setFormData({ name: '', email: '', phone: '', role: 'sales', password: '' })
+      setShowAddUserModal(false)
+      window.location.reload()
+    } catch (error: any) {
+      console.error('Add user error:', error)
+      alert('Lỗi: ' + (error.message || 'Không thể thêm nhân viên'))
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -381,9 +388,10 @@ export default function SettingsPage() {
               </button>
               <button
                 onClick={handleAddUser}
-                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90"
+                disabled={isSubmitting}
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {t('settings.userManagement.modal.add')}
+                {isSubmitting ? 'Đang thêm...' : t('settings.userManagement.modal.add')}
               </button>
             </div>
           </div>

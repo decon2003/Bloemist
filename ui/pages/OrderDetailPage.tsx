@@ -215,16 +215,14 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
             <select
               value={order.status}
               onChange={(e) => handleUpdateStatus(e.target.value as Order['status'])}
-              className={`h-9 rounded-full border px-4 py-2 text-sm font-medium focus:ring-1 focus:ring-primary ${order.status === 'SHIPPED' ? 'bg-purple-100 text-purple-800 border-purple-200' :
-                  order.status === 'READY' ? 'bg-green-100 text-green-800 border-green-200' :
-                    order.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800 border-blue-200' :
-                      'bg-muted text-foreground border-transparent'
+              className={`h-9 rounded-full border px-4 py-2 text-sm font-medium focus:ring-1 focus:ring-primary ${order.status === 'READY' ? 'bg-green-100 text-green-800 border-green-200' :
+                  order.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800 border-blue-200' :
+                    'bg-muted text-foreground border-transparent'
                 }`}
             >
               <option value="NEW">{getOrderStatusLabel('NEW')}</option>
               <option value="IN_PROGRESS">{getOrderStatusLabel('IN_PROGRESS')}</option>
               <option value="READY">{getOrderStatusLabel('READY')}</option>
-              <option value="SHIPPED">{getOrderStatusLabel('SHIPPED')}</option>
               <option value="DELIVERED">{getOrderStatusLabel('DELIVERED')}</option>
             </select>
 

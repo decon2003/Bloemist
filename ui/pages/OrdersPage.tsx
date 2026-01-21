@@ -14,7 +14,7 @@ import type { Order } from '@/lib/types'
 import { formatCurrencyDisplay } from '@/lib/utils'
 import { useViewSettings } from '@/components/providers/view-settings-provider'
 
-const baseStatuses: Order['status'][] = ['NEW', 'IN_PROGRESS', 'READY', 'SHIPPED', 'DELIVERED']
+const baseStatuses: Order['status'][] = ['NEW', 'IN_PROGRESS', 'READY', 'DELIVERED']
 const orderStatuses: Array<'ALL' | Order['status']> = ['ALL', ...baseStatuses]
 
 type OrderFilter = (typeof orderStatuses)[number]
@@ -226,10 +226,9 @@ export default function OrdersPage() {
                             e.stopPropagation()
                             updateOrder(order.id, { status: e.target.value as Order['status'] })
                           }}
-                          className={`h-8 rounded-md border px-2 py-1 text-xs font-medium focus:ring-1 focus:ring-primary ${order.status === 'SHIPPED' ? 'bg-purple-100 text-purple-800 border-purple-200' :
-                              order.status === 'READY' ? 'bg-green-100 text-green-800 border-green-200' :
-                                order.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800 border-blue-200' :
-                                  'bg-muted text-foreground border-transparent'
+                          className={`h-8 rounded-md border px-2 py-1 text-xs font-medium focus:ring-1 focus:ring-primary ${order.status === 'READY' ? 'bg-green-100 text-green-800 border-green-200' :
+                            order.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800 border-blue-200' :
+                              'bg-muted text-foreground border-transparent'
                             }`}
                         >
                           {baseStatuses.map((s) => (

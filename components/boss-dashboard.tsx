@@ -41,9 +41,9 @@ export default function BossDashboard() {
   const monthlyData = useMemo(() => {
     return orders.filter(order => {
       const date = new Date(order.receiveTime)
-      return date >= startOfMonth && date <= today
+      return date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear()
     })
-  }, [orders, startOfMonth, today])
+  }, [orders, today])
 
   const weeklyData = useMemo(() => {
     return orders.filter(order => {
@@ -60,7 +60,7 @@ export default function BossDashboard() {
     const activeOrdersCount = orders.filter(o => o.status === 'IN_PROGRESS' || o.status === 'NEW').length
     const monthlyTasksCount = tasks.filter(t => {
       const date = new Date(t.createdAt) // Assuming createdAt for tasks
-      return date >= startOfMonth && date <= today
+      return date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear()
     }).length
 
     return {
@@ -69,7 +69,7 @@ export default function BossDashboard() {
       active: activeOrdersCount,
       tasks: monthlyTasksCount
     }
-  }, [monthlyData, orders, tasks, startOfMonth, today])
+  }, [monthlyData, orders, tasks, today])
 
   // Chart Data (Last 7 Days)
   const chartData = useMemo(() => {

@@ -83,19 +83,25 @@ const useQueryClient = () => {
 
 function useQuery<T>({ queryKey, queryFn }: QueryOptions<T>) {
   const client = useQueryClient()
-  const [state, setState] = useState<QueryState<T>>(() => ({
-    data: client.getQueryData<T>(queryKey),
-    status: client.getQueryData<T>(queryKey) ? 'success' : 'pending',
-    error: null,
-  }))
-
   const keyHash = useMemo(() => hashKey(queryKey), [queryKey])
+
+  const [state, setState] = useState<QueryState<T>>(() => {
+    const cached = client.getQueryData<T>(queryKey)
+    return {
+      data: cached,
+      status: cached !== undefined ? 'success' : 'pending',
+      error: null,
+    }
+  })
+
+  // Use refs to avoid stale closures
   const queryFnRef = useRef(queryFn)
   const isFetchingRef = useRef(false)
+  const hasFetchedRef = useRef(false)
   queryFnRef.current = queryFn
 
+  // Stable runQuery that won't change
   const runQuery = useCallback(async () => {
-    // Prevent duplicate fetches
     if (isFetchingRef.current) return
     isFetchingRef.current = true
 
@@ -106,32 +112,34 @@ function useQuery<T>({ queryKey, queryFn }: QueryOptions<T>) {
       setState({ data, status: 'success', error: null })
       return data
     } catch (error) {
+      console.error('Query error for', queryKey, error)
       setState((current) => ({ ...current, status: 'error', error: error as Error }))
-      throw error
     } finally {
       isFetchingRef.current = false
     }
-  }, [client, keyHash]) // Use keyHash instead of queryKey to prevent unnecessary re-runs
+  }, [client, keyHash])
 
-  // Initial fetch - only runs once per queryKey
+  // Initial fetch - runs once per key
   useEffect(() => {
+    if (hasFetchedRef.current) return
+    hasFetchedRef.current = true
+
     const cached = client.getQueryData<T>(queryKey)
     if (cached !== undefined) {
       setState({ data: cached, status: 'success', error: null })
     } else {
-      runQuery().catch(() => null)
+      runQuery()
     }
-  }, [keyHash]) // Only re-run when key changes
+  }, [keyHash])
 
-  // Subscribe to cache updates from other components
+  // Subscribe to cache updates
   useEffect(() => {
-    const unsubscribe = client.subscribe(queryKey, () => {
+    return client.subscribe(queryKey, () => {
       const cached = client.getQueryData<T>(queryKey)
       if (cached !== undefined) {
         setState((current) => ({ ...current, data: cached, status: 'success' }))
       }
     })
-    return unsubscribe
   }, [client, keyHash])
 
   return {

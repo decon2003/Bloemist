@@ -14,7 +14,7 @@ import type { Order } from '@/lib/types'
 import { formatCurrencyDisplay } from '@/lib/utils'
 import { useViewSettings } from '@/components/providers/view-settings-provider'
 
-const baseStatuses: Order['status'][] = ['NEW', 'IN_PROGRESS', 'READY', 'DELIVERED']
+const baseStatuses: Order['status'][] = ['NEW', 'IN_PROGRESS', 'READY', 'SHIPPED', 'DELIVERED']
 const orderStatuses: Array<'ALL' | Order['status']> = ['ALL', ...baseStatuses]
 
 type OrderFilter = (typeof orderStatuses)[number]

@@ -226,7 +226,7 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
 
 
           {/* Workflow Actions */}
-          {user?.role === 'florist' && order.status === 'IN_PROGRESS' && (
+          {(user?.role === 'florist' || user?.role === 'admin' || user?.role === 'boss') && order.status === 'IN_PROGRESS' && (
             <button
               onClick={() => handleUpdateStatus('READY')}
               className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 shadow-sm"

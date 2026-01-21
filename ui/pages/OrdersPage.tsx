@@ -205,7 +205,7 @@ export default function OrdersPage() {
                       <p className="text-sm text-muted-foreground">{order.customerName}</p>
                     </div>
                   </div>
-                  <div className="grid flex-1 grid-cols-2 gap-4 text-sm md:grid-cols-4 md:text-right">
+                  <div className="grid flex-1 grid-cols-2 gap-4 text-sm md:grid-cols-3 md:text-right">
                     <div className="text-left md:text-right">
                       <p className="text-muted-foreground">{t('orders.detail.total')}</p>
                       <p className="text-lg font-semibold text-foreground">{formatMoney(order.total)}</p>
@@ -240,38 +240,7 @@ export default function OrdersPage() {
                       </div>
                     </div>
 
-                    <div className="text-left md:text-right" onClick={(e) => e.stopPropagation()}>
-                      <p className="text-muted-foreground">{t('orders.assignee', 'Florist')}</p>
-                      <div className="flex md:justify-end">
-                        <select
-                          value={order.assigneeId || ''}
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            const selectedId = e.target.value
-                            const florist = florists.find((f) => f.id === selectedId)
-                            if (florist) {
-                              assignOrder(order.id, { userId: florist.id, userName: florist.name })
-                              // Auto-update status to IN_PROGRESS if currently NEW
-                              if (order.status === 'NEW') {
-                                updateOrder(order.id, { status: 'IN_PROGRESS' })
-                              }
-                            }
-                          }}
-                          className="h-8 max-w-[140px] rounded-md border border-input bg-background px-2 py-1 text-xs font-medium focus:ring-1 focus:ring-primary"
-                        >
-                          <option value="" disabled>
-                            {t('common.select', 'Select')}
-                          </option>
-                          {florists.map((f) => (
-                            <option key={f.id} value={f.id}>
-                              {f.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
+
                   </div>
                   {user?.role !== 'florist' && (
                     <div className="flex shrink-0 items-center justify-end md:pl-4" onClick={(e) => e.stopPropagation()}>

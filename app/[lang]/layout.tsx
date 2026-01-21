@@ -4,6 +4,7 @@ import { RouteGuard } from '@/components/layout/route-guard'
 import { LocaleProvider } from '@/components/providers/locale-provider'
 import { AuthProvider } from '@/components/providers/auth-provider'
 import { ViewSettingsProvider } from '@/components/providers/view-settings-provider'
+import { AppDataProvider } from '@/components/providers/app-data-provider'
 
 export default async function LangLayout({
   children,
@@ -18,9 +19,11 @@ export default async function LangLayout({
     <AuthProvider>
       <LocaleProvider lang={lang}>
         <ViewSettingsProvider>
-          <AppShell>
-            <RouteGuard>{children}</RouteGuard>
-          </AppShell>
+          <AppDataProvider>
+            <AppShell>
+              <RouteGuard>{children}</RouteGuard>
+            </AppShell>
+          </AppDataProvider>
         </ViewSettingsProvider>
       </LocaleProvider>
     </AuthProvider>

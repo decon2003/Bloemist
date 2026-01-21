@@ -1,8 +1,6 @@
 import type { Metadata } from 'next'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
-import { AppDataProvider } from '@/components/providers/app-data-provider'
-import { AuthProvider } from '@/components/providers/auth-provider'
 
 export const metadata: Metadata = {
   title: 'Bloemist CRM',
@@ -35,11 +33,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="font-sans antialiased">
-        <AppDataProvider>
-          <AuthProvider>
-            {children}
-          </AuthProvider>
-        </AppDataProvider>
+        {children}
         <Analytics />
       </body>
     </html>

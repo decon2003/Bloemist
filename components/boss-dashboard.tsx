@@ -40,14 +40,14 @@ export default function BossDashboard() {
   // Filter Data
   const monthlyData = useMemo(() => {
     return orders.filter(order => {
-      const date = new Date(order.receiveTime)
+      const date = new Date(order.createdAt)
       return date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear()
     })
   }, [orders, today])
 
   const weeklyData = useMemo(() => {
     return orders.filter(order => {
-      const date = new Date(order.receiveTime)
+      const date = new Date(order.createdAt)
       // Check if date is within the last 7 days window
       return date >= weekAgo
     })
@@ -84,7 +84,7 @@ export default function BossDashboard() {
       // Filter orders for this specific day
       const dailyRevenue = weeklyData
         .filter(o => {
-          const oDate = new Date(o.receiveTime)
+          const oDate = new Date(o.createdAt)
           return oDate.getDate() === d.getDate() && oDate.getMonth() === d.getMonth()
         })
         .reduce((sum, o) => sum + parseCurrencyToNumber(o.total), 0)
@@ -100,7 +100,7 @@ export default function BossDashboard() {
   // Recent 5 Orders
   const recentOrders = useMemo(() => {
     return [...orders]
-      .sort((a, b) => new Date(b.receiveTime).getTime() - new Date(a.receiveTime).getTime())
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .slice(0, 5)
   }, [orders])
 

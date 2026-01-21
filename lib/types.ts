@@ -75,6 +75,7 @@ export interface Order {
   assigneeName?: string
   new_customer?: boolean
   deliveryAddress?: string
+  createdAt: string
 }
 
 export interface CreateOrderInput {

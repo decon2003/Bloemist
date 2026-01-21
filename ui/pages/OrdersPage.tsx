@@ -21,7 +21,7 @@ type OrderFilter = (typeof orderStatuses)[number]
 
 export default function OrdersPage() {
   const router = useRouter()
-  const { orders, florists, assignOrder, deleteOrder, updateOrder } = useAppData()
+  const { orders, tasks, florists, assignOrder, deleteOrder, updateOrder } = useAppData()
   const { lang, t, getDeliveryLabel, getOrderStatusLabel } = useLocale()
   const { user } = useAuth()
   const { dateFilterMode } = useViewSettings()
@@ -41,10 +41,11 @@ export default function OrdersPage() {
 
   const ordersWithDerivedStatus = useMemo(() => {
     if (user?.role === 'florist') {
-      return orders.filter((order) => order.assigneeId === user.id)
+      const myOrderIds = new Set(tasks.filter(t => t.assigneeId === user.id).map(t => t.orderId))
+      return orders.filter((order) => myOrderIds.has(order.id))
     }
     return orders
-  }, [orders, user])
+  }, [orders, tasks, user])
 
   const filteredOrders = useMemo(
     () =>

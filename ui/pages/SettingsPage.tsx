@@ -47,6 +47,107 @@ const sections = [
   },
 ]
 
+// Modal component defined outside to avoid re-rendering issues
+const UserFormModal = ({
+  isOpen,
+  title,
+  onClose,
+  onSubmit,
+  submitLabel,
+  formData,
+  setFormData,
+  isSubmitting
+}: {
+  isOpen: boolean
+  title: string
+  onClose: () => void
+  onSubmit: () => void
+  submitLabel: string
+  formData: any
+  setFormData: (data: any) => void
+  isSubmitting: boolean
+}) => {
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-2xl p-6 max-w-md w-full space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xl font-bold text-foreground">{title}</h3>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1">Họ và tên</label>
+            <input
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              placeholder="Nguyễn Văn A"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1">Email</label>
+            <input
+              type="email"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              placeholder="email@bloemist.com"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1">Số điện thoại</label>
+            <input
+              type="tel"
+              value={formData.phone}
+              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              placeholder="0901234567"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1">Vai trò</label>
+            <select
+              value={formData.role}
+              onChange={(e) => setFormData({ ...formData, role: e.target.value as User['role'] })}
+              className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              <option value="sales">Sales</option>
+              <option value="florist">Florist</option>
+              <option value="boss">Boss</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="flex gap-2 justify-end pt-4 border-t border-border">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-foreground border border-border rounded-lg hover:bg-muted"
+          >
+            Hủy
+          </button>
+          <button
+            onClick={onSubmit}
+            disabled={isSubmitting}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isSubmitting ? 'Đang xử lý...' : submitLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function SettingsPage() {
   const { t } = useLocale()
   const { user } = useAuth()
@@ -199,100 +300,6 @@ export default function SettingsPage() {
       default:
         return 'bg-gray-100 text-gray-800'
     }
-  }
-
-  const UserFormModal = ({
-    isOpen,
-    title,
-    onClose,
-    onSubmit,
-    submitLabel
-  }: {
-    isOpen: boolean
-    title: string
-    onClose: () => void
-    onSubmit: () => void
-    submitLabel: string
-  }) => {
-    if (!isOpen) return null
-
-    return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-2xl p-6 max-w-md w-full space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xl font-bold text-foreground">{title}</h3>
-            <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-
-          <div className="space-y-3">
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Họ và tên</label>
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                placeholder="Nguyễn Văn A"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Email</label>
-              <input
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                placeholder="email@bloemist.com"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Số điện thoại</label>
-              <input
-                type="tel"
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                placeholder="0901234567"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Vai trò</label>
-              <select
-                value={formData.role}
-                onChange={(e) => setFormData({ ...formData, role: e.target.value as User['role'] })}
-                className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-              >
-                <option value="sales">Sales</option>
-                <option value="florist">Florist</option>
-                <option value="boss">Boss</option>
-                <option value="admin">Admin</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="flex gap-2 justify-end pt-4 border-t border-border">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-foreground border border-border rounded-lg hover:bg-muted"
-            >
-              Hủy
-            </button>
-            <button
-              onClick={onSubmit}
-              disabled={isSubmitting}
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isSubmitting ? 'Đang xử lý...' : submitLabel}
-            </button>
-          </div>
-        </div>
-      </div>
-    )
   }
 
   return (
@@ -483,6 +490,9 @@ export default function SettingsPage() {
         onClose={() => { setShowAddUserModal(false); resetForm() }}
         onSubmit={handleAddUser}
         submitLabel="Thêm"
+        formData={formData}
+        setFormData={setFormData}
+        isSubmitting={isSubmitting}
       />
 
       {/* Edit User Modal */}
@@ -492,6 +502,9 @@ export default function SettingsPage() {
         onClose={() => { setShowEditUserModal(false); setEditingUser(null); resetForm() }}
         onSubmit={handleUpdateUser}
         submitLabel="Lưu thay đổi"
+        formData={formData}
+        setFormData={setFormData}
+        isSubmitting={isSubmitting}
       />
     </div>
   )

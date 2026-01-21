@@ -295,7 +295,9 @@ export const assignTask = async (taskId: string, payload: AssignTaskPayload) => 
 
 export const assignOrder = async (orderId: string, payload: AssignTaskPayload) => {
   const current = await db.order.findUnique({ where: { id: orderId } })
-  const newStatus = (current && current.status === 'NEW') ? 'IN_PROGRESS' : undefined
+  // Force status to IN_PROGRESS unless it's already finished/shipped
+  const isFinalState = current?.status === 'SHIPPED' || current?.status === 'DELIVERED'
+  const newStatus = !isFinalState ? 'IN_PROGRESS' : undefined
 
   await db.order.update({
     where: { id: orderId },

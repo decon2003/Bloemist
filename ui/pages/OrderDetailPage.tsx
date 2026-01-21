@@ -19,7 +19,7 @@ interface OrderDetailPageProps {
 
 export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
   const router = useRouter()
-  const { tasks, florists, assignTask } = useAppData()
+  const { tasks, florists, assignTask, updateTaskStatus } = useAppData()
   const { lang, t, getDeliveryLabel, getOrderStatusLabel, getTaskStatusLabel } = useLocale()
   const { user } = useAuth()
   const [order, setOrder] = useState<Order | null>(null)
@@ -118,6 +118,7 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
   }
 
   const handleDelete = async () => {
+    if (!order) return
     if (!window.confirm(t('orders.detail.deleteConfirmation'))) return
 
     try {
@@ -317,8 +318,8 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
                       <span className="text-xs text-muted-foreground">{t('orders.new.quantityLabel', 'Qty')}: {task.quantity}</span>
                       <span className="text-xs text-muted-foreground">•</span>
                       <span className={`text-xs font-medium ${task.status === 'READY' ? 'text-green-600' :
-                          task.status === 'IN_PROGRESS' ? 'text-blue-600' :
-                            'text-muted-foreground'
+                        task.status === 'IN_PROGRESS' ? 'text-blue-600' :
+                          'text-muted-foreground'
                         }`}>
                         {getTaskStatusLabel(task.status)}
                       </span>
@@ -335,6 +336,9 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
                       const florist = florists.find((f) => f.id === selectedId)
                       if (florist) {
                         assignTask(task.id, { userId: florist.id, userName: florist.name })
+                        if (task.status === 'UNASSIGNED' || !task.status) {
+                          updateTaskStatus(task.id, 'IN_PROGRESS')
+                        }
                       }
                     }}
                     className="h-9 w-full md:w-48 rounded-lg border border-border bg-white px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary"

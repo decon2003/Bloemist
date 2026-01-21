@@ -7,6 +7,7 @@ import {
   fetchOrders,
   fetchFlorists,
   createOrder as createOrderRequest,
+  updateOrder as updateOrderRequest,
   deleteOrder as deleteOrderRequest,
   createTask as createTaskRequest,
   updateTask as updateTaskRequest,
@@ -37,6 +38,7 @@ interface AppDataContextValue {
   florists: Florist[]
   isLoading: boolean
   createOrder: (input: CreateOrderInput) => Promise<Order>
+  updateOrder: (orderId: string, input: Partial<CreateOrderInput>) => Promise<Order>
   createTask: (input: CreateTaskInput) => Promise<Task>
   updateTask: (taskId: string, input: Partial<CreateTaskInput>) => Promise<Task>
   updateTaskStatus: (taskId: string, status: TaskStatus) => Promise<Task>
@@ -54,8 +56,6 @@ interface AppDataContextValue {
 }
 
 const AppDataContext = createContext<AppDataContextValue | undefined>(undefined)
-
-
 
 const AppDataContextProvider = ({ children }: { children: React.ReactNode }) => {
   const queryClient = useQueryClient()
@@ -92,6 +92,12 @@ const AppDataContextProvider = ({ children }: { children: React.ReactNode }) => 
     onSuccess: (created) => {
       queryClient.setQueryData<Order[]>(['orders'], (prev = []) => [...prev, created])
     },
+  })
+
+  const updateOrder = useMutation({
+    mutationFn: ({ orderId, input }: { orderId: string; input: Partial<CreateOrderInput> }) =>
+      updateOrderRequest(orderId, input),
+    onSuccess: (updated) => mergeOrder(updated),
   })
 
   const assignOrder = useMutation({
@@ -172,8 +178,6 @@ const AppDataContextProvider = ({ children }: { children: React.ReactNode }) => 
   const settings = settingsQuery.data ?? null
   const users = usersQuery.data ?? []
 
-
-
   const value = useMemo(
     () => ({
       tasks,
@@ -181,6 +185,7 @@ const AppDataContextProvider = ({ children }: { children: React.ReactNode }) => 
       florists,
       isLoading: tasksQuery.isPending || ordersQuery.isPending || floristsQuery.isPending,
       createOrder: (input: CreateOrderInput) => createOrder.mutateAsync(input),
+      updateOrder: (orderId: string, input: Partial<CreateOrderInput>) => updateOrder.mutateAsync({ orderId, input }),
       createTask: (input: CreateTaskInput) => createTask.mutateAsync(input),
       updateTask: (taskId: string, input: Partial<CreateTaskInput>) => updateTask.mutateAsync({ taskId, input }),
       updateTaskStatus: (taskId: string, status: TaskStatus) => updateTaskStatus.mutateAsync({ taskId, status }),
@@ -204,6 +209,7 @@ const AppDataContextProvider = ({ children }: { children: React.ReactNode }) => 
       ordersQuery.isPending,
       floristsQuery.isPending,
       createOrder,
+      updateOrder,
       createTask,
       updateTask,
       updateTaskStatus,

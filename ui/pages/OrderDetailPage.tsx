@@ -212,37 +212,26 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
         </div>
         <div className="flex items-center gap-2">
           <div className="flex gap-3">
-            <span className={`inline-flex items-center rounded-full px-4 py-2 text-sm font-medium border ${order.status === 'SHIPPED' ? 'bg-purple-100 text-purple-800 border-purple-200' :
-              order.status === 'READY' ? 'bg-green-100 text-green-800 border-green-200' :
-                order.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800 border-blue-200' :
-                  'bg-muted text-foreground border-transparent'
-              }`}>
-              {getOrderStatusLabel(order.status)}
-            </span>
+            <select
+              value={order.status}
+              onChange={(e) => handleUpdateStatus(e.target.value as Order['status'])}
+              className={`h-9 rounded-full border px-4 py-2 text-sm font-medium focus:ring-1 focus:ring-primary ${order.status === 'SHIPPED' ? 'bg-purple-100 text-purple-800 border-purple-200' :
+                  order.status === 'READY' ? 'bg-green-100 text-green-800 border-green-200' :
+                    order.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800 border-blue-200' :
+                      'bg-muted text-foreground border-transparent'
+                }`}
+            >
+              <option value="NEW">{getOrderStatusLabel('NEW')}</option>
+              <option value="IN_PROGRESS">{getOrderStatusLabel('IN_PROGRESS')}</option>
+              <option value="READY">{getOrderStatusLabel('READY')}</option>
+              <option value="SHIPPED">{getOrderStatusLabel('SHIPPED')}</option>
+              <option value="DELIVERED">{getOrderStatusLabel('DELIVERED')}</option>
+            </select>
+
             <span className="inline-flex items-center rounded-full bg-primary/10 px-4 py-2 text-sm font-semibold text-primary">
               {getDeliveryLabel(order.deliveryType)}
             </span>
           </div>
-
-
-          {/* Workflow Actions */}
-          {(user?.role === 'florist' || user?.role === 'admin' || user?.role === 'boss') && order.status === 'IN_PROGRESS' && (
-            <button
-              onClick={() => handleUpdateStatus('READY')}
-              className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 shadow-sm"
-            >
-              <CheckCircle className="h-4 w-4" /> Hoàn thành
-            </button>
-          )}
-
-          {(user?.role === 'admin' || user?.role === 'boss') && order.status === 'READY' && (
-            <button
-              onClick={() => handleUpdateStatus('SHIPPED')}
-              className="inline-flex items-center gap-2 rounded-lg bg-purple-600 px-3 py-2 text-sm font-medium text-white hover:bg-purple-700 shadow-sm"
-            >
-              <Package className="h-4 w-4" /> Xác nhận đã ship
-            </button>
-          )}
 
           {canEdit &&
             (!isEditMode ? (

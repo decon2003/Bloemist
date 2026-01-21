@@ -21,7 +21,7 @@ type OrderFilter = (typeof orderStatuses)[number]
 
 export default function OrdersPage() {
   const router = useRouter()
-  const { orders, florists, assignOrder, deleteOrder } = useAppData()
+  const { orders, florists, assignOrder, deleteOrder, updateOrder } = useAppData()
   const { lang, t, getDeliveryLabel, getOrderStatusLabel } = useLocale()
   const { user } = useAuth()
   const { dateFilterMode } = useViewSettings()
@@ -214,12 +214,33 @@ export default function OrdersPage() {
                       <p className="text-muted-foreground">{t('orders.detail.delivery')}</p>
                       <p className="font-semibold text-foreground">{getDeliveryLabel(order.deliveryType)}</p>
                     </div>
-                    <div className="text-left md:text-right">
+
+                    <div className="text-left md:text-right" onClick={(e) => e.stopPropagation()}>
                       <p className="text-muted-foreground">Status</p>
-                      <span className="inline-flex rounded-full bg-muted px-3 py-1 text-xs font-semibold text-foreground">
-                        {getOrderStatusLabel(order.status)}
-                      </span>
+                      <div className="flex md:justify-end">
+                        <select
+                          value={order.status}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            updateOrder(order.id, { status: e.target.value as Order['status'] })
+                          }}
+                          className={`h-8 rounded-md border px-2 py-1 text-xs font-medium focus:ring-1 focus:ring-primary ${order.status === 'SHIPPED' ? 'bg-purple-100 text-purple-800 border-purple-200' :
+                              order.status === 'READY' ? 'bg-green-100 text-green-800 border-green-200' :
+                                order.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800 border-blue-200' :
+                                  'bg-muted text-foreground border-transparent'
+                            }`}
+                        >
+                          {baseStatuses.map((s) => (
+                            <option key={s} value={s}>
+                              {getOrderStatusLabel(s)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
+
                     <div className="text-left md:text-right" onClick={(e) => e.stopPropagation()}>
                       <p className="text-muted-foreground">{t('orders.assignee', 'Florist')}</p>
                       <div className="flex md:justify-end">

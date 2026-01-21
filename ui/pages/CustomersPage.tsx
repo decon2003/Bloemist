@@ -5,11 +5,7 @@ import Image from 'next/image'
 import { Sparkles } from 'lucide-react'
 import { useAppData } from '@/components/providers/app-data-provider'
 import { useLocale } from '@/components/providers/locale-provider'
-
-function parseTotal(value: string) {
-  const numeric = Number(value.replace(/[^0-9.-]/g, ''))
-  return Number.isFinite(numeric) ? numeric : 0
-}
+import { parseCurrencyToNumber, formatCurrencyFromNumber } from '@/lib/utils'
 
 export default function CustomersPage() {
   const { orders } = useAppData()
@@ -19,7 +15,7 @@ export default function CustomersPage() {
     const map = new Map<string, { id: string; name: string; phone: string; total: number; orders: number }>()
     orders.forEach((order) => {
       const current = map.get(order.customerPhone)
-      const spend = parseTotal(order.total)
+      const spend = parseCurrencyToNumber(order.total)
       if (current) {
         current.total += spend
         current.orders += 1
@@ -70,7 +66,7 @@ export default function CustomersPage() {
               <div>
                 <dt className="text-muted-foreground">{t('customers.lifetimeSpend')}</dt>
                 <dd className="text-2xl font-bold text-primary">
-                  {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(customer.total)}
+                  {formatCurrencyFromNumber(customer.total)}
                 </dd>
               </div>
               <div>

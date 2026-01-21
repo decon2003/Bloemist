@@ -34,6 +34,8 @@ export interface ApiClient {
   login: (email: string, password: string) => Promise<User>
   fetchUsers: () => Promise<User[]>
   createUser: (input: Partial<User>) => Promise<User>
+  updateUser: (userId: string, input: Partial<User>) => Promise<User>
+  deleteUser: (userId: string) => Promise<void>
   fetchInventory: () => Promise<any[]>
   updateInventory: (item: any) => Promise<any>
 }

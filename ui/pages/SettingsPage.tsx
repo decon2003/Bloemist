@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { Bell, Shield, Users, Plus, Edit2, X, Clock } from 'lucide-react'
+import { Bell, Shield, Users, Plus, Edit2, Trash2, X, Clock } from 'lucide-react'
 import { useLocale } from '@/components/providers/locale-provider'
 import { useAuth } from '@/components/providers/auth-provider'
 import { useAppData } from '@/components/providers/app-data-provider'
@@ -52,10 +52,11 @@ export default function SettingsPage() {
   const { user } = useAuth()
   const { users: appUsers, settings } = useAppData()
 
-  // Users list synced from API
   const users = appUsers
 
   const [showAddUserModal, setShowAddUserModal] = useState(false)
+  const [showEditUserModal, setShowEditUserModal] = useState(false)
+  const [editingUser, setEditingUser] = useState<User | null>(null)
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -64,6 +65,7 @@ export default function SettingsPage() {
     password: '',
   })
   const [workingHours, setWorkingHours] = useState({ start: '08:00', end: '18:00' })
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   React.useEffect(() => {
     if (settings) {
@@ -78,7 +80,9 @@ export default function SettingsPage() {
       ? `${workingHours.start} - ${workingHours.end}`
       : t('settings.workingHoursUnset', 'Not set')
 
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const resetForm = () => {
+    setFormData({ name: '', email: '', phone: '', role: 'sales', password: '' })
+  }
 
   const handleAddUser = async () => {
     if (!canManageUsers) {
@@ -86,7 +90,6 @@ export default function SettingsPage() {
       return
     }
 
-    // Validate required fields
     if (!formData.name || !formData.email || !formData.phone || !formData.role) {
       alert('Vui lòng điền đầy đủ thông tin: Họ tên, Email, Số điện thoại và Vai trò')
       return
@@ -101,8 +104,8 @@ export default function SettingsPage() {
         phone: formData.phone,
         role: formData.role,
       })
-      alert('Thêm nhân viên thành công! Trang sẽ tải lại.')
-      setFormData({ name: '', email: '', phone: '', role: 'sales', password: '' })
+      alert('Thêm nhân viên thành công!')
+      resetForm()
       setShowAddUserModal(false)
       window.location.reload()
     } catch (error: any) {
@@ -110,6 +113,71 @@ export default function SettingsPage() {
       alert('Lỗi: ' + (error.message || 'Không thể thêm nhân viên'))
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  const handleEditClick = (u: User) => {
+    setEditingUser(u)
+    setFormData({
+      name: u.name,
+      email: u.email,
+      phone: u.phone || '',
+      role: u.role,
+      password: '',
+    })
+    setShowEditUserModal(true)
+  }
+
+  const handleUpdateUser = async () => {
+    if (!canManageUsers || !editingUser) return
+
+    if (!formData.name || !formData.email || !formData.phone || !formData.role) {
+      alert('Vui lòng điền đầy đủ thông tin')
+      return
+    }
+
+    setIsSubmitting(true)
+    try {
+      const { updateUser } = await import('@/lib/api')
+      await updateUser(editingUser.id, {
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        role: formData.role,
+      })
+      alert('Cập nhật thành công!')
+      resetForm()
+      setShowEditUserModal(false)
+      setEditingUser(null)
+      window.location.reload()
+    } catch (error: any) {
+      console.error('Update user error:', error)
+      alert('Lỗi: ' + (error.message || 'Không thể cập nhật'))
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleDeleteUser = async (u: User) => {
+    if (!canManageUsers) return
+
+    if (u.email === 'admin@bloemist.com') {
+      alert('Không thể xóa tài khoản Admin chính')
+      return
+    }
+
+    if (!confirm(`Bạn có chắc muốn xóa nhân viên "${u.name}"?`)) {
+      return
+    }
+
+    try {
+      const { deleteUser } = await import('@/lib/api')
+      await deleteUser(u.id)
+      alert('Đã xóa nhân viên')
+      window.location.reload()
+    } catch (error: any) {
+      console.error('Delete user error:', error)
+      alert('Lỗi: ' + (error.message || 'Không thể xóa'))
     }
   }
 
@@ -131,6 +199,100 @@ export default function SettingsPage() {
       default:
         return 'bg-gray-100 text-gray-800'
     }
+  }
+
+  const UserFormModal = ({
+    isOpen,
+    title,
+    onClose,
+    onSubmit,
+    submitLabel
+  }: {
+    isOpen: boolean
+    title: string
+    onClose: () => void
+    onSubmit: () => void
+    submitLabel: string
+  }) => {
+    if (!isOpen) return null
+
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+        <div className="bg-white rounded-2xl p-6 max-w-md w-full space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xl font-bold text-foreground">{title}</h3>
+            <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Họ và tên</label>
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                placeholder="Nguyễn Văn A"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Email</label>
+              <input
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                placeholder="email@bloemist.com"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Số điện thoại</label>
+              <input
+                type="tel"
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                placeholder="0901234567"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Vai trò</label>
+              <select
+                value={formData.role}
+                onChange={(e) => setFormData({ ...formData, role: e.target.value as User['role'] })}
+                className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                <option value="sales">Sales</option>
+                <option value="florist">Florist</option>
+                <option value="boss">Boss</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="flex gap-2 justify-end pt-4 border-t border-border">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-foreground border border-border rounded-lg hover:bg-muted"
+            >
+              Hủy
+            </button>
+            <button
+              onClick={onSubmit}
+              disabled={isSubmitting}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSubmitting ? 'Đang xử lý...' : submitLabel}
+            </button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -166,7 +328,7 @@ export default function SettingsPage() {
         <div className="grid gap-4 md:grid-cols-2">
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              {t('settings.workingHoursStart', 'Start time')}
+              Giờ bắt đầu
             </label>
             <input
               type="time"
@@ -178,7 +340,7 @@ export default function SettingsPage() {
           </div>
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              {t('settings.workingHoursEnd', 'End time')}
+              Giờ kết thúc
             </label>
             <input
               type="time"
@@ -218,7 +380,7 @@ export default function SettingsPage() {
               disabled={!canEditSettings}
               className="mt-5 rounded-xl border border-border px-4 py-2 text-sm font-semibold text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Manage
+              Quản lý
             </button>
           </section>
         ))}
@@ -230,17 +392,17 @@ export default function SettingsPage() {
           <div className="flex items-center gap-3">
             <Users className="h-5 w-5 text-primary" />
             <div>
-              <h2 className="text-lg font-semibold text-foreground">{t('settings.userManagement.title')}</h2>
-              <p className="text-sm text-muted-foreground">{t('settings.userManagement.subtitle')}</p>
+              <h2 className="text-lg font-semibold text-foreground">Quản lý nhân sự</h2>
+              <p className="text-sm text-muted-foreground">Thêm, sửa và quản lý thành viên nhóm</p>
             </div>
           </div>
           <button
-            onClick={() => canManageUsers && setShowAddUserModal(true)}
+            onClick={() => { resetForm(); setShowAddUserModal(true) }}
             disabled={!canManageUsers}
             className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Plus className="h-4 w-4" />
-            {t('settings.userManagement.addUser')}
+            Thêm nhân viên
           </button>
         </div>
 
@@ -250,17 +412,16 @@ export default function SettingsPage() {
             <div className="text-center py-8 text-muted-foreground">
               <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <p>Chưa có nhân viên nào trong hệ thống.</p>
-              <p className="text-sm">Bấm "Thêm nhân viên" để tạo mới.</p>
             </div>
           ) : (
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border">
-                  <th className="px-4 py-3 text-left font-semibold text-foreground">{t('settings.userManagement.table.name')}</th>
-                  <th className="px-4 py-3 text-left font-semibold text-foreground">{t('settings.userManagement.table.contact')}</th>
-                  <th className="px-4 py-3 text-left font-semibold text-foreground">{t('settings.userManagement.table.role')}</th>
-                  <th className="px-4 py-3 text-left font-semibold text-foreground">{t('settings.userManagement.table.status')}</th>
-                  <th className="px-4 py-3 text-left font-semibold text-foreground">{t('settings.userManagement.table.actions')}</th>
+                  <th className="px-4 py-3 text-left font-semibold text-foreground">Tên</th>
+                  <th className="px-4 py-3 text-left font-semibold text-foreground">Liên hệ</th>
+                  <th className="px-4 py-3 text-left font-semibold text-foreground">Vai trò</th>
+                  <th className="px-4 py-3 text-left font-semibold text-foreground">Trạng thái</th>
+                  <th className="px-4 py-3 text-left font-semibold text-foreground">Thao tác</th>
                 </tr>
               </thead>
               <tbody>
@@ -290,10 +451,20 @@ export default function SettingsPage() {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <button
+                          onClick={() => handleEditClick(u)}
                           disabled={!canManageUsers}
-                          className="p-1 text-muted-foreground hover:text-primary hover:bg-muted rounded disabled:cursor-not-allowed disabled:opacity-60"
+                          className="p-2 text-muted-foreground hover:text-primary hover:bg-muted rounded disabled:cursor-not-allowed disabled:opacity-60"
+                          title="Chỉnh sửa"
                         >
                           <Edit2 className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteUser(u)}
+                          disabled={!canManageUsers || u.email === 'admin@bloemist.com'}
+                          className="p-2 text-muted-foreground hover:text-red-600 hover:bg-red-50 rounded disabled:cursor-not-allowed disabled:opacity-60"
+                          title="Xóa"
+                        >
+                          <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
                     </td>
@@ -306,97 +477,22 @@ export default function SettingsPage() {
       </div>
 
       {/* Add User Modal */}
-      {showAddUserModal && canManageUsers && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xl font-bold text-foreground">{t('settings.userManagement.modal.title')}</h3>
-              <button
-                onClick={() => setShowAddUserModal(false)}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+      <UserFormModal
+        isOpen={showAddUserModal && canManageUsers}
+        title="Thêm nhân viên mới"
+        onClose={() => { setShowAddUserModal(false); resetForm() }}
+        onSubmit={handleAddUser}
+        submitLabel="Thêm"
+      />
 
-            <div className="space-y-3">
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">{t('settings.userManagement.form.name')}</label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="Họ và tên"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">{t('settings.userManagement.form.email')}</label>
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="email@bloemist.com"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">{t('settings.userManagement.form.phone')}</label>
-                <input
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="0901234567"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">{t('settings.userManagement.form.role')}</label>
-                <select
-                  value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value as User['role'] })}
-                  className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                >
-                  <option value="sales">Sales</option>
-                  <option value="florist">Florist</option>
-                  <option value="boss">Boss</option>
-                  <option value="admin">Admin</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">{t('settings.userManagement.form.password')}</label>
-                <input
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="Mật khẩu tạm"
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-2 justify-end pt-4 border-t border-border">
-              <button
-                onClick={() => setShowAddUserModal(false)}
-                className="px-4 py-2 text-foreground border border-border rounded-lg hover:bg-muted"
-              >
-                {t('settings.userManagement.modal.cancel')}
-              </button>
-              <button
-                onClick={handleAddUser}
-                disabled={isSubmitting}
-                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isSubmitting ? 'Đang thêm...' : t('settings.userManagement.modal.add')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Edit User Modal */}
+      <UserFormModal
+        isOpen={showEditUserModal && canManageUsers}
+        title="Chỉnh sửa nhân viên"
+        onClose={() => { setShowEditUserModal(false); setEditingUser(null); resetForm() }}
+        onSubmit={handleUpdateUser}
+        submitLabel="Lưu thay đổi"
+      />
     </div>
   )
 }

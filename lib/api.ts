@@ -54,6 +54,8 @@ const apiClient: ApiClient = {
   fetchFlorists: () => request<Florist[]>('/florists'),
   fetchUsers: () => request<User[]>('/users'),
   createUser: (input: Partial<User>) => request<User>('/users', { method: 'POST', body: JSON.stringify(input) }),
+  updateUser: (userId: string, input: Partial<User>) => request<User>(`/users/${userId}`, { method: 'PATCH', body: JSON.stringify(input) }),
+  deleteUser: (userId: string) => request<void>(`/users/${userId}`, { method: 'DELETE' }),
   login: (email, password) => request<User>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
 
   // Check-ins
@@ -95,6 +97,8 @@ export const fetchWorkspaceSettings = apiClient.fetchWorkspaceSettings
 export const login = apiClient.login
 export const fetchUsers = apiClient.fetchUsers
 export const createUser = apiClient.createUser
+export const updateUser = apiClient.updateUser
+export const deleteUser = apiClient.deleteUser
 export const fetchInventory = apiClient.fetchInventory
 export const updateInventory = apiClient.updateInventory
 

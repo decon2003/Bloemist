@@ -55,21 +55,7 @@ interface AppDataContextValue {
 
 const AppDataContext = createContext<AppDataContextValue | undefined>(undefined)
 
-const applyOrderStatusRules = (currentOrders: Order[], currentTasks: Task[]) =>
-  currentOrders.map((order) => {
-    const relatedTasks = currentTasks.filter((task) => task.orderId === order.id)
-    const allTasksReady = relatedTasks.length > 0 && relatedTasks.every((task) => task.status === 'READY')
 
-    if (allTasksReady && order.status !== 'READY') {
-      return { ...order, status: 'READY' as const }
-    }
-
-    if (!allTasksReady && order.status === 'READY' && relatedTasks.length > 0) {
-      return { ...order, status: 'IN_PROGRESS' as const }
-    }
-
-    return order
-  })
 
 const AppDataContextProvider = ({ children }: { children: React.ReactNode }) => {
   const queryClient = useQueryClient()
@@ -186,12 +172,12 @@ const AppDataContextProvider = ({ children }: { children: React.ReactNode }) => 
   const settings = settingsQuery.data ?? null
   const users = usersQuery.data ?? []
 
-  const derivedOrders = useMemo(() => applyOrderStatusRules(orders, tasks), [orders, tasks])
+
 
   const value = useMemo(
     () => ({
       tasks,
-      orders: derivedOrders,
+      orders,
       florists,
       isLoading: tasksQuery.isPending || ordersQuery.isPending || floristsQuery.isPending,
       createOrder: (input: CreateOrderInput) => createOrder.mutateAsync(input),
@@ -212,7 +198,7 @@ const AppDataContextProvider = ({ children }: { children: React.ReactNode }) => 
     }),
     [
       tasks,
-      derivedOrders,
+      orders,
       florists,
       tasksQuery.isPending,
       ordersQuery.isPending,

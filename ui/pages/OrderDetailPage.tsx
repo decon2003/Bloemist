@@ -302,57 +302,74 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
         <section className="rounded-2xl border border-border bg-white p-6">
           <h2 className="mb-4 text-base font-semibold text-foreground">{t('orders.new.taskListTitle', 'Products')}</h2>
           <div className="space-y-4">
-            {relatedTasks.map((task) => (
-              <div key={task.id} className="flex flex-col gap-4 border-b border-border pb-4 last:border-0 last:pb-0 md:flex-row md:items-center md:justify-between">
-                <div className="flex items-center gap-4">
-                  <Image
-                    src={task.bouquetImage || '/placeholder.jpg'}
-                    alt={task.bouquetName}
-                    width={56}
-                    height={56}
-                    className="h-14 w-14 rounded-xl object-cover"
-                  />
-                  <div>
-                    <p className="font-semibold text-foreground">{task.bouquetName}</p>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">{t('orders.new.quantityLabel', 'Qty')}: {task.quantity}</span>
-                      <span className="text-xs text-muted-foreground">•</span>
-                      <span className={`text-xs font-medium ${task.status === 'READY' ? 'text-green-600' :
-                        task.status === 'IN_PROGRESS' ? 'text-blue-600' :
-                          'text-muted-foreground'
-                        }`}>
-                        {getTaskStatusLabel(task.status)}
-                      </span>
+            {relatedTasks.map((task) => {
+              const isMyTask = user?.id === task.assigneeId
+              return (
+                <div
+                  key={task.id}
+                  className={`flex flex-col gap-4 border-b pb-4 last:border-0 last:pb-0 md:flex-row md:items-center md:justify-between rounded-xl p-3 transition-colors ${isMyTask ? 'bg-blue-50/50 border border-blue-100 shadow-sm' : 'border-border'
+                    }`}
+                >
+                  <div className="flex items-center gap-4">
+                    <Image
+                      src={task.bouquetImage || '/placeholder.jpg'}
+                      alt={task.bouquetName}
+                      width={56}
+                      height={56}
+                      className="h-14 w-14 rounded-xl object-cover"
+                    />
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className={`font-semibold ${isMyTask ? 'text-blue-700' : 'text-foreground'}`}>
+                          {task.bouquetName}
+                        </p>
+                        {isMyTask && (
+                          <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700">
+                            {t('common.you', 'You')}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">{t('orders.new.quantityLabel', 'Qty')}: {task.quantity}</span>
+                        <span className="text-xs text-muted-foreground">•</span>
+                        <span className={`text-xs font-medium ${task.status === 'READY' ? 'text-green-600' :
+                            task.status === 'IN_PROGRESS' ? 'text-blue-600' :
+                              'text-muted-foreground'
+                          }`}>
+                          {getTaskStatusLabel(task.status)}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="flex items-center gap-2 md:justify-end">
-                  <span className="text-sm text-muted-foreground md:hidden">{t('orders.detail.assignedTo', 'Assigned to')}:</span>
-                  <select
-                    value={task.assigneeId || ''}
-                    onChange={(e) => {
-                      const selectedId = e.target.value
-                      const florist = florists.find((f) => f.id === selectedId)
-                      if (florist) {
-                        assignTask(task.id, { userId: florist.id, userName: florist.name })
-                        if (task.status === 'UNASSIGNED' || !task.status) {
-                          updateTaskStatus(task.id, 'IN_PROGRESS')
+                  <div className="flex items-center gap-2 md:justify-end">
+                    <span className="text-sm text-muted-foreground md:hidden">{t('orders.detail.assignedTo', 'Assigned to')}:</span>
+                    <select
+                      value={task.assigneeId || ''}
+                      onChange={(e) => {
+                        const selectedId = e.target.value
+                        const florist = florists.find((f) => f.id === selectedId)
+                        if (florist) {
+                          assignTask(task.id, { userId: florist.id, userName: florist.name })
+                          if (task.status === 'UNASSIGNED' || !task.status) {
+                            updateTaskStatus(task.id, 'IN_PROGRESS')
+                          }
                         }
-                      }
-                    }}
-                    className="h-9 w-full md:w-48 rounded-lg border border-border bg-white px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                  >
-                    <option value="">{t('tasks.unassigned', 'Unassigned')}</option>
-                    {florists.map((f) => (
-                      <option key={f.id} value={f.id}>
-                        {f.name}
-                      </option>
-                    ))}
-                  </select>
+                      }}
+                      className={`h-9 w-full md:w-48 rounded-lg border px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary ${isMyTask ? 'border-blue-200 bg-white' : 'border-border bg-white'
+                        }`}
+                    >
+                      <option value="">{t('tasks.unassigned', 'Unassigned')}</option>
+                      {florists.map((f) => (
+                        <option key={f.id} value={f.id}>
+                          {f.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
             {relatedTasks.length === 0 && (
               <p className="text-center text-sm text-muted-foreground py-4">{t('orders.empty', 'No products found')}</p>
             )}

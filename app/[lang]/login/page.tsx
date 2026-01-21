@@ -67,16 +67,7 @@ export default function LoginPage() {
             <p className="text-muted-foreground">{t('auth.loginSubtitle')}</p>
           </div>
 
-          {/* Demo Credentials */}
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-2 text-sm">
-            <p className="font-semibold text-blue-900">{t('auth.demoCredentials')}</p>
-            <div className="text-blue-800 space-y-1">
-              <p><strong>Boss:</strong> admin@bloemist.com / admin</p>
-              <p><strong>Staff:</strong> florist@bloemist.com / florist</p>
-              <p><strong>Sales:</strong> sales@bloemist.com / sales</p>
-              <p><strong>Admin:</strong> tech@bloemist.com / admin</p>
-            </div>
-          </div>
+
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-5">

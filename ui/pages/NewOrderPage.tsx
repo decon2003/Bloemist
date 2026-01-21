@@ -291,6 +291,16 @@ export default function NewOrderPage() {
             </div>
             <div className="grid gap-4 md:grid-cols-2">
               <label className="space-y-2 text-sm font-medium text-foreground">
+                <span>{t('orders.new.customerName', 'Customer name')}</span>
+                <input
+                  required
+                  value={customerName}
+                  onChange={(event) => setCustomerName(event.target.value)}
+                  disabled={customerNameLocked}
+                  className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:cursor-not-allowed disabled:bg-muted/50"
+                />
+              </label>
+              <label className="space-y-2 text-sm font-medium text-foreground">
                 <span>{t('orders.new.customerPhone', 'Customer phone')}</span>
                 <input
                   required
@@ -306,16 +316,6 @@ export default function NewOrderPage() {
                     </option>
                   ))}
                 </datalist>
-              </label>
-              <label className="space-y-2 text-sm font-medium text-foreground">
-                <span>{t('orders.new.customerName', 'Customer name')}</span>
-                <input
-                  required
-                  value={customerName}
-                  onChange={(event) => setCustomerName(event.target.value)}
-                  disabled={customerNameLocked}
-                  className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:cursor-not-allowed disabled:bg-muted/50"
-                />
               </label>
               <label className="space-y-2 text-sm font-medium text-foreground">
                 <span>{t('orders.new.receiverName', 'Receiver name')}</span>

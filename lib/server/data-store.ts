@@ -111,7 +111,8 @@ export const getOrder = async (orderId: string) => {
 export const listFlorists = async () => {
   const users = await db.user.findMany({
     where: {
-      role: { in: ['florist', 'sales', 'hybrid'] }
+      role: 'florist',
+      status: 'active'
     },
     select: { id: true, name: true }
   })

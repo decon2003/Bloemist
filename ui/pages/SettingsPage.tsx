@@ -397,94 +397,96 @@ export default function SettingsPage() {
       </div>
 
       {/* User Management Section */}
-      <div className="rounded-2xl border border-border bg-white p-6 shadow-sm">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <Users className="h-5 w-5 text-primary" />
-            <div>
-              <h2 className="text-lg font-semibold text-foreground">Quản lý nhân sự</h2>
-              <p className="text-sm text-muted-foreground">Thêm, sửa và quản lý thành viên nhóm</p>
+      {canManageUsers && (
+        <div className="rounded-2xl border border-border bg-white p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <Users className="h-5 w-5 text-primary" />
+              <div>
+                <h2 className="text-lg font-semibold text-foreground">Quản lý nhân sự</h2>
+                <p className="text-sm text-muted-foreground">Thêm, sửa và quản lý thành viên nhóm</p>
+              </div>
             </div>
+            <button
+              onClick={() => { setShowAddUserModal(true) }}
+              disabled={!canManageUsers}
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Plus className="h-4 w-4" />
+              Thêm nhân viên
+            </button>
           </div>
-          <button
-            onClick={() => { setShowAddUserModal(true) }}
-            disabled={!canManageUsers}
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <Plus className="h-4 w-4" />
-            Thêm nhân viên
-          </button>
-        </div>
 
-        {/* Users Table */}
-        <div className="overflow-x-auto">
-          {users.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>Chưa có nhân viên nào trong hệ thống.</p>
-            </div>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="px-4 py-3 text-left font-semibold text-foreground">Tên</th>
-                  <th className="px-4 py-3 text-left font-semibold text-foreground">Liên hệ</th>
-                  <th className="px-4 py-3 text-left font-semibold text-foreground">Vai trò</th>
-                  <th className="px-4 py-3 text-left font-semibold text-foreground">Trạng thái</th>
-                  <th className="px-4 py-3 text-left font-semibold text-foreground">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.map((u) => (
-                  <tr key={u.id} className="border-b border-border hover:bg-muted/50">
-                    <td className="px-4 py-3 text-foreground flex items-center gap-2">
-                      <span className="text-lg">{u.avatar || '👤'}</span>
-                      {u.name}
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      <div>{u.email}</div>
-                      <div className="text-xs">{u.phone}</div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-block px-3 py-1 rounded-lg text-xs font-semibold ${getRoleColor(u.role)}`}>
-                        {u.role.charAt(0).toUpperCase() + u.role.slice(1)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-block px-3 py-1 rounded-lg text-xs font-semibold ${u.status === 'active'
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-red-100 text-red-800'
-                        }`}>
-                        {u.status === 'active' ? 'Hoạt động' : 'Vô hiệu'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleEditClick(u)}
-                          disabled={!canManageUsers}
-                          className="p-2 text-muted-foreground hover:text-primary hover:bg-muted rounded disabled:cursor-not-allowed disabled:opacity-60"
-                          title="Chỉnh sửa"
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteUser(u)}
-                          disabled={!canManageUsers || u.email === 'admin@bloemist.com'}
-                          className="p-2 text-muted-foreground hover:text-red-600 hover:bg-red-50 rounded disabled:cursor-not-allowed disabled:opacity-60"
-                          title="Xóa"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
+          {/* Users Table */}
+          <div className="overflow-x-auto">
+            {users.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>Chưa có nhân viên nào trong hệ thống.</p>
+              </div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="px-4 py-3 text-left font-semibold text-foreground">Tên</th>
+                    <th className="px-4 py-3 text-left font-semibold text-foreground">Liên hệ</th>
+                    <th className="px-4 py-3 text-left font-semibold text-foreground">Vai trò</th>
+                    <th className="px-4 py-3 text-left font-semibold text-foreground">Trạng thái</th>
+                    <th className="px-4 py-3 text-left font-semibold text-foreground">Thao tác</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+                </thead>
+                <tbody>
+                  {users.map((u) => (
+                    <tr key={u.id} className="border-b border-border hover:bg-muted/50">
+                      <td className="px-4 py-3 text-foreground flex items-center gap-2">
+                        <span className="text-lg">{u.avatar || '👤'}</span>
+                        {u.name}
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        <div>{u.email}</div>
+                        <div className="text-xs">{u.phone}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-block px-3 py-1 rounded-lg text-xs font-semibold ${getRoleColor(u.role)}`}>
+                          {u.role.charAt(0).toUpperCase() + u.role.slice(1)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-block px-3 py-1 rounded-lg text-xs font-semibold ${u.status === 'active'
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'
+                          }`}>
+                          {u.status === 'active' ? 'Hoạt động' : 'Vô hiệu'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleEditClick(u)}
+                            disabled={!canManageUsers}
+                            className="p-2 text-muted-foreground hover:text-primary hover:bg-muted rounded disabled:cursor-not-allowed disabled:opacity-60"
+                            title="Chỉnh sửa"
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteUser(u)}
+                            disabled={!canManageUsers || u.email === 'admin@bloemist.com'}
+                            className="p-2 text-muted-foreground hover:text-red-600 hover:bg-red-50 rounded disabled:cursor-not-allowed disabled:opacity-60"
+                            title="Xóa"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Add User Modal */}
       <UserFormModal

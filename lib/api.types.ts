@@ -33,6 +33,7 @@ export interface ApiClient {
   fetchWorkspaceSettings: () => Promise<WorkspaceSettings>
   login: (email: string, password: string) => Promise<User>
   fetchUsers: () => Promise<User[]>
+  createUser: (input: Partial<User>) => Promise<User>
   fetchInventory: () => Promise<any[]>
   updateInventory: (item: any) => Promise<any>
 }

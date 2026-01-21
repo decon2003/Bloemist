@@ -78,14 +78,31 @@ export default function SettingsPage() {
       ? `${workingHours.start} - ${workingHours.end}`
       : t('settings.workingHoursUnset', 'Not set')
 
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
   const handleAddUser = async () => {
     if (!canManageUsers) return
 
     if (formData.name && formData.email && formData.phone && formData.role) {
-      // TODO: Call API to create user
-      alert('Chức năng thêm nhân viên sẽ được kết nối với API sau.')
-      setFormData({ name: '', email: '', phone: '', role: 'sales', password: '' })
-      setShowAddUserModal(false)
+      setIsSubmitting(true)
+      try {
+        const { createUser } = await import('@/lib/api')
+        await createUser({
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          role: formData.role,
+        })
+        alert('Thêm nhân viên thành công! Trang sẽ tải lại.')
+        setFormData({ name: '', email: '', phone: '', role: 'sales', password: '' })
+        setShowAddUserModal(false)
+        // Refresh page to reload users
+        window.location.reload()
+      } catch (error: any) {
+        alert('Lỗi: ' + (error.message || 'Không thể thêm nhân viên'))
+      } finally {
+        setIsSubmitting(false)
+      }
     }
   }
 

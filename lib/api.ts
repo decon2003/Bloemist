@@ -53,6 +53,7 @@ const apiClient: ApiClient = {
   // Users & Florists
   fetchFlorists: () => request<Florist[]>('/florists'),
   fetchUsers: () => request<User[]>('/users'),
+  createUser: (input: Partial<User>) => request<User>('/users', { method: 'POST', body: JSON.stringify(input) }),
   login: (email, password) => request<User>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
 
   // Check-ins
@@ -93,6 +94,7 @@ export const fetchDashboardStats = apiClient.fetchDashboardStats
 export const fetchWorkspaceSettings = apiClient.fetchWorkspaceSettings
 export const login = apiClient.login
 export const fetchUsers = apiClient.fetchUsers
+export const createUser = apiClient.createUser
 export const fetchInventory = apiClient.fetchInventory
 export const updateInventory = apiClient.updateInventory
 

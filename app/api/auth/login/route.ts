@@ -8,15 +8,15 @@ export async function POST(request: Request) {
         const { email, password } = await request.json()
 
         // In this demo, we accept any existing user and a simple password check
-        // Real apps would use bcrypt/auth-js, but we'll stick to a simple DB check for "realism"
-        const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email) as any
+        const user = await db.user.findUnique({
+            where: { email: email }
+        })
 
         if (!user) {
             throw new ApiError(401, 'Invalid credentials')
         }
 
-        // For the demo, let's assume 'admin', 'sales', 'florist' as passwords if not specified differently
-        // Or just accept the email if it exists for simplicity in this dev environment
+        // For the demo, we are skipping real password hashing check
         return NextResponse.json({
             id: user.id,
             name: user.name,
@@ -25,7 +25,7 @@ export async function POST(request: Request) {
             role: user.role,
             status: user.status,
             avatar: user.avatar,
-            createdAt: user.created_at
+            createdAt: user.createdAt
         })
     } catch (error) {
         return handleRouteError(error)

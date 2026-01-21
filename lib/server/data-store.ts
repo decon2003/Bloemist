@@ -389,8 +389,8 @@ export const createStaffCheckIn = async (input: Partial<StaffCheckIn>) => {
       distanceFromOfficeKm: input.distanceFromOfficeKm || 0,
       ordersTouched: 0,
       completedTasks: 0,
-      notes: input.notes,
-      displayName: undefined // Prisma doesn't like extra fields
+      notes: input.notes
+      // displayName: undefined // Removed to fix type error
     }
   })
   return mapCheckIn(checkin)
@@ -434,11 +434,18 @@ export const getDashboardStats = async () => {
 
   const totalRevenue = revenueResult[0]?.total ? Number(revenueResult[0].total) : 0
 
+  const activeStaff = await db.user.count({
+    where: {
+      role: { in: ['florist', 'sales', 'hybrid'] },
+      status: 'active'
+    }
+  })
+
   return {
     totalOrders,
     completedTasks,
     totalRevenue,
-    activeStaff: 12 // Mock
+    activeStaff
   }
 }
 

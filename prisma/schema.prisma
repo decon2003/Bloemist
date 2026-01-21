@@ -132,3 +132,15 @@ model Message {
   from User @relation("SentMessages", fields: [fromId], references: [id])
   to   User @relation("ReceivedMessages", fields: [toId], references: [id])
 }
+
+model InventoryItem {
+  id          String   @id @default(uuid())
+  name        String
+  type        String
+  image       String?
+  unit        String
+  onHand      Int      @default(0)
+  reserved    Int      @default(0)
+  status      String   @default("ok")
+  lastUpdated DateTime @default(now()) @updatedAt
+}

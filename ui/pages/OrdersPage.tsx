@@ -191,7 +191,7 @@ export default function OrdersPage() {
                 className="flex flex-col gap-4 rounded-2xl border border-border bg-white p-5 transition hover:border-primary/50 hover:shadow-md cursor-pointer"
               >
                 <div className="flex flex-1 flex-col justify-center gap-4 md:flex-row md:items-center md:justify-start">
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-4 md:w-[320px] md:shrink-0">
                     <Image
                       src={orderThumbnail}
                       alt={order.bouquetName}

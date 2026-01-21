@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Bell, Shield, Users, Plus, Edit2, Trash2, X, Clock } from 'lucide-react'
 import { useLocale } from '@/components/providers/locale-provider'
 import { useAuth } from '@/components/providers/auth-provider'
@@ -47,26 +47,49 @@ const sections = [
   },
 ]
 
-// Modal component defined outside to avoid re-rendering issues
+interface UserFormData {
+  name: string
+  email: string
+  phone: string
+  role: User['role']
+}
+
 const UserFormModal = ({
   isOpen,
   title,
   onClose,
   onSubmit,
   submitLabel,
-  formData,
-  setFormData,
+  initialData,
   isSubmitting
 }: {
   isOpen: boolean
   title: string
   onClose: () => void
-  onSubmit: () => void
+  onSubmit: (data: UserFormData) => void
   submitLabel: string
-  formData: any
-  setFormData: (data: any) => void
+  initialData?: UserFormData
   isSubmitting: boolean
 }) => {
+  // Modal manages its own state
+  const [localData, setLocalData] = useState<UserFormData>({
+    name: '',
+    email: '',
+    phone: '',
+    role: 'sales'
+  })
+
+  // Reset or initialize state when modal opens or initialData changes
+  useEffect(() => {
+    if (isOpen) {
+      if (initialData) {
+        setLocalData(initialData)
+      } else {
+        setLocalData({ name: '', email: '', phone: '', role: 'sales' })
+      }
+    }
+  }, [isOpen, initialData])
+
   if (!isOpen) return null
 
   return (
@@ -84,8 +107,8 @@ const UserFormModal = ({
             <label className="block text-sm font-medium text-foreground mb-1">Họ và tên</label>
             <input
               type="text"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              value={localData.name}
+              onChange={(e) => setLocalData(prev => ({ ...prev, name: e.target.value }))}
               className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
               placeholder="Nguyễn Văn A"
             />
@@ -95,8 +118,8 @@ const UserFormModal = ({
             <label className="block text-sm font-medium text-foreground mb-1">Email</label>
             <input
               type="email"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              value={localData.email}
+              onChange={(e) => setLocalData(prev => ({ ...prev, email: e.target.value }))}
               className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
               placeholder="email@bloemist.com"
             />
@@ -106,8 +129,8 @@ const UserFormModal = ({
             <label className="block text-sm font-medium text-foreground mb-1">Số điện thoại</label>
             <input
               type="tel"
-              value={formData.phone}
-              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              value={localData.phone}
+              onChange={(e) => setLocalData(prev => ({ ...prev, phone: e.target.value }))}
               className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
               placeholder="0901234567"
             />
@@ -116,8 +139,8 @@ const UserFormModal = ({
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">Vai trò</label>
             <select
-              value={formData.role}
-              onChange={(e) => setFormData({ ...formData, role: e.target.value as User['role'] })}
+              value={localData.role}
+              onChange={(e) => setLocalData(prev => ({ ...prev, role: e.target.value as User['role'] }))}
               className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
             >
               <option value="sales">Sales</option>
@@ -136,7 +159,7 @@ const UserFormModal = ({
             Hủy
           </button>
           <button
-            onClick={onSubmit}
+            onClick={() => onSubmit(localData)}
             disabled={isSubmitting}
             className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -158,13 +181,6 @@ export default function SettingsPage() {
   const [showAddUserModal, setShowAddUserModal] = useState(false)
   const [showEditUserModal, setShowEditUserModal] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    role: 'sales' as User['role'],
-    password: '',
-  })
   const [workingHours, setWorkingHours] = useState({ start: '08:00', end: '18:00' })
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -181,17 +197,13 @@ export default function SettingsPage() {
       ? `${workingHours.start} - ${workingHours.end}`
       : t('settings.workingHoursUnset', 'Not set')
 
-  const resetForm = () => {
-    setFormData({ name: '', email: '', phone: '', role: 'sales', password: '' })
-  }
-
-  const handleAddUser = async () => {
+  const handleAddUser = async (data: UserFormData) => {
     if (!canManageUsers) {
       alert('Bạn không có quyền thêm nhân viên')
       return
     }
 
-    if (!formData.name || !formData.email || !formData.phone || !formData.role) {
+    if (!data.name || !data.email || !data.phone || !data.role) {
       alert('Vui lòng điền đầy đủ thông tin: Họ tên, Email, Số điện thoại và Vai trò')
       return
     }
@@ -200,13 +212,12 @@ export default function SettingsPage() {
     try {
       const { createUser } = await import('@/lib/api')
       await createUser({
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        role: formData.role,
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+        role: data.role,
       })
       alert('Thêm nhân viên thành công!')
-      resetForm()
       setShowAddUserModal(false)
       window.location.reload()
     } catch (error: any) {
@@ -219,20 +230,13 @@ export default function SettingsPage() {
 
   const handleEditClick = (u: User) => {
     setEditingUser(u)
-    setFormData({
-      name: u.name,
-      email: u.email,
-      phone: u.phone || '',
-      role: u.role,
-      password: '',
-    })
     setShowEditUserModal(true)
   }
 
-  const handleUpdateUser = async () => {
+  const handleUpdateUser = async (data: UserFormData) => {
     if (!canManageUsers || !editingUser) return
 
-    if (!formData.name || !formData.email || !formData.phone || !formData.role) {
+    if (!data.name || !data.email || !data.phone || !data.role) {
       alert('Vui lòng điền đầy đủ thông tin')
       return
     }
@@ -241,13 +245,12 @@ export default function SettingsPage() {
     try {
       const { updateUser } = await import('@/lib/api')
       await updateUser(editingUser.id, {
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        role: formData.role,
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+        role: data.role,
       })
       alert('Cập nhật thành công!')
-      resetForm()
       setShowEditUserModal(false)
       setEditingUser(null)
       window.location.reload()
@@ -404,7 +407,7 @@ export default function SettingsPage() {
             </div>
           </div>
           <button
-            onClick={() => { resetForm(); setShowAddUserModal(true) }}
+            onClick={() => { setShowAddUserModal(true) }}
             disabled={!canManageUsers}
             className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity disabled:cursor-not-allowed disabled:opacity-60"
           >
@@ -487,11 +490,9 @@ export default function SettingsPage() {
       <UserFormModal
         isOpen={showAddUserModal && canManageUsers}
         title="Thêm nhân viên mới"
-        onClose={() => { setShowAddUserModal(false); resetForm() }}
+        onClose={() => { setShowAddUserModal(false) }}
         onSubmit={handleAddUser}
         submitLabel="Thêm"
-        formData={formData}
-        setFormData={setFormData}
         isSubmitting={isSubmitting}
       />
 
@@ -499,11 +500,15 @@ export default function SettingsPage() {
       <UserFormModal
         isOpen={showEditUserModal && canManageUsers}
         title="Chỉnh sửa nhân viên"
-        onClose={() => { setShowEditUserModal(false); setEditingUser(null); resetForm() }}
+        onClose={() => { setShowEditUserModal(false); setEditingUser(null) }}
         onSubmit={handleUpdateUser}
         submitLabel="Lưu thay đổi"
-        formData={formData}
-        setFormData={setFormData}
+        initialData={editingUser ? {
+          name: editingUser.name,
+          email: editingUser.email,
+          phone: editingUser.phone || '',
+          role: editingUser.role
+        } : undefined}
         isSubmitting={isSubmitting}
       />
     </div>

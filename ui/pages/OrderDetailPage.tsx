@@ -3,13 +3,12 @@
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { ArrowLeft, User, Truck, ClipboardList, Plus, Edit, Check, X, StickyNote, Trash2 } from "lucide-react"
+import { ArrowLeft, User, Truck, ClipboardList, Plus, Edit, Check, X, StickyNote, Trash2, Play, CheckCircle, Package } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useAppData } from "@/components/providers/app-data-provider"
 import { useLocale } from "@/components/providers/locale-provider"
 import { useAuth } from "@/components/providers/auth-provider"
 import AddTaskDialog from "@/components/tasks/add-task-dialog"
-import TaskCard from "@/components/tasks/task-card"
 import { fetchOrder, updateOrder, deleteOrder } from "@/lib/api"
 import type { Order } from "@/lib/types"
 import { formatCurrencyDisplay, formatDateTime } from "@/lib/utils"
@@ -71,7 +70,9 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
   const derivedStatus = useMemo(() => {
     if (!order) return undefined
     const allTasksReady = relatedTasks.length > 0 && relatedTasks.every((task) => task.status === 'READY')
-    return allTasksReady ? 'READY' : order.status
+    // If explicit status set, prefer that, but logic can vary. For now rely on order.status primarily unless synced.
+    // The previous logic overrode derivedStatus. Let's stick to order.status if it's set to something specific.
+    return order.status
   }, [order, relatedTasks])
 
   const orderThumbnail = useMemo(() => {
@@ -122,7 +123,6 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
     try {
       await deleteOrder(order.id)
       router.push(`/${lang}/orders`)
-      // Note: Ideally show a toast on the next page, but simple redirect is fine
     } catch (err) {
       console.error("Failed to delete order", err)
       setToastMessage(t("orders.detail.deleteError"))
@@ -131,6 +131,18 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
 
   const handleEditChange = (field: keyof Order, value: any) => {
     setEditForm({ ...editForm, [field]: value })
+  }
+
+  const handleUpdateStatus = async (newStatus: Order['status']) => {
+    if (!order) return
+    try {
+      const updated = await updateOrder(order.id, { status: newStatus })
+      setOrder(updated)
+      setToastMessage(t("orders.detail.updateSuccess", "Status updated"))
+    } catch (err) {
+      console.error("Failed to update status", err)
+      setToastMessage(t("orders.detail.updateError", "Failed to update status"))
+    }
   }
 
   if (isFetching) {
@@ -200,13 +212,38 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
         </div>
         <div className="flex items-center gap-2">
           <div className="flex gap-3">
-            <span className="inline-flex items-center rounded-full bg-muted px-4 py-2 text-sm font-medium text-foreground">
+            <span className={`inline-flex items-center rounded-full px-4 py-2 text-sm font-medium border ${order.status === 'SHIPPED' ? 'bg-purple-100 text-purple-800 border-purple-200' :
+              order.status === 'READY' ? 'bg-green-100 text-green-800 border-green-200' :
+                order.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800 border-blue-200' :
+                  'bg-muted text-foreground border-transparent'
+              }`}>
               {getOrderStatusLabel(order.status)}
             </span>
             <span className="inline-flex items-center rounded-full bg-primary/10 px-4 py-2 text-sm font-semibold text-primary">
               {getDeliveryLabel(order.deliveryType)}
             </span>
           </div>
+
+
+          {/* Workflow Actions */}
+          {user?.role === 'florist' && order.status === 'IN_PROGRESS' && (
+            <button
+              onClick={() => handleUpdateStatus('READY')}
+              className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 shadow-sm"
+            >
+              <CheckCircle className="h-4 w-4" /> Hoàn thành
+            </button>
+          )}
+
+          {(user?.role === 'admin' || user?.role === 'boss') && order.status === 'READY' && (
+            <button
+              onClick={() => handleUpdateStatus('SHIPPED')}
+              className="inline-flex items-center gap-2 rounded-lg bg-purple-600 px-3 py-2 text-sm font-medium text-white hover:bg-purple-700 shadow-sm"
+            >
+              <Package className="h-4 w-4" /> Xác nhận đã ship
+            </button>
+          )}
+
           {canEdit &&
             (!isEditMode ? (
               <div className="flex gap-2">
@@ -271,7 +308,7 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
               </div>
               <div>
                 <dt className="text-muted-foreground">Status</dt>
-                <dd className="font-semibold text-foreground">{getOrderStatusLabel(derivedStatus || order.status)}</dd>
+                <dd className="font-semibold text-foreground">{getOrderStatusLabel(order.status)}</dd>
               </div>
             </dl>
           </div>

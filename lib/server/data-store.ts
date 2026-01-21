@@ -134,7 +134,7 @@ export const createOrder = async (input: CreateOrderInput) => {
       receiveTime: new Date(input.receiveTime), // Convert string to Date
       deliveryType: input.deliveryType,
       deliveryAddress: input.deliveryAddress,
-      status: input.status || 'NEW',
+      status: input.status || (input.assigneeId ? 'IN_PROGRESS' : 'NEW'),
       listedPrice: input.listedPrice,
       discount: input.discount,
       deliveryFee: input.deliveryFee,
@@ -164,6 +164,14 @@ export const updateOrder = async (orderId: string, input: Partial<CreateOrderInp
   // Ensure we don't update ID or Code if passed
   delete data.id
   delete data.code
+
+  // Auto-status update upon assignment
+  if (data.assigneeId) {
+    const current = await db.order.findUnique({ where: { id: orderId } })
+    if (current && current.status === 'NEW') {
+      data.status = 'IN_PROGRESS'
+    }
+  }
 
   const order = await db.order.update({
     where: { id: orderId },
@@ -286,11 +294,15 @@ export const assignTask = async (taskId: string, payload: AssignTaskPayload) => 
 }
 
 export const assignOrder = async (orderId: string, payload: AssignTaskPayload) => {
+  const current = await db.order.findUnique({ where: { id: orderId } })
+  const newStatus = (current && current.status === 'NEW') ? 'IN_PROGRESS' : undefined
+
   await db.order.update({
     where: { id: orderId },
     data: {
       assigneeId: payload.userId,
-      assigneeName: payload.userName
+      assigneeName: payload.userName,
+      ...(newStatus ? { status: newStatus } : {})
     }
   })
 

@@ -58,7 +58,7 @@ export interface Order {
   bouquetImage?: string
   receiveTime: string
   deliveryType: 'DELIVERY' | 'PICKUP'
-  status: 'NEW' | 'IN_PROGRESS' | 'READY' | 'DELIVERED'
+  status: 'NEW' | 'IN_PROGRESS' | 'READY' | 'SHIPPED' | 'DELIVERED'
   listedPrice: string
   discount?: string
   deliveryFee?: string

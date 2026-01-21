@@ -253,6 +253,10 @@ export default function OrdersPage() {
                             const florist = florists.find((f) => f.id === selectedId)
                             if (florist) {
                               assignOrder(order.id, { userId: florist.id, userName: florist.name })
+                              // Auto-update status to IN_PROGRESS if currently NEW
+                              if (order.status === 'NEW') {
+                                updateOrder(order.id, { status: 'IN_PROGRESS' })
+                              }
                             }
                           }}
                           className="h-8 max-w-[140px] rounded-md border border-input bg-background px-2 py-1 text-xs font-medium focus:ring-1 focus:ring-primary"

@@ -205,7 +205,7 @@ export default function NewOrderPage() {
         deliveryType,
         deliveryAddress: deliveryType === 'DELIVERY' ? deliveryAddress : undefined,
         receiveTime: new Date(receiveTime).toISOString(),
-        status: 'NEW',
+        status: assigneeId ? 'IN_PROGRESS' : 'NEW',
         listedPrice,
         discount,
         deliveryFee,

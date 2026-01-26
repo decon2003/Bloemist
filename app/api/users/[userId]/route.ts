@@ -30,7 +30,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     try {
         const { userId } = await context.params
         const body = await request.json()
-        const { name, email, phone, role, status, avatar } = body
+        const { name, email, phone, role, status, avatar, baseSalary, commissionRate } = body
 
         const user = await db.user.update({
             where: { id: userId },
@@ -41,6 +41,8 @@ export async function PATCH(request: Request, context: RouteContext) {
                 ...(role && { role }),
                 ...(status && { status }),
                 ...(avatar && { avatar }),
+                ...(baseSalary && { baseSalary }),
+                ...(commissionRate !== undefined && { commissionRate }),
             }
         })
 

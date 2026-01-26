@@ -21,8 +21,7 @@ export async function GET() {
 export async function POST(request: Request) {
     try {
         const body = await request.json()
-        const { name, email, phone, role, avatar } = body
-
+        const { name, email, phone, role, avatar, baseSalary, commissionRate } = body
         // Validate required fields
         if (!name || !email || !phone || !role) {
             return NextResponse.json(
@@ -48,7 +47,9 @@ export async function POST(request: Request) {
                 phone,
                 role,
                 status: 'active',
-                avatar: avatar || '👤'
+                avatar: avatar || '👤',
+                baseSalary: baseSalary || "0",
+                commissionRate: commissionRate !== undefined ? commissionRate : 0
             }
         })
 

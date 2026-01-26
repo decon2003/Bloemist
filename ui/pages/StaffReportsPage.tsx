@@ -1,9 +1,9 @@
 'use client'
 
-import { useMemo, useState, useCallback } from 'react'
-import { Users, ShoppingBag, ClipboardList, Search, Filter, Calendar } from 'lucide-react'
+import { useMemo, useState, useCallback, useEffect } from 'react'
+import { Users, ShoppingBag, ClipboardList, Search, Filter, Calendar, Settings, X, Save } from 'lucide-react'
 import { StaffCheckIn, StaffProfile, User } from '@/lib/types'
-import { formatDateTime } from '@/lib/utils'
+import { formatDateTime, parseCurrencyToNumber, formatCurrencyFromNumber, formatCurrencyInput } from '@/lib/utils'
 import { useLocale } from '@/components/providers/locale-provider'
 import { useAuth } from '@/components/providers/auth-provider'
 import { useAppData } from '@/components/providers/app-data-provider'
@@ -21,22 +21,93 @@ const formatInputDate = (date: Date) => {
 }
 
 interface StaffReportRow {
-  profile: StaffProfile
+  profile: StaffProfile & { baseSalary?: string; commissionRate?: number }
   checkins: number
   orders: number
   tasks: number
   tasksInProgress: number
   tasksCompleted: number
+  salary: number
+  commissionAmount: number
   lastSeen: string | null
   lastLocation: string | null
+}
+
+function SalaryConfigModal({ user, onClose, onSave }: { user: User, onClose: () => void, onSave: (id: string, data: Partial<User>) => Promise<any> }) {
+  const [base, setBase] = useState(user.baseSalary || '0')
+  const [rate, setRate] = useState(user.commissionRate?.toString() || '0')
+  const [saving, setSaving] = useState(false)
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      await onSave(user.id, {
+        baseSalary: base.replace(/\D/g, ''), // Ensure clean number string
+        commissionRate: parseFloat(rate)
+      })
+      onClose()
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-bold">Salary Configuration</h3>
+          <button onClick={onClose}><X className="h-5 w-5" /></button>
+        </div>
+        <div className="mt-4 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Staff Member</label>
+            <p className="text-lg font-semibold">{user.name}</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Base Salary (VND)</label>
+            <input
+              value={formatCurrencyInput(base)}
+              onChange={(e) => setBase(e.target.value.replace(/\D/g, ''))}
+              className="mt-1 w-full rounded-lg border border-gray-300 p-2"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Commission Rate (%)</label>
+            <input
+              type="number"
+              value={rate}
+              onChange={(e) => setRate(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-gray-300 p-2"
+              step="0.1"
+            />
+            <p className="text-xs text-gray-500 mt-1">Applied to sales orders or completed tasks.</p>
+          </div>
+        </div>
+        <div className="mt-6 flex justify-end gap-3">
+          <button onClick={onClose} className="rounded-lg px-4 py-2 text-sm font-medium hover:bg-gray-100">Cancel</button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+          >
+            {saving ? 'Saving...' : <><Save className="h-4 w-4" /> Save Changes</>}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export default function StaffReportsPage() {
   const { lang, t } = useLocale()
   const { user } = useAuth()
-  const { tasks, checkins, users } = useAppData()
+  const { tasks, checkins, users, orders, updateUser } = useAppData()
+
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedDate, setSelectedDate] = useState(() => new Date())
+  const [editingConfigUser, setEditingConfigUser] = useState<User | null>(null)
 
   const dateInputValue = useMemo(() => formatInputDate(selectedDate), [selectedDate])
 
@@ -94,12 +165,16 @@ export default function StaffReportsPage() {
           name: profile.name,
           title: profile.role === 'florist' ? 'Florist' : profile.role === 'sales' ? 'Sales' : 'Admin',
           specialty: profile.role as any,
+          baseSalary: profile.baseSalary,
+          commissionRate: profile.commissionRate,
         },
         checkins: 0,
         orders: 0,
         tasks: 0,
         tasksInProgress: 0,
         tasksCompleted: 0,
+        salary: 0,
+        commissionAmount: 0,
         lastSeen: null,
         lastLocation: null,
       })
@@ -108,7 +183,6 @@ export default function StaffReportsPage() {
     // Process check-ins
     monthEntries.forEach((entry: StaffCheckIn) => {
       if (!base.has(entry.staffId)) {
-        // Create entry if user not in 'users' list (edge case)
         base.set(entry.staffId, {
           profile: {
             id: entry.staffId,
@@ -121,6 +195,8 @@ export default function StaffReportsPage() {
           tasks: 0,
           tasksInProgress: 0,
           tasksCompleted: 0,
+          salary: 0,
+          commissionAmount: 0,
           lastSeen: null,
           lastLocation: null,
         })
@@ -139,6 +215,43 @@ export default function StaffReportsPage() {
       }
     })
 
+    // Calculate Salary & Commission
+    const startOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1)
+    const endOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0, 23, 59, 59)
+
+    const relevantOrders = orders.filter(o => {
+      const d = new Date(o.createdAt)
+      return d >= startOfMonth && d <= endOfMonth
+    })
+
+    // Process Sales Commission
+    relevantOrders.forEach(order => {
+      if (!order.createdById) return
+      const record = base.get(order.createdById)
+      if (record) {
+        const userRev = parseCurrencyToNumber(order.sellingPrice || order.total)
+        const rate = record.profile.commissionRate || 0
+        record.commissionAmount += userRev * (rate / 100)
+      }
+    })
+
+    // Process Florist Commission
+    const relevantTasks = tasks.filter(t => {
+      if (t.status !== 'COMPLETED' || !t.completedAt) return false
+      const d = new Date(t.completedAt)
+      return d >= startOfMonth && d <= endOfMonth
+    })
+
+    relevantTasks.forEach(task => {
+      if (!task.assigneeId) return
+      const record = base.get(task.assigneeId)
+      if (record) {
+        const price = parseCurrencyToNumber(task.price || '0')
+        const rate = record.profile.commissionRate || 0
+        record.commissionAmount += price * (rate / 100)
+      }
+    })
+
     return Array.from(base.values())
       .map((record) => {
         const activeAssignment = taskAssignments.get(record.profile.id) || {
@@ -146,14 +259,18 @@ export default function StaffReportsPage() {
           completed: record.tasksCompleted,
         }
 
+        const baseSal = parseCurrencyToNumber(record.profile.baseSalary || '0')
+        const totalSalary = baseSal + record.commissionAmount
+
         return {
           ...record,
           tasksInProgress: activeAssignment.inProgress,
           tasksCompleted: activeAssignment.completed,
+          salary: totalSalary
         }
       })
       .sort((a, b) => a.profile.name.localeCompare(b.profile.name))
-  }, [monthEntries, taskAssignments, users])
+  }, [monthEntries, taskAssignments, users, orders, tasks, selectedDate])
 
   const totals = useMemo(
     () =>
@@ -193,8 +310,21 @@ export default function StaffReportsPage() {
     [selectedDate, monthFormatter],
   )
 
+  const handleOpenConfig = (userId: string) => {
+    const u = users.find(u => u.id === userId)
+    if (u) setEditingConfigUser(u)
+  }
+
   return (
     <div className="space-y-6 p-4 md:p-8">
+      {editingConfigUser && (
+        <SalaryConfigModal
+          user={editingConfigUser}
+          onClose={() => setEditingConfigUser(null)}
+          onSave={updateUser}
+        />
+      )}
+
       <div>
         <p className="text-sm uppercase tracking-wide text-muted-foreground">{t('staffReports.subtitle')}</p>
         <h1 className="mt-1 text-3xl font-bold text-foreground">{t('staffReports.title')}</h1>
@@ -267,11 +397,12 @@ export default function StaffReportsPage() {
                   <th className="px-4 py-3 font-medium">{t('staffReports.columns.checkins', 'Check-ins')}</th>
                   <th className="px-4 py-3 font-medium">{t('staffReports.columns.orders')}</th>
                   <th className="px-4 py-3 font-medium">{t('staffReports.columns.tasksInCharge', 'Tasks in charge')}</th>
+                  <th className="px-4 py-3 font-medium">Estimated Salary</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {filteredStaffReports.map((row) => (
-                  <tr key={row.profile.id} className="text-foreground">
+                  <tr key={row.profile.id} className="text-foreground hover:bg-gray-50/50">
                     <td className="py-4 pr-4 align-top">
                       <div className="flex items-center gap-2">
                         <div>
@@ -295,6 +426,23 @@ export default function StaffReportsPage() {
                         {row.tasksInProgress}/{row.tasksCompleted}
                       </p>
                       <p className="text-xs text-muted-foreground">{t('staffReports.tasksBreakdown', 'In progress / Completed')}</p>
+                    </td>
+                    <td className="px-4 py-4 align-top">
+                      <div className="flex items-center gap-2">
+                        <div>
+                          <p className="font-bold text-green-600">{formatCurrencyFromNumber(row.salary)}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Base: {formatCurrencyFromNumber(parseCurrencyToNumber(row.profile.baseSalary || '0'))} • Comm: {row.profile.commissionRate || 0}%
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => handleOpenConfig(row.profile.id)}
+                          className="rounded-full p-1 hover:bg-gray-200 text-gray-500"
+                          title="Configure Salary"
+                        >
+                          <Settings className="h-4 w-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

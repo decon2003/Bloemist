@@ -201,6 +201,8 @@ export interface User {
   status: 'active' | 'disabled'
   avatar?: string
   createdAt: string
+  baseSalary?: string
+  commissionRate?: number
 }
 
 export interface AuthContextValue {

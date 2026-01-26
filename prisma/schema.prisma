@@ -24,6 +24,8 @@ model User {
   staffCheckIns    StaffCheckIn[]
   messagesSent     Message[]      @relation("SentMessages")
   messagesReceived Message[]      @relation("ReceivedMessages")
+  baseSalary       String?        @default("0")
+  commissionRate   Float?         @default(0)
 }
 
 model StoreLocation {

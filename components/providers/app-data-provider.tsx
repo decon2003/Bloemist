@@ -22,6 +22,8 @@ import {
   checkOut as checkOutRequest,
   fetchWorkspaceSettings,
   fetchUsers,
+  createUser as createUserRequest,
+  updateUser as updateUserRequest,
   type AssignTaskPayload,
 } from '@/lib/api'
 import {
@@ -53,6 +55,7 @@ interface AppDataContextValue {
   users: User[]
   assignOrder: (orderId: string, payload: AssignTaskPayload) => Promise<Order>
   deleteOrder: (orderId: string) => Promise<void>
+  updateUser: (userId: string, input: Partial<User>) => Promise<User>
 }
 
 const AppDataContext = createContext<AppDataContextValue | undefined>(undefined)
@@ -87,6 +90,16 @@ const AppDataContextProvider = ({ children }: { children: React.ReactNode }) => 
     })
   }
 
+  const mergeUser = (updated: User) => {
+    queryClient.setQueryData<User[]>(['users'], (prev = []) => {
+      const existing = prev.some((u) => u.id === updated.id)
+      if (!existing) {
+        return [...prev, updated]
+      }
+      return prev.map((u) => (u.id === updated.id ? updated : u))
+    })
+  }
+
   const createOrder = useMutation({
     mutationFn: createOrderRequest,
     onSuccess: (created) => {
@@ -111,6 +124,23 @@ const AppDataContextProvider = ({ children }: { children: React.ReactNode }) => 
     onSuccess: (_data, orderId) => {
       queryClient.setQueryData<Order[]>(['orders'], (prev = []) => prev.filter((o) => o.id !== orderId))
     },
+  })
+
+  const createUser = useMutation({
+    mutationFn: ({ input }: { input: Partial<User> }) =>
+      createUserRequest(input),
+    onSuccess: (created) => {
+      queryClient.setQueryData<User[]>(['users'], (prev = []) => [...prev, created])
+    },
+  })
+
+  // Actually I should import { updateUser } from '@/lib/api' which I did.
+  // Let's use the imported one.
+
+  const updateUser = useMutation({
+    mutationFn: ({ userId, input }: { userId: string; input: Partial<User> }) =>
+      updateUserRequest(userId, input),
+    onSuccess: (updated) => mergeUser(updated),
   })
 
   const createTask = useMutation({
@@ -200,6 +230,7 @@ const AppDataContextProvider = ({ children }: { children: React.ReactNode }) => 
       assignOrder: (orderId: string, payload: AssignTaskPayload) => assignOrder.mutateAsync({ orderId, payload }),
       deleteOrder: (orderId: string) => deleteOrder.mutateAsync(orderId),
       users,
+      updateUser: (userId: string, input: Partial<User>) => updateUser.mutateAsync({ userId, input }),
     }),
     [
       tasks,
@@ -217,6 +248,7 @@ const AppDataContextProvider = ({ children }: { children: React.ReactNode }) => 
       assignTask,
       unassignTask,
       completeTask,
+      updateUser,
     ],
   )
 

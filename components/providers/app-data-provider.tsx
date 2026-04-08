@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useContext, useMemo, useState } from 'react'
+import { usePathname } from 'next/navigation'
 import type { CreateOrderInput, CreateTaskInput, Task, TaskStatus, Order, Florist, StaffCheckIn, WorkspaceSettings, User } from '@/lib/types'
 import {
   fetchTasks,
@@ -62,13 +63,33 @@ const AppDataContext = createContext<AppDataContextValue | undefined>(undefined)
 
 const AppDataContextProvider = ({ children }: { children: React.ReactNode }) => {
   const queryClient = useQueryClient()
+  const pathname = usePathname()
 
-  const tasksQuery = useQuery({ queryKey: ['tasks'], queryFn: fetchTasks })
-  const ordersQuery = useQuery({ queryKey: ['orders'], queryFn: fetchOrders })
-  const floristsQuery = useQuery({ queryKey: ['florists'], queryFn: fetchFlorists })
-  const checkinsQuery = useQuery({ queryKey: ['checkins'], queryFn: fetchCheckIns })
-  const settingsQuery = useQuery({ queryKey: ['settings'], queryFn: fetchWorkspaceSettings })
-  const usersQuery = useQuery({ queryKey: ['users'], queryFn: fetchUsers })
+  const dataNeeds = useMemo(() => {
+    const route = pathname ?? ''
+    const isOrdersRoute = route.includes('/orders')
+    const isTasksRoute = route.includes('/tasks')
+    const isCheckinsRoute = route.includes('/checkins')
+    const isStaffRoute = route.includes('/staff')
+    const isSettingsRoute = route.includes('/settings')
+    const isCustomersRoute = route.includes('/customers')
+
+    return {
+      orders: isOrdersRoute || isCustomersRoute || isStaffRoute,
+      tasks: isOrdersRoute || isTasksRoute || isStaffRoute,
+      florists: isOrdersRoute || isTasksRoute,
+      checkins: isCheckinsRoute || isStaffRoute,
+      settings: isCheckinsRoute || isSettingsRoute,
+      users: isStaffRoute || isSettingsRoute,
+    }
+  }, [pathname])
+
+  const tasksQuery = useQuery({ queryKey: ['tasks'], queryFn: fetchTasks, enabled: dataNeeds.tasks })
+  const ordersQuery = useQuery({ queryKey: ['orders'], queryFn: fetchOrders, enabled: dataNeeds.orders })
+  const floristsQuery = useQuery({ queryKey: ['florists'], queryFn: fetchFlorists, enabled: dataNeeds.florists })
+  const checkinsQuery = useQuery({ queryKey: ['checkins'], queryFn: fetchCheckIns, enabled: dataNeeds.checkins })
+  const settingsQuery = useQuery({ queryKey: ['settings'], queryFn: fetchWorkspaceSettings, enabled: dataNeeds.settings })
+  const usersQuery = useQuery({ queryKey: ['users'], queryFn: fetchUsers, enabled: dataNeeds.users })
 
   const mergeTask = (updated: Task) => {
     queryClient.setQueryData<Task[]>(['tasks'], (prev = []) => {
@@ -213,7 +234,10 @@ const AppDataContextProvider = ({ children }: { children: React.ReactNode }) => 
       tasks,
       orders,
       florists,
-      isLoading: tasksQuery.isPending || ordersQuery.isPending || floristsQuery.isPending,
+      isLoading:
+        (dataNeeds.tasks && tasksQuery.isPending) ||
+        (dataNeeds.orders && ordersQuery.isPending) ||
+        (dataNeeds.florists && floristsQuery.isPending),
       createOrder: (input: CreateOrderInput) => createOrder.mutateAsync(input),
       updateOrder: (orderId: string, input: Partial<CreateOrderInput>) => updateOrder.mutateAsync({ orderId, input }),
       createTask: (input: CreateTaskInput) => createTask.mutateAsync(input),
@@ -248,7 +272,13 @@ const AppDataContextProvider = ({ children }: { children: React.ReactNode }) => 
       assignTask,
       unassignTask,
       completeTask,
+      checkins,
+      settings,
+      users,
       updateUser,
+      dataNeeds.orders,
+      dataNeeds.tasks,
+      dataNeeds.florists,
     ],
   )
 

@@ -1,4 +1,4 @@
-import { CreateOrderInput, CreateTaskInput, Order, Task, TaskStatus, Florist, StaffCheckIn, WorkspaceSettings, User } from './types'
+import { CreateOrderInput, CreateTaskInput, DashboardStats, Order, Task, TaskStatus, Florist, StaffCheckIn, WorkspaceSettings, User } from './types'
 
 export interface AssignTaskPayload {
   userId: string
@@ -29,7 +29,7 @@ export interface ApiClient {
   fetchCheckIns: () => Promise<StaffCheckIn[]>
   createCheckIn: (input: Partial<StaffCheckIn>) => Promise<StaffCheckIn>
   checkOut: (checkInId: string) => Promise<StaffCheckIn>
-  fetchDashboardStats: () => Promise<any>
+  fetchDashboardStats: () => Promise<DashboardStats>
   fetchWorkspaceSettings: () => Promise<WorkspaceSettings>
   login: (email: string, password: string) => Promise<User>
   fetchUsers: () => Promise<User[]>

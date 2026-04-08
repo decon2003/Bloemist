@@ -2,7 +2,6 @@
 
 import { useMemo } from 'react'
 import {
-  ShoppingBag,
   DollarSign,
   Clock,
   TrendingUp,
@@ -20,89 +19,46 @@ import {
 } from 'recharts'
 import Link from 'next/link'
 import { useLocale } from '@/components/providers/locale-provider'
-import { useAppData } from '@/components/providers/app-data-provider'
+import { fetchDashboardStats } from '@/lib/api'
+import { useQuery } from '@/lib/query-client'
 import { parseCurrencyToNumber, formatCurrencyFromNumber, formatDateTime } from '@/lib/utils'
 
 export default function BossDashboard() {
   const { t, lang, getOrderStatusLabel } = useLocale()
-  const { orders, tasks } = useAppData()
+  const dashboardQuery = useQuery({ queryKey: ['dashboard-stats'], queryFn: fetchDashboardStats })
+  const stats = dashboardQuery.data
 
   // Time calculations
-  const { today, startOfMonth, weekAgo } = useMemo(() => {
+  const today = useMemo(() => {
     const now = new Date()
-    const start = new Date(now.getFullYear(), now.getMonth(), 1)
-    const week = new Date(now)
-    week.setDate(now.getDate() - 6) // Last 7 days including today
-    week.setHours(0, 0, 0, 0)
-    return { today: now, startOfMonth: start, weekAgo: week }
+    return now
   }, [])
-
-  // Filter Data
-  const monthlyData = useMemo(() => {
-    return orders.filter(order => {
-      const date = new Date(order.createdAt)
-      return date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear()
-    })
-  }, [orders, today])
-
-  const weeklyData = useMemo(() => {
-    return orders.filter(order => {
-      const date = new Date(order.createdAt)
-      // Check if date is within the last 7 days window
-      return date >= weekAgo
-    })
-  }, [orders, weekAgo])
 
   // KPIs
   const kpis = useMemo(() => {
-    const monthlyRevenue = monthlyData.reduce((sum, order) => sum + parseCurrencyToNumber(order.total), 0)
-    const monthlyOrdersCount = monthlyData.length
-    const activeOrdersCount = orders.filter(o => o.status === 'IN_PROGRESS' || o.status === 'NEW').length
-    const monthlyTasksCount = tasks.filter(t => {
-      const date = new Date(t.createdAt) // Assuming createdAt for tasks
-      return date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear()
-    }).length
-
     return {
-      revenue: monthlyRevenue,
-      orders: monthlyOrdersCount,
-      active: activeOrdersCount,
-      tasks: monthlyTasksCount
+      revenue: stats?.monthlyRevenue ?? 0,
+      orders: stats?.monthlyOrders ?? 0,
+      active: stats?.activeOrders ?? 0,
+      tasks: stats?.monthlyTasks ?? 0
     }
-  }, [monthlyData, orders, tasks, today])
+  }, [stats])
 
   // Chart Data (Last 7 Days)
   const chartData = useMemo(() => {
-    const days = []
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(today)
-      d.setDate(today.getDate() - i)
-      d.setHours(0, 0, 0, 0)
-
-      const dayLabel = d.toLocaleDateString(lang === 'vi' ? 'vi-VN' : 'en-US', { weekday: 'short', day: 'numeric', month: 'numeric' })
-
-      // Filter orders for this specific day
-      const dailyRevenue = weeklyData
-        .filter(o => {
-          const oDate = new Date(o.createdAt)
-          return oDate.getDate() === d.getDate() && oDate.getMonth() === d.getMonth()
-        })
-        .reduce((sum, o) => sum + parseCurrencyToNumber(o.total), 0)
-
-      days.push({
-        name: dayLabel,
-        revenue: dailyRevenue
-      })
-    }
-    return days
-  }, [weeklyData, today, lang])
+    return (stats?.weeklyRevenue ?? []).map((entry) => {
+      const date = new Date(`${entry.date}T00:00:00`)
+      return {
+        name: date.toLocaleDateString(lang === 'vi' ? 'vi-VN' : 'en-US', { weekday: 'short', day: 'numeric', month: 'numeric' }),
+        revenue: entry.revenue,
+      }
+    })
+  }, [stats, lang])
 
   // Recent 5 Orders
   const recentOrders = useMemo(() => {
-    return [...orders]
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      .slice(0, 5)
-  }, [orders])
+    return stats?.recentOrders ?? []
+  }, [stats])
 
   return (
     <div className="space-y-8 p-4 md:p-8 pb-20">

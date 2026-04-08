@@ -1,7 +1,7 @@
 // ============================================================
 // API Layer - Calls Real Backend API Routes
 // ============================================================
-import type { CreateOrderInput, CreateTaskInput, Order, Task, TaskStatus, Florist, User, StaffCheckIn, WorkspaceSettings } from './types'
+import type { CreateOrderInput, CreateTaskInput, DashboardStats, Order, Task, TaskStatus, Florist, User, StaffCheckIn, WorkspaceSettings } from './types'
 import type { ApiClient, AssignTaskPayload, CompleteTaskPayload } from './api.types'
 
 const API_BASE_URL = '/api'
@@ -64,7 +64,7 @@ const apiClient: ApiClient = {
   checkOut: (checkInId) => request<StaffCheckIn>(`/checkins/${checkInId}`, { method: 'PATCH' }),
 
   // Dashboard & Settings
-  fetchDashboardStats: () => request<any>('/reports/dashboard'),
+  fetchDashboardStats: () => request<DashboardStats>('/reports/dashboard'),
   fetchWorkspaceSettings: () => request<WorkspaceSettings>('/settings'),
 
   // Inventory

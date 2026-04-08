@@ -21,7 +21,10 @@ const mapOrder = (o: any): Order => ({
   // Ensure types match what UI expects
   deliveryCoveredByShop: o.deliveryCoveredByShop ?? false,
   new_customer: o.new_customer ?? false,
+  requiresAttention: o.requiresAttention ?? false,
   receiveTime: o.receiveTime.toISOString(),
+  sourceLastUpdatedAt: o.sourceLastUpdatedAt?.toISOString() ?? null,
+  createdAt: o.createdAt.toISOString(),
   // createdAt is Date in Prisma, string in App? Check types.ts. Usually string in App.
   // We need to verify types.ts. Assuming string for now based on previous code usage (row.created_at ISO string).
 })
@@ -52,6 +55,14 @@ const mapUser = (u: any) => ({
   ...u,
   createdAt: u.createdAt.toISOString(),
 })
+
+const parseCurrencyToNumber = (value: string | null | undefined) => {
+  if (!value) return 0
+  const numeric = Number(value.replace(/[^\d]/g, ''))
+  return Number.isFinite(numeric) ? numeric : 0
+}
+
+const getDateKey = (date: Date) => date.toISOString().slice(0, 10)
 
 export const listTasks = async () => {
   const tasks = await db.task.findMany({
@@ -150,6 +161,13 @@ export const createOrder = async (input: CreateOrderInput) => {
       assigneeId: input.assigneeId,
       assigneeName: input.assigneeName,
       new_customer: input.new_customer,
+      sourcePlatform: input.sourcePlatform,
+      sourceChatId: input.sourceChatId,
+      sourceMessageId: input.sourceMessageId,
+      sourceThreadId: input.sourceThreadId,
+      sourceRawText: input.sourceRawText,
+      requiresAttention: input.requiresAttention ?? false,
+      sourceLastUpdatedAt: input.sourceLastUpdatedAt ? new Date(input.sourceLastUpdatedAt) : undefined,
     }
   })
 
@@ -161,6 +179,7 @@ export const updateOrder = async (orderId: string, input: Partial<CreateOrderInp
 
   // Clean up fields specifically
   if (data.receiveTime) data.receiveTime = new Date(data.receiveTime)
+  if (data.sourceLastUpdatedAt) data.sourceLastUpdatedAt = new Date(data.sourceLastUpdatedAt)
   // Ensure we don't update ID or Code if passed
   delete data.id
   delete data.code
@@ -417,36 +436,68 @@ export const checkOutStaff = async (checkInId: string) => {
 }
 
 export const getDashboardStats = async () => {
-  const totalOrders = await db.order.count()
-  const completedTasks = await db.task.count({ where: { status: 'COMPLETED' } })
+  const now = new Date()
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+  const weekAgo = new Date(now)
+  weekAgo.setDate(now.getDate() - 6)
+  weekAgo.setHours(0, 0, 0, 0)
 
-  // Revenue: Sum total. Orders store total as "200,000". Need to parse.
-  // Prisma aggregate doesn't support complex regex replace.
-  // We might have to fetch all totals or use raw query.
-  // For small scale, fetch all totals is fine.
-  // For performance, use raw query.
-  // Let's use raw query for revenue to keep it fast.
-  const revenueResult: any[] = await db.$queryRaw`
-      SELECT sum(CAST(REPLACE(REPLACE(total, '₫', ''), '.', '') AS INTEGER)) as total FROM "Order"
-  `
-  // Note: Table name "Order" is quoted and PascalCase because of Prisma Model naming convention in PG?
-  // Prisma usually maps model Order to "Order" table unless @@map is used.
-  // Postgres is case sensitive if quoted.
+  const [monthlyOrders, weeklyOrders, activeOrders, monthlyTasks, recentOrders] = await Promise.all([
+    db.order.findMany({
+      where: { createdAt: { gte: startOfMonth } },
+      select: { total: true },
+    }),
+    db.order.findMany({
+      where: { createdAt: { gte: weekAgo } },
+      select: { createdAt: true, total: true },
+    }),
+    db.order.count({
+      where: { status: { in: ['NEW', 'IN_PROGRESS'] } },
+    }),
+    db.task.count({
+      where: { createdAt: { gte: startOfMonth } },
+    }),
+    db.order.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+      select: {
+        id: true,
+        code: true,
+        bouquetName: true,
+        receiveTime: true,
+        status: true,
+        total: true,
+      },
+    }),
+  ])
 
-  const totalRevenue = revenueResult[0]?.total ? Number(revenueResult[0].total) : 0
-
-  const activeStaff = await db.user.count({
-    where: {
-      role: { in: ['florist', 'sales', 'hybrid'] },
-      status: 'active'
+  const weeklyRevenue = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(weekAgo)
+    date.setDate(weekAgo.getDate() + index)
+    return {
+      date: getDateKey(date),
+      revenue: 0,
     }
   })
+  const weeklyIndex = new Map(weeklyRevenue.map((entry, index) => [entry.date, index]))
+
+  for (const order of weeklyOrders) {
+    const index = weeklyIndex.get(getDateKey(order.createdAt))
+    if (index !== undefined) {
+      weeklyRevenue[index].revenue += parseCurrencyToNumber(order.total)
+    }
+  }
 
   return {
-    totalOrders,
-    completedTasks,
-    totalRevenue,
-    activeStaff
+    monthlyRevenue: monthlyOrders.reduce((sum, order) => sum + parseCurrencyToNumber(order.total), 0),
+    monthlyOrders: monthlyOrders.length,
+    activeOrders,
+    monthlyTasks,
+    weeklyRevenue,
+    recentOrders: recentOrders.map((order) => ({
+      ...order,
+      receiveTime: order.receiveTime.toISOString(),
+    })),
   }
 }
 

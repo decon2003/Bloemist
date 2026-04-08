@@ -13,6 +13,7 @@ type QueryState<T> = {
 type QueryOptions<T> = {
   queryKey: QueryKey
   queryFn: () => Promise<T>
+  enabled?: boolean
 }
 
 type MutationOptions<TData, TVariables> = {
@@ -81,7 +82,7 @@ const useQueryClient = () => {
   return client
 }
 
-function useQuery<T>({ queryKey, queryFn }: QueryOptions<T>) {
+function useQuery<T>({ queryKey, queryFn, enabled = true }: QueryOptions<T>) {
   const client = useQueryClient()
   const keyHash = useMemo(() => hashKey(queryKey), [queryKey])
 
@@ -89,7 +90,7 @@ function useQuery<T>({ queryKey, queryFn }: QueryOptions<T>) {
     const cached = client.getQueryData<T>(queryKey)
     return {
       data: cached,
-      status: cached !== undefined ? 'success' : 'pending',
+      status: !enabled || cached !== undefined ? 'success' : 'pending',
       error: null,
     }
   })
@@ -102,6 +103,7 @@ function useQuery<T>({ queryKey, queryFn }: QueryOptions<T>) {
 
   // Stable runQuery that won't change
   const runQuery = useCallback(async () => {
+    if (!enabled) return
     if (isFetchingRef.current) return
     isFetchingRef.current = true
 
@@ -117,10 +119,11 @@ function useQuery<T>({ queryKey, queryFn }: QueryOptions<T>) {
     } finally {
       isFetchingRef.current = false
     }
-  }, [client, keyHash])
+  }, [client, enabled, keyHash])
 
   // Initial fetch - runs once per key
   useEffect(() => {
+    if (!enabled) return
     if (hasFetchedRef.current) return
     hasFetchedRef.current = true
 
@@ -130,7 +133,7 @@ function useQuery<T>({ queryKey, queryFn }: QueryOptions<T>) {
     } else {
       runQuery()
     }
-  }, [keyHash])
+  }, [enabled, keyHash])
 
   // Subscribe to cache updates
   useEffect(() => {

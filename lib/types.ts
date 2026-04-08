@@ -75,7 +75,26 @@ export interface Order {
   assigneeName?: string
   new_customer?: boolean
   deliveryAddress?: string
+  sourcePlatform?: string
+  sourceChatId?: string
+  sourceMessageId?: string
+  sourceThreadId?: string
+  sourceRawText?: string
+  requiresAttention?: boolean
+  sourceLastUpdatedAt?: string | null
   createdAt: string
+}
+
+export interface DashboardStats {
+  monthlyRevenue: number
+  monthlyOrders: number
+  activeOrders: number
+  monthlyTasks: number
+  weeklyRevenue: Array<{
+    date: string
+    revenue: number
+  }>
+  recentOrders: Array<Pick<Order, 'id' | 'code' | 'bouquetName' | 'receiveTime' | 'status' | 'total'>>
 }
 
 export interface CreateOrderInput {
@@ -105,6 +124,13 @@ export interface CreateOrderInput {
   new_customer?: boolean
   assigneeId?: string
   assigneeName?: string
+  sourcePlatform?: string
+  sourceChatId?: string
+  sourceMessageId?: string
+  sourceThreadId?: string
+  sourceRawText?: string
+  requiresAttention?: boolean
+  sourceLastUpdatedAt?: string | null
   tasks?: Array<{ name: string; price?: string; note?: string }>
   products?: Array<{ name: string; quantity: number; note?: string; samplePhotoUrls?: string[] }>
 }

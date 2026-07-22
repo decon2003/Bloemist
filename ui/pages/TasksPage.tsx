@@ -61,7 +61,9 @@ export default function TasksPage() {
           const matchesDate =
             dateFilterMode === 'range'
               ? (!dateRange.from ||
-                (dateKey >= dateRange.from && (!dateRange.to || dateKey <= dateRange.to)))
+                (dateKey !== null &&
+                  dateKey >= dateRange.from &&
+                  (!dateRange.to || dateKey <= dateRange.to)))
               : !selectedDate || dateKey === selectedDate
           const matchesAssignee = !assignedOnly || (user?.id ? task.assigneeId === user.id : true)
           const matchesType = typeFilter === 'ALL' || task.type === typeFilter

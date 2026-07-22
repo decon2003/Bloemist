@@ -36,6 +36,11 @@
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    // prisma.config.ts imports "prisma/config", which only exists in Prisma 6.
+    // This project pins prisma 5.22, where the file is inert (the seed command
+    // comes from the "prisma" block in package.json). Excluded so it does not
+    // fail the build; delete it, or upgrade Prisma, to resolve properly.
+    "prisma.config.ts"
   ]
 }

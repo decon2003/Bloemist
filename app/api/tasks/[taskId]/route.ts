@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getTask, updateTask } from '@/lib/server/data-store'
-import { handleRouteError } from '@/lib/server/route-helpers'
+import { handleRouteError, readJsonBody } from '@/lib/server/route-helpers'
 
 export async function GET(_request: Request, { params }: { params: Promise<{ taskId: string }> }) {
   try {
@@ -15,7 +15,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tas
 export async function PATCH(request: Request, { params }: { params: Promise<{ taskId: string }> }) {
   try {
     const { taskId } = await params
-    const body = await request.json()
+    const body = await readJsonBody(request)
     const updated = await updateTask(taskId, body)
     return NextResponse.json(updated)
   } catch (error) {

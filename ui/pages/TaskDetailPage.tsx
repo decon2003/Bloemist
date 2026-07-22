@@ -9,7 +9,7 @@ import { useLocale } from '@/components/providers/locale-provider'
 import { useAuth } from '@/components/providers/auth-provider'
 import { Task, TaskStatus } from '@/lib/types'
 import { fetchTask } from '@/lib/api'
-import { fileToDataUrl, formatDateTime } from '@/lib/utils'
+import { MAX_COMPLETION_PHOTO_BYTES, fileToDataUrl, formatDateTime, fromDateTimeLocalValue, toDateTimeLocalValue } from '@/lib/utils'
 
 interface TaskDetailPageProps {
   taskId: string
@@ -33,6 +33,9 @@ export default function TaskDetailPage({ taskId }: TaskDetailPageProps) {
   const [proofPreview, setProofPreview] = useState<string | null>(null)
   const [isCompleting, setIsCompleting] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
+  // Surfaces failures from actions (assign, start, complete, save). Without it
+  // these mutations failed silently and the UI kept showing the old state.
+  const [actionError, setActionError] = useState<string | null>(null)
   const [editTitle, setEditTitle] = useState('')
   const [editDueTime, setEditDueTime] = useState('')
   const [samplePreviewUrl, setSamplePreviewUrl] = useState<string | null>(null)
@@ -74,7 +77,7 @@ export default function TaskDetailPage({ taskId }: TaskDetailPageProps) {
       setNotes(task.notes)
       setActiveStatus(task.status)
       setEditTitle(task.taskTitle)
-      setEditDueTime(new Date(task.dueTime).toISOString().slice(0, 16))
+      setEditDueTime(toDateTimeLocalValue(task.dueTime))
       setSamplePhotoUrls(task.samplePhotoUrls || [])
     }
   }, [task])
@@ -129,13 +132,24 @@ export default function TaskDetailPage({ taskId }: TaskDetailPageProps) {
     ? `${t('taskDetail.assignedTo', 'Assigned to')} ${task.assigneeName}`
     : t('taskDetail.assignToMe', 'Assign to me')
 
+  // Each of these previously used try/finally with no catch. mutateAsync
+  // re-throws, so a failed request became an unhandled rejection: the spinner
+  // stopped, no message appeared, and the florist believed the action had
+  // succeeded when the server had rejected it.
+  const describeError = (error: unknown, fallback: string) =>
+    error instanceof Error && error.message ? error.message : fallback
+
   const handleStartTask = async () => {
     if (!task || task.status === 'IN_PROGRESS') return
     try {
       setIsStarting(true)
+      setActionError(null)
       const updated = await updateTaskStatus(task.id, 'IN_PROGRESS')
       setTask(updated)
       setActiveStatus(updated.status)
+    } catch (error) {
+      console.error('Failed to start task:', error)
+      setActionError(describeError(error, t('taskDetail.startError', 'Could not start this task.')))
     } finally {
       setIsStarting(false)
     }
@@ -145,8 +159,12 @@ export default function TaskDetailPage({ taskId }: TaskDetailPageProps) {
     if (!task || !user || assignDisabled) return
     try {
       setIsAssigning(true)
+      setActionError(null)
       const updated = await assignTask(task.id, { userId: user.id, userName: user.name })
       setTask(updated)
+    } catch (error) {
+      console.error('Failed to assign task:', error)
+      setActionError(describeError(error, t('taskDetail.assignError', 'Could not assign this task.')))
     } finally {
       setIsAssigning(false)
     }
@@ -156,8 +174,12 @@ export default function TaskDetailPage({ taskId }: TaskDetailPageProps) {
     if (!task || !user || !isAssignedToCurrentUser) return
     try {
       setIsUnassigning(true)
+      setActionError(null)
       const updated = await unassignTask(task.id, { userId: user.id, userName: user.name })
       setTask(updated)
+    } catch (error) {
+      console.error('Failed to unassign task:', error)
+      setActionError(describeError(error, t('taskDetail.unassignError', 'Could not unassign this task.')))
     } finally {
       setIsUnassigning(false)
     }
@@ -187,11 +209,28 @@ export default function TaskDetailPage({ taskId }: TaskDetailPageProps) {
 
   const submitCompletion = async () => {
     if (!task || !completionFile) return
+
+    // The server rejects anything over this; check here too so the user is not
+    // made to wait for a multi-megabyte upload only to be refused.
+    if (completionFile.size > MAX_COMPLETION_PHOTO_BYTES) {
+      setActionError(
+        t(
+          'taskDetail.photoTooLarge',
+          `Photo is too large (max ${MAX_COMPLETION_PHOTO_BYTES / 1024 / 1024} MB).`,
+        ),
+      )
+      return
+    }
+
     try {
       setIsCompleting(true)
+      setActionError(null)
       const updated = await completeTask(task.id, completionFile)
       setTask(updated)
       closeCompletionDialog()
+    } catch (error) {
+      console.error('Failed to complete task:', error)
+      setActionError(describeError(error, t('taskDetail.completeError', 'Could not complete this task.')))
     } finally {
       setIsCompleting(false)
     }
@@ -204,11 +243,19 @@ export default function TaskDetailPage({ taskId }: TaskDetailPageProps) {
 
   const saveDetails = async () => {
     if (!task) return
+
+    const dueTimeIso = fromDateTimeLocalValue(editDueTime)
+    if (!dueTimeIso) {
+      setActionError(t('taskDetail.invalidDueTime', 'Please enter a valid due time.'))
+      return
+    }
+
     try {
       setIsSavingDetails(true)
+      setActionError(null)
       const updated = await updateTask(task.id, {
         taskTitle: editTitle,
-        dueTime: new Date(editDueTime).toISOString(),
+        dueTime: dueTimeIso,
         samplePhotoUrls: samplePhotoUrls.length ? samplePhotoUrls : undefined,
         bouquetImage: samplePhotoUrls[0] || task.bouquetImage,
         notes,
@@ -218,6 +265,12 @@ export default function TaskDetailPage({ taskId }: TaskDetailPageProps) {
       setSamplePhotoUrls(updated.samplePhotoUrls || [])
       setNotes(updated.notes)
       setIsEditing(false)
+    } catch (error) {
+      // Previously try/finally with no catch: mutateAsync re-throws, so a failed
+      // save produced an unhandled rejection, the spinner cleared, and the user
+      // was left believing the change had been saved.
+      console.error('Failed to save task details:', error)
+      setActionError(error instanceof Error ? error.message : t('taskDetail.saveError', 'Could not save changes.'))
     } finally {
       setIsSavingDetails(false)
     }
@@ -231,6 +284,23 @@ export default function TaskDetailPage({ taskId }: TaskDetailPageProps) {
       <Link href={`/${lang}/tasks`} className="inline-flex items-center gap-2 text-sm text-primary">
         <ArrowLeft className="h-4 w-4" /> {t('taskDetail.back')}
       </Link>
+
+      {actionError ? (
+        <div
+          role="alert"
+          className="flex items-start justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+        >
+          <span>{actionError}</span>
+          <button
+            type="button"
+            onClick={() => setActionError(null)}
+            aria-label={t('common.close', 'Close')}
+            className="shrink-0 rounded p-0.5 hover:bg-red-100"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      ) : null}
 
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div>
@@ -247,7 +317,7 @@ export default function TaskDetailPage({ taskId }: TaskDetailPageProps) {
                 onClick={() => {
                   setIsEditing(false)
                   setEditTitle(task.taskTitle)
-                  setEditDueTime(new Date(task.dueTime).toISOString().slice(0, 16))
+                  setEditDueTime(toDateTimeLocalValue(task.dueTime))
                   setNotes(task.notes)
                   setSamplePhotoUrls(task.samplePhotoUrls || [])
                   setSamplePhotoInput('')

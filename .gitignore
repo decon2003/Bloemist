@@ -7,3 +7,11 @@ node_modules
 *.db-journal
 /lib/generated/prisma
 .vercel
+
+# TypeScript incremental build cache
+tsconfig.tsbuildinfo
+
+# Local tooling / generated review artifacts
+.claude/
+_bmad/
+_bmad-output/

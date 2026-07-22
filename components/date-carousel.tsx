@@ -76,7 +76,11 @@ export default function DateCarousel({
 
   const handleDateChange = (value: string) => {
     if (!value) return
-    onSelectDate(getDateKey(value))
+    const key = getDateKey(value)
+    // A partially typed or out-of-range date yields no key; ignore it rather
+    // than clearing the user's current filter.
+    if (!key) return
+    onSelectDate(key)
   }
 
   const handleJumpToToday = () => {

@@ -5,14 +5,9 @@ import type {
 } from '../api.types'
 import type { CreateOrderInput, CreateTaskInput, Florist, Order, Task, TaskStatus, StaffCheckIn } from '../types'
 
-class ApiError extends Error {
-  status: number
-
-  constructor(status: number, message: string) {
-    super(message)
-    this.status = status
-  }
-}
+import { MAX_COMPLETION_PHOTO_BYTES } from '../utils'
+import { ApiError } from './api-error'
+import { TASK_STATUSES, assertOneOf } from './validation'
 
 // Helper to map Prisma entity to App entity
 // Most fields match exactly due to camelCase in schema
@@ -21,12 +16,8 @@ const mapOrder = (o: any): Order => ({
   // Ensure types match what UI expects
   deliveryCoveredByShop: o.deliveryCoveredByShop ?? false,
   new_customer: o.new_customer ?? false,
-  requiresAttention: o.requiresAttention ?? false,
   receiveTime: o.receiveTime.toISOString(),
-  sourceLastUpdatedAt: o.sourceLastUpdatedAt?.toISOString() ?? null,
   createdAt: o.createdAt.toISOString(),
-  // createdAt is Date in Prisma, string in App? Check types.ts. Usually string in App.
-  // We need to verify types.ts. Assuming string for now based on previous code usage (row.created_at ISO string).
 })
 
 const mapTask = (t: any): Task => ({
@@ -56,13 +47,54 @@ const mapUser = (u: any) => ({
   createdAt: u.createdAt.toISOString(),
 })
 
-const parseCurrencyToNumber = (value: string | null | undefined) => {
-  if (!value) return 0
-  const numeric = Number(value.replace(/[^\d]/g, ''))
-  return Number.isFinite(numeric) ? numeric : 0
+// Money arrives as free-form strings ("1.500.000 d", "-50000", "1 234,56").
+// Strip grouping separators and currency decoration but preserve the sign and
+// the decimal separator - dropping either silently turns refunds into revenue
+// and inflates decimal amounts by 10x/100x.
+const parseCurrencyToNumber = (value: string | number | null | undefined) => {
+  if (value === null || value === undefined || value === '') return 0
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0
+
+  let text = value.trim().replace(/[^\d,.\-]/g, '')
+  const negative = text.startsWith('-')
+  text = text.replace(/-/g, '')
+
+  const lastComma = text.lastIndexOf(',')
+  const lastDot = text.lastIndexOf('.')
+  const decimalAt = Math.max(lastComma, lastDot)
+
+  // A separator is decimal only when it is the last one and leaves 1-2 digits
+  // after it; otherwise every separator is thousands grouping (VN style).
+  if (decimalAt !== -1 && text.length - decimalAt - 1 <= 2 && text.length - decimalAt - 1 > 0) {
+    const whole = text.slice(0, decimalAt).replace(/[.,]/g, '')
+    const fraction = text.slice(decimalAt + 1)
+    text = `${whole}.${fraction}`
+  } else {
+    text = text.replace(/[.,]/g, '')
+  }
+
+  const numeric = Number(text)
+  if (!Number.isFinite(numeric)) return 0
+  return negative ? -numeric : numeric
 }
 
-const getDateKey = (date: Date) => date.toISOString().slice(0, 10)
+// Local-time date key. Must match lib/date-utils.ts so that server buckets and
+// client buckets agree; toISOString() here would shift every VN evening order
+// into the previous day.
+const getDateKey = (date: Date) => {
+  const year = date.getFullYear()
+  const month = `${date.getMonth() + 1}`.padStart(2, '0')
+  const day = `${date.getDate()}`.padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const parseRequiredDate = (value: string | Date, field: string) => {
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    throw new ApiError(400, `Invalid date for field "${field}"`)
+  }
+  return date
+}
 
 export const listTasks = async () => {
   const tasks = await db.task.findMany({
@@ -142,7 +174,7 @@ export const createOrder = async (input: CreateOrderInput) => {
       receiverPhone: input.receiverPhone,
       bouquetName: input.bouquetName,
       bouquetImage: input.bouquetImage,
-      receiveTime: new Date(input.receiveTime), // Convert string to Date
+      receiveTime: parseRequiredDate(input.receiveTime, 'receiveTime'),
       deliveryType: input.deliveryType,
       deliveryAddress: input.deliveryAddress,
       status: input.status || 'NEW',
@@ -161,28 +193,36 @@ export const createOrder = async (input: CreateOrderInput) => {
       assigneeId: input.assigneeId,
       assigneeName: input.assigneeName,
       new_customer: input.new_customer,
-      sourcePlatform: input.sourcePlatform,
-      sourceChatId: input.sourceChatId,
-      sourceMessageId: input.sourceMessageId,
-      sourceThreadId: input.sourceThreadId,
-      sourceRawText: input.sourceRawText,
-      requiresAttention: input.requiresAttention ?? false,
-      sourceLastUpdatedAt: input.sourceLastUpdatedAt ? new Date(input.sourceLastUpdatedAt) : undefined,
     }
   })
 
   return mapOrder(order)
 }
 
-export const updateOrder = async (orderId: string, input: Partial<CreateOrderInput>) => {
-  const data: any = { ...input }
+// Only these columns may be written by an update. Anything else in the request
+// body is ignored - notably id, code and createdAt, which the dashboard groups
+// revenue by and which callers must never be able to rewrite.
+const ORDER_UPDATABLE_FIELDS = [
+  'customerName', 'customerPhone', 'receiverName', 'receiverPhone',
+  'deliveryAddress', 'bouquetName', 'bouquetImage', 'deliveryType', 'status',
+  'listedPrice', 'discount', 'deliveryFee', 'deliveryCoveredByShop',
+  'vatPercent', 'deposit', 'sellingPrice', 'remainingBalance', 'total',
+  'notes', 'assigneeId', 'assigneeName', 'new_customer',
+] as const
 
-  // Clean up fields specifically
-  if (data.receiveTime) data.receiveTime = new Date(data.receiveTime)
-  if (data.sourceLastUpdatedAt) data.sourceLastUpdatedAt = new Date(data.sourceLastUpdatedAt)
-  // Ensure we don't update ID or Code if passed
-  delete data.id
-  delete data.code
+export const updateOrder = async (orderId: string, input: Partial<CreateOrderInput>) => {
+  const data: any = {}
+  for (const field of ORDER_UPDATABLE_FIELDS) {
+    if (input[field] !== undefined) data[field] = input[field]
+  }
+
+  if (input.receiveTime !== undefined) {
+    data.receiveTime = parseRequiredDate(input.receiveTime, 'receiveTime')
+  }
+
+  if (Object.keys(data).length === 0) {
+    throw new ApiError(400, 'No updatable fields supplied')
+  }
 
   const order = await db.order.update({
     where: { id: orderId },
@@ -270,12 +310,34 @@ export const updateTask = async (taskId: string, input: Partial<CreateTaskInput>
 }
 
 export const updateTaskStatus = async (taskId: string, status: TaskStatus) => {
-  const data: any = { status }
-  if (status === 'IN_PROGRESS') {
-    const t = await db.task.findUnique({ where: { id: taskId } })
-    if (t && !t.startTime) {
-      data.startTime = new Date()
-    }
+  // `status` is a bare String column, so without this check any value at all -
+  // "COMPLETED" typed by hand, or "banana" - was persisted verbatim.
+  const nextStatus = assertOneOf(status, TASK_STATUSES, 'status')
+
+  const current = await db.task.findUnique({ where: { id: taskId } })
+  if (!current) throw new ApiError(404, 'Task not found')
+
+  // Completion requires proof of work and must go through completeTask(), which
+  // enforces the photo. Allowing a direct PATCH to COMPLETED bypassed that
+  // control entirely.
+  if (nextStatus === 'COMPLETED' && !current.completionProofUrl) {
+    throw new ApiError(
+      400,
+      'A task can only be completed through the completion endpoint, which requires a proof photo',
+    )
+  }
+
+  const data: any = { status: nextStatus }
+
+  if (nextStatus === 'IN_PROGRESS' && !current.startTime) {
+    data.startTime = new Date()
+  }
+
+  // Moving a task back out of COMPLETED must clear the completion evidence,
+  // otherwise the row claims to be in progress and completed at the same time.
+  if (current.status === 'COMPLETED' && nextStatus !== 'COMPLETED') {
+    data.completedAt = null
+    data.completionProofUrl = null
   }
 
   await db.task.update({ where: { id: taskId }, data })
@@ -283,6 +345,9 @@ export const updateTaskStatus = async (taskId: string, status: TaskStatus) => {
 }
 
 export const updateTaskNotes = async (taskId: string, notes: string) => {
+  if (typeof notes !== 'string') {
+    throw new ApiError(400, 'Field "notes" must be a string')
+  }
   await db.task.update({ where: { id: taskId }, data: { notes } })
   return getTask(taskId)
 }
@@ -353,6 +418,17 @@ export const unassignTask = async (taskId: string, _payload: AssignTaskPayload) 
   const task = await db.task.findUnique({ where: { id: taskId } })
   if (!task) throw new ApiError(404, 'Task not found')
 
+  // Unassigning a completed task used to strip the assignee and startTime while
+  // leaving completedAt and the proof photo in place, so the row was completed
+  // by nobody and the florist lost attribution for finished work.
+  if (task.status === 'COMPLETED') {
+    throw new ApiError(409, 'A completed task cannot be unassigned. Reopen it first.')
+  }
+
+  if (task.status === 'UNASSIGNED') {
+    throw new ApiError(409, 'This task is already unassigned')
+  }
+
   await db.task.update({
     where: { id: taskId },
     data: {
@@ -367,13 +443,48 @@ export const unassignTask = async (taskId: string, _payload: AssignTaskPayload) 
   return getTask(taskId)
 }
 
+// Proof photos are base64-inlined into a text column (there is no object
+// storage yet), and base64 inflates a file by ~1.37x. On the current Neon free
+// tier a handful of unbounded uploads is enough to fill the database, so the
+// cap here is a storage guard, not just a performance one.
+const ALLOWED_PHOTO_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif']
+
 export const completeTask = async (taskId: string, payload: CompleteTaskPayload) => {
-  if (!payload.photo) {
-    throw new ApiError(400, 'Completion photo is required')
+  // `photo` is cast from formData.get(), so a plain text field arrives here as a
+  // string and would blow up on .arrayBuffer(). Check the shape, not truthiness.
+  const photo = payload.photo as unknown
+  if (!photo || typeof photo !== 'object' || typeof (photo as Blob).arrayBuffer !== 'function') {
+    throw new ApiError(400, 'Completion photo is required and must be an uploaded file')
   }
 
-  const buffer = Buffer.from(await payload.photo.arrayBuffer())
-  const mime = (payload.photo as any).type || 'application/octet-stream'
+  const blob = photo as Blob
+  const mime = blob.type || 'application/octet-stream'
+
+  if (!ALLOWED_PHOTO_MIME.includes(mime)) {
+    throw new ApiError(400, `Unsupported image type "${mime}". Allowed: JPEG, PNG, WebP, HEIC.`)
+  }
+
+  if (blob.size === 0) {
+    throw new ApiError(400, 'Completion photo is empty')
+  }
+
+  if (blob.size > MAX_COMPLETION_PHOTO_BYTES) {
+    throw new ApiError(
+      413,
+      `Completion photo is too large (${(blob.size / 1024 / 1024).toFixed(1)} MB). Maximum is ${MAX_COMPLETION_PHOTO_BYTES / 1024 / 1024} MB.`,
+    )
+  }
+
+  const current = await db.task.findUnique({ where: { id: taskId } })
+  if (!current) throw new ApiError(404, 'Task not found')
+
+  // Completing twice previously overwrote completedAt and destroyed the earlier
+  // proof photo - a retry after a timeout silently replaced the evidence.
+  if (current.status === 'COMPLETED') {
+    throw new ApiError(409, 'This task is already completed')
+  }
+
+  const buffer = Buffer.from(await blob.arrayBuffer())
   const dataUrl = `data:${mime};base64,${buffer.toString('base64')}`
 
   await db.task.update({
@@ -435,6 +546,11 @@ export const checkOutStaff = async (checkInId: string) => {
   return mapCheckIn(updated)
 }
 
+// Orders in these states never represent realised revenue and must be excluded
+// from every revenue figure. Previously the revenue queries filtered on date
+// only, so a cancelled order still counted for its full total.
+const REVENUE_EXCLUDED_STATUSES = ['CANCELLED']
+
 export const getDashboardStats = async () => {
   const now = new Date()
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
@@ -442,13 +558,21 @@ export const getDashboardStats = async () => {
   weekAgo.setDate(now.getDate() - 6)
   weekAgo.setHours(0, 0, 0, 0)
 
+  // Bound the window at "now" as well as at the start of the period. Without an
+  // upper bound a future-dated order counts towards this month's revenue, and
+  // keeps counting every month thereafter.
+  const revenueWindow = (from: Date) => ({
+    createdAt: { gte: from, lte: now },
+    status: { notIn: REVENUE_EXCLUDED_STATUSES },
+  })
+
   const [monthlyOrders, weeklyOrders, activeOrders, monthlyTasks, recentOrders] = await Promise.all([
     db.order.findMany({
-      where: { createdAt: { gte: startOfMonth } },
+      where: revenueWindow(startOfMonth),
       select: { total: true },
     }),
     db.order.findMany({
-      where: { createdAt: { gte: weekAgo } },
+      where: revenueWindow(weekAgo),
       select: { createdAt: true, total: true },
     }),
     db.order.count({

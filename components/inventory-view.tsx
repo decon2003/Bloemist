@@ -30,8 +30,16 @@ export default function InventoryView() {
   const [adjustItemType, setAdjustItemType] = useState<'BOUQUET' | 'MATERIAL'>('BOUQUET')
   const [inventory, setInventory] = useState<InventoryRecord[]>([])
 
-  const bouquets = inventory.filter(item => item.type === 'BOUQUET')
-  const materials = inventory.filter(item => item.type === 'MATERIAL')
+  // searchQuery was bound to the search box but never applied to either list,
+  // so typing in it filtered nothing.
+  const matchesSearch = (item: InventoryRecord) => {
+    const needle = searchQuery.trim().toLowerCase()
+    if (!needle) return true
+    return item.name.toLowerCase().includes(needle)
+  }
+
+  const bouquets = inventory.filter(item => item.type === 'BOUQUET' && matchesSearch(item))
+  const materials = inventory.filter(item => item.type === 'MATERIAL' && matchesSearch(item))
 
   useEffect(() => {
     loadInventory()
@@ -39,9 +47,12 @@ export default function InventoryView() {
 
   const loadInventory = async () => {
     setLoading(true)
+    // Clear any previous failure, otherwise the error screen is sticky and a
+    // successful retry never dismisses it.
+    setError(false)
     try {
       const data = await fetchInventory()
-      setInventory(data)
+      setInventory(Array.isArray(data) ? data : [])
     } catch (err) {
       console.error('Failed to load inventory:', err)
       setError(true)
@@ -110,32 +121,43 @@ export default function InventoryView() {
     name: string,
     delta: number,
   ) => {
-    const existing = inventory.find((item: InventoryRecord) => item.name.toLowerCase() === name.toLowerCase())
+    // Match on name AND type: matching on name alone collided a bouquet with a
+    // material that happened to share a name.
+    const existing = inventory.find(
+      (item: InventoryRecord) =>
+        item.name.toLowerCase() === name.toLowerCase() && item.type === type,
+    )
 
-    const payload = existing ? {
-      ...existing,
-      onHand: Math.max(0, existing.onHand + delta)
-    } : {
-      id: `item-${Date.now()}`,
-      type,
-      name,
-      onHand: Math.max(0, delta),
-      reserved: 0,
-      unit: type === 'BOUQUET' ? 'arrangement' : 'unit'
-    }
+    // On create, do not invent an id - the server generates it. Sending a
+    // client-made id makes the request look like an update of a row that does
+    // not exist.
+    const payload = existing
+      ? { id: existing.id, onHand: Math.max(0, existing.onHand + delta) }
+      : {
+          type,
+          name,
+          onHand: Math.max(0, delta),
+          reserved: 0,
+          unit: type === 'BOUQUET' ? 'arrangement' : 'unit',
+        }
 
     try {
       await updateInventory(payload)
       await loadInventory()
     } catch (err) {
       console.error('Failed to update inventory:', err)
-      alert('Failed to update inventory')
+      alert(err instanceof Error ? err.message : 'Failed to update inventory')
     }
   }
 
   const handleSaveAdjustment = () => {
     const normalizedName = adjustItemName.trim()
     if (!normalizedName) {
+      setAdjustmentOpen(false)
+      return
+    }
+
+    if (quantityChange === 0) {
       setAdjustmentOpen(false)
       return
     }
@@ -458,8 +480,8 @@ export default function InventoryView() {
                       onChange={(event) => setAdjustItemType(event.target.value as 'BOUQUET' | 'MATERIAL')}
                       className="mt-2 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                     >
-                      <option value="Bouquet">Bouquet</option>
-                      <option value="Material">Material</option>
+                      <option value="BOUQUET">Bouquet</option>
+                      <option value="MATERIAL">Material</option>
                     </select>
                   </div>
 
@@ -482,18 +504,24 @@ export default function InventoryView() {
                   <div>
                     <label className="text-sm font-medium text-foreground">Quantity Change</label>
                     <div className="mt-2 flex gap-2">
+                      {/* The delta may be negative: shrinkage, breakage and
+                          consumption all reduce stock. Clamping this at zero
+                          made "Quantity Change" increase-only. */}
                       <button
                         type="button"
-                        onClick={() => setQuantityChange((prev) => Math.max(0, prev - 1))}
+                        onClick={() => setQuantityChange((prev) => prev - 1)}
                         className="flex-1 rounded-lg border border-border bg-muted px-3 py-2 text-sm font-medium hover:bg-border"
                       >
                         -
                       </button>
                       <input
                         type="number"
-                        min={0}
+                        step={1}
                         value={quantityChange}
-                        onChange={(event) => setQuantityChange(Math.max(0, Number(event.target.value)))}
+                        onChange={(event) => {
+                          const next = Number(event.target.value)
+                          setQuantityChange(Number.isFinite(next) ? Math.trunc(next) : 0)
+                        }}
                         className="flex-1 rounded-lg border border-border bg-white px-3 py-2 text-sm text-center focus:outline-none focus:ring-2 focus:ring-primary"
                       />
                       <button

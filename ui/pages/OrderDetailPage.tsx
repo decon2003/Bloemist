@@ -11,7 +11,7 @@ import { useAuth } from "@/components/providers/auth-provider"
 import AddTaskDialog from "@/components/tasks/add-task-dialog"
 import { fetchOrder, updateOrder, deleteOrder } from "@/lib/api"
 import type { Order } from "@/lib/types"
-import { formatCurrencyDisplay, formatDateTime } from "@/lib/utils"
+import { formatCurrencyDisplay, formatDateTime, fromDateTimeLocalValue, toDateTimeLocalValue } from "@/lib/utils"
 
 interface OrderDetailPageProps {
   orderId: string
@@ -459,10 +459,20 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Receive Time</label>
+                {/* datetime-local is a LOCAL wall-clock control. Slicing an ISO
+                    (UTC) string into it showed the time 7h early in Vietnam and,
+                    because the value was read back as local time, shifted the
+                    stored timestamp another 7h earlier on every save - even when
+                    the field was never touched. */}
                 <input
                   type="datetime-local"
-                  value={editForm.receiveTime ? editForm.receiveTime.slice(0, 16) : ""}
-                  onChange={(e) => handleEditChange("receiveTime", new Date(e.target.value).toISOString())}
+                  value={toDateTimeLocalValue(editForm.receiveTime)}
+                  onChange={(e) => {
+                    const iso = fromDateTimeLocalValue(e.target.value)
+                    // A cleared or partially typed value yields null; ignore it
+                    // rather than throwing RangeError during render.
+                    if (iso) handleEditChange("receiveTime", iso)
+                  }}
                   className="w-full rounded-lg border border-border bg-white px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>

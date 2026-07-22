@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createTask, listTasks } from '@/lib/server/data-store'
-import { handleRouteError } from '@/lib/server/route-helpers'
+import { handleRouteError, readJsonBody } from '@/lib/server/route-helpers'
 
 export async function GET() {
   try {
@@ -13,7 +13,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json()
+    const body = await readJsonBody(request)
     const created = await createTask(body)
     return NextResponse.json(created, { status: 201 })
   } catch (error) {

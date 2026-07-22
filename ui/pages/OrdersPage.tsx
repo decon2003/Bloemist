@@ -59,7 +59,9 @@ export default function OrdersPage() {
         const matchesDate =
           dateFilterMode === 'range'
             ? (!dateRange.from ||
-              (receiveDate >= dateRange.from && (!dateRange.to || receiveDate <= dateRange.to)))
+              (receiveDate !== null &&
+                receiveDate >= dateRange.from &&
+                (!dateRange.to || receiveDate <= dateRange.to)))
             : !selectedDate || receiveDate === selectedDate
         return matchesStatus && matchesQuery && matchesDate
       }),

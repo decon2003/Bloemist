@@ -10,9 +10,6 @@ export const protectedRoutes: ProtectedRoute[] = [
   { path: '/settings', allowedRoles: ['boss', 'admin', 'sales', 'florist'] },
   { path: '/customers', allowedRoles: ['boss', 'admin'] },
 
-  // Inventory is now visible to frontline staff
-  { path: '/inventory', allowedRoles: ['boss', 'sales', 'florist', 'admin'] },
-
   // Orders, tasks, and check-ins - shared workspace tools
   { path: '/orders', allowedRoles: ['boss', 'sales', 'florist', 'admin'] },
   { path: '/tasks', allowedRoles: ['boss', 'sales', 'florist', 'admin'] },

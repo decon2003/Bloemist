@@ -66,10 +66,6 @@ const apiClient: ApiClient = {
   // Dashboard & Settings
   fetchDashboardStats: () => request<DashboardStats>('/reports/dashboard'),
   fetchWorkspaceSettings: () => request<WorkspaceSettings>('/settings'),
-
-  // Inventory
-  fetchInventory: () => request<any[]>('/inventory'),
-  updateInventory: (item) => request<any>('/inventory', { method: 'POST', body: JSON.stringify(item) }),
 }
 
 // Named exports for convenience
@@ -99,8 +95,6 @@ export const fetchUsers = apiClient.fetchUsers
 export const createUser = apiClient.createUser
 export const updateUser = apiClient.updateUser
 export const deleteUser = apiClient.deleteUser
-export const fetchInventory = apiClient.fetchInventory
-export const updateInventory = apiClient.updateInventory
 
 export type { AssignTaskPayload, CompleteTaskPayload } from './api.types'
 export default apiClient

@@ -9,8 +9,6 @@ export function cn(...inputs: ClassValue[]) {
  *  route. Proof photos are base64-inlined into a Postgres text column (~1.37x
  *  inflation) and the database is on a small free tier, so this is a storage
  *  limit, not just a UX one. */
-export const MAX_COMPLETION_PHOTO_BYTES = 2 * 1024 * 1024
-
 const dateTimeFormatterCache: Record<string, Intl.DateTimeFormat> = {}
 
 // Intl throws RangeError on an Invalid Date. These formatters are called from
@@ -145,10 +143,3 @@ export function formatCurrencyDisplay(value?: string | number | null, fallback: 
   return formatCurrencyFromNumber(numeric)
 }
 
-export const fileToDataUrl = (file: File | Blob) =>
-  new Promise<string>((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onloadend = () => resolve(reader.result as string)
-    reader.onerror = reject
-    reader.readAsDataURL(file)
-  })

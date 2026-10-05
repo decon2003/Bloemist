@@ -33,6 +33,7 @@ export interface ApiClient {
   fetchWorkspaceSettings: () => Promise<WorkspaceSettings>
   login: (email: string, password: string) => Promise<User>
   logout: () => Promise<void>
+  uploadPhoto: (file: File | Blob) => Promise<string>
   fetchCurrentUser: () => Promise<User>
   changePassword: (currentPassword: string, newPassword: string) => Promise<User>
   fetchUsers: () => Promise<User[]>

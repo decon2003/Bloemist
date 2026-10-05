@@ -5,8 +5,8 @@ import type {
 } from '../api.types'
 import type { CreateOrderInput, CreateTaskInput, Florist, Order, Task, TaskStatus, StaffCheckIn } from '../types'
 
-import { MAX_COMPLETION_PHOTO_BYTES } from '../utils'
 import { ApiError } from './api-error'
+import { storePhoto } from './storage'
 import { TASK_STATUSES, assertOneOf } from './validation'
 
 // Helper to map Prisma entity to App entity
@@ -104,6 +104,33 @@ export const redactOrderFor = <T extends { customerPhone?: string; receiverPhone
   order: T,
 ): T => (viewer.role === 'florist' ? { ...order, customerPhone: '', receiverPhone: '' } : order)
 
+// Photos saved before object storage existed are base64 data URLs inside the
+// row. Sending them in list responses blew through Vercel's 4.5 MB response
+// limit after a handful of photos, so lists point at /api/legacy-photos instead.
+const isInline = (value: string | null | undefined): value is string => !!value && value.startsWith('data:')
+const legacyTaskPhoto = (id: string, field: string, index?: number) =>
+  `/api/legacy-photos?task=${encodeURIComponent(id)}&field=${field}${index === undefined ? '' : `&i=${index}`}`
+
+const slimTaskPhotos = (task: Task, { samples }: { samples: boolean }): Task => ({
+  ...task,
+  completionProofUrl: isInline(task.completionProofUrl) ? legacyTaskPhoto(task.id, 'proof') : task.completionProofUrl,
+  // Detail views send samples and bouquetImage back on save, so they keep the
+  // real values there; only lists swap them for links.
+  ...(samples
+    ? {
+        bouquetImage: isInline(task.bouquetImage) ? legacyTaskPhoto(task.id, 'bouquet') : task.bouquetImage,
+        samplePhotoUrls: (task.samplePhotoUrls ?? []).map((url, index) =>
+          isInline(url) ? legacyTaskPhoto(task.id, 'sample', index) : url,
+        ),
+      }
+    : {}),
+})
+
+const slimOrderPhotos = <T extends { id: string; bouquetImage?: string | null }>(order: T): T =>
+  isInline(order.bouquetImage)
+    ? { ...order, bouquetImage: `/api/legacy-photos?order=${encodeURIComponent(order.id)}&field=bouquet` }
+    : order
+
 export const listTasks = async () => {
   const tasks = await db.task.findMany({
     orderBy: { createdAt: 'desc' },
@@ -118,7 +145,7 @@ export const listTasks = async () => {
       }
     }
   })
-  return tasks.map(mapTask)
+  return tasks.map((task) => slimTaskPhotos(mapTask(task), { samples: true }))
 }
 
 export const getTask = async (taskId: string) => {
@@ -135,14 +162,14 @@ export const getTask = async (taskId: string) => {
     }
   })
   if (!task) throw new ApiError(404, 'Task not found')
-  return mapTask(task)
+  return slimTaskPhotos(mapTask(task), { samples: false })
 }
 
 export const listOrders = async () => {
   const orders = await db.order.findMany({
     orderBy: { createdAt: 'desc' }
   })
-  return orders.map(o => ({
+  return orders.map(o => slimOrderPhotos({
     ...mapOrder(o),
     receiveTime: o.receiveTime.toISOString()
   }))
@@ -451,38 +478,7 @@ export const unassignTask = async (taskId: string, _payload: AssignTaskPayload) 
   return getTask(taskId)
 }
 
-// Proof photos are base64-inlined into a text column (there is no object
-// storage yet), and base64 inflates a file by ~1.37x. On the current Neon free
-// tier a handful of unbounded uploads is enough to fill the database, so the
-// cap here is a storage guard, not just a performance one.
-const ALLOWED_PHOTO_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif']
-
 export const completeTask = async (taskId: string, payload: CompleteTaskPayload) => {
-  // `photo` is cast from formData.get(), so a plain text field arrives here as a
-  // string and would blow up on .arrayBuffer(). Check the shape, not truthiness.
-  const photo = payload.photo as unknown
-  if (!photo || typeof photo !== 'object' || typeof (photo as Blob).arrayBuffer !== 'function') {
-    throw new ApiError(400, 'Completion photo is required and must be an uploaded file')
-  }
-
-  const blob = photo as Blob
-  const mime = blob.type || 'application/octet-stream'
-
-  if (!ALLOWED_PHOTO_MIME.includes(mime)) {
-    throw new ApiError(400, `Unsupported image type "${mime}". Allowed: JPEG, PNG, WebP, HEIC.`)
-  }
-
-  if (blob.size === 0) {
-    throw new ApiError(400, 'Completion photo is empty')
-  }
-
-  if (blob.size > MAX_COMPLETION_PHOTO_BYTES) {
-    throw new ApiError(
-      413,
-      `Completion photo is too large (${(blob.size / 1024 / 1024).toFixed(1)} MB). Maximum is ${MAX_COMPLETION_PHOTO_BYTES / 1024 / 1024} MB.`,
-    )
-  }
-
   const current = await db.task.findUnique({ where: { id: taskId } })
   if (!current) throw new ApiError(404, 'Task not found')
 
@@ -492,14 +488,14 @@ export const completeTask = async (taskId: string, payload: CompleteTaskPayload)
     throw new ApiError(409, 'This task is already completed')
   }
 
-  const buffer = Buffer.from(await blob.arrayBuffer())
-  const dataUrl = `data:${mime};base64,${buffer.toString('base64')}`
+  // Validates type/size and uploads to R2 (or inlines it when R2 is not set up).
+  const proofUrl = await storePhoto(payload.photo, 'proofs')
 
   await db.task.update({
     where: { id: taskId },
     data: {
       status: 'COMPLETED',
-      completionProofUrl: dataUrl,
+      completionProofUrl: proofUrl,
       completedAt: new Date()
     }
   })

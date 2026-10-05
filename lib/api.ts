@@ -3,6 +3,7 @@
 // ============================================================
 import type { CreateOrderInput, CreateTaskInput, DashboardStats, Order, Task, TaskStatus, Florist, User, StaffCheckIn, WorkspaceSettings } from './types'
 import type { ApiClient, AssignTaskPayload, CompleteTaskPayload } from './api.types'
+import { compressImage } from './image-compress'
 
 const API_BASE_URL = '/api'
 
@@ -52,10 +53,16 @@ const apiClient: ApiClient = {
   updateTaskNotes: (taskId, notes) => request<Task>(`/tasks/${taskId}/notes`, { method: 'PATCH', body: JSON.stringify({ notes }) }),
   assignTask: (taskId, payload) => request<Task>(`/tasks/${taskId}/assign`, { method: 'POST', body: JSON.stringify(payload) }),
   unassignTask: (taskId, payload) => request<Task>(`/tasks/${taskId}/unassign`, { method: 'POST', body: JSON.stringify(payload) }),
-  completeTask: (taskId, payload) => {
+  completeTask: async (taskId, payload) => {
     const formData = new FormData()
-    formData.append('photo', payload.photo)
+    formData.append('photo', await compressImage(payload.photo))
     return request<Task>(`/tasks/${taskId}/complete`, { method: 'POST', body: formData })
+  },
+  uploadPhoto: async (file) => {
+    const formData = new FormData()
+    formData.append('photo', await compressImage(file))
+    const { url } = await request<{ url: string }>('/uploads', { method: 'POST', body: formData })
+    return url
   },
 
   // Orders
@@ -112,6 +119,7 @@ export const fetchDashboardStats = apiClient.fetchDashboardStats
 export const fetchWorkspaceSettings = apiClient.fetchWorkspaceSettings
 export const login = apiClient.login
 export const logout = apiClient.logout
+export const uploadPhoto = apiClient.uploadPhoto
 export const fetchCurrentUser = apiClient.fetchCurrentUser
 export const changePassword = apiClient.changePassword
 export const fetchUsers = apiClient.fetchUsers

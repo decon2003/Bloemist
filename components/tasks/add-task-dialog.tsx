@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { useAppData } from '@/components/providers/app-data-provider'
 import { TaskType } from '@/lib/types'
 import { useLocale } from '@/components/providers/locale-provider'
-import { fileToDataUrl } from '@/lib/utils'
+import { uploadPhoto } from '@/lib/api'
 
 interface AddTaskDialogProps {
   open: boolean
@@ -324,9 +324,12 @@ export default function AddTaskDialog({
                     onChange={async (event) => {
                       const file = event.target.files?.[0]
                       if (!file) return
-                      const dataUrl = await fileToDataUrl(file)
-                      addSamplePhoto(dataUrl)
                       event.target.value = ''
+                      try {
+                        addSamplePhoto(await uploadPhoto(file))
+                      } catch (error) {
+                        alert(error instanceof Error ? error.message : 'Không tải được ảnh lên')
+                      }
                     }}
                   />
                 </div>

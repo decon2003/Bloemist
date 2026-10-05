@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation'
 import { useLocale } from '@/components/providers/locale-provider'
 import { useAppData } from '@/components/providers/app-data-provider'
 import { useAuth } from '@/components/providers/auth-provider'
-import { fileToDataUrl, formatCurrencyFromNumber, formatCurrencyInput, parseCurrencyToNumber } from '@/lib/utils'
+import { uploadPhoto } from '@/lib/api'
+import { formatCurrencyFromNumber, formatCurrencyInput, parseCurrencyToNumber } from '@/lib/utils'
 
 const normalizePhone = (value: string) => value.replace(/\D/g, '')
 
@@ -165,8 +166,11 @@ export default function NewOrderPage() {
   const handleSampleFileUpload = async (index: number, fileList: FileList | null) => {
     const file = fileList?.[0]
     if (!file) return
-    const dataUrl = await fileToDataUrl(file)
-    addSamplePhotoToProduct(index, dataUrl)
+    try {
+      addSamplePhotoToProduct(index, await uploadPhoto(file))
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Không tải được ảnh lên')
+    }
   }
 
   const addProductRow = () => {

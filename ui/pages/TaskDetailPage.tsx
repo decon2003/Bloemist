@@ -8,8 +8,8 @@ import { useAppData } from '@/components/providers/app-data-provider'
 import { useLocale } from '@/components/providers/locale-provider'
 import { useAuth } from '@/components/providers/auth-provider'
 import { Task, TaskStatus } from '@/lib/types'
-import { fetchTask } from '@/lib/api'
-import { MAX_COMPLETION_PHOTO_BYTES, fileToDataUrl, formatDateTime, fromDateTimeLocalValue, toDateTimeLocalValue } from '@/lib/utils'
+import { fetchTask, uploadPhoto } from '@/lib/api'
+import { formatDateTime, fromDateTimeLocalValue, toDateTimeLocalValue } from '@/lib/utils'
 
 interface TaskDetailPageProps {
   taskId: string
@@ -210,18 +210,8 @@ export default function TaskDetailPage({ taskId }: TaskDetailPageProps) {
   const submitCompletion = async () => {
     if (!task || !completionFile) return
 
-    // The server rejects anything over this; check here too so the user is not
-    // made to wait for a multi-megabyte upload only to be refused.
-    if (completionFile.size > MAX_COMPLETION_PHOTO_BYTES) {
-      setActionError(
-        t(
-          'taskDetail.photoTooLarge',
-          `Photo is too large (max ${MAX_COMPLETION_PHOTO_BYTES / 1024 / 1024} MB).`,
-        ),
-      )
-      return
-    }
-
+    // The photo is compressed before upload and the server enforces the size
+    // limit, so a large phone photo is fine here.
     try {
       setIsCompleting(true)
       setActionError(null)
@@ -473,9 +463,13 @@ export default function TaskDetailPage({ taskId }: TaskDetailPageProps) {
                         onChange={async (event) => {
                           const file = event.target.files?.[0]
                           if (!file) return
-                          const dataUrl = await fileToDataUrl(file)
-                          setSamplePhotoUrls((prev) => [...prev, dataUrl])
                           event.target.value = ''
+                          try {
+                            const url = await uploadPhoto(file)
+                            setSamplePhotoUrls((prev) => [...prev, url])
+                          } catch (error) {
+                            setActionError(describeError(error, t('taskDetail.uploadError', 'Không tải được ảnh lên.')))
+                          }
                         }}
                       />
                     </div>

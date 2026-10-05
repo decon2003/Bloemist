@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
 import { assignTask } from '@/lib/server/data-store'
 import { handleRouteError, readJsonBody } from '@/lib/server/route-helpers'
+import { requireUser } from '@/lib/server/session'
 
 export async function POST(request: Request, { params }: { params: Promise<{ taskId: string }> }) {
   try {
+    await requireUser(request)
     const { taskId } = await params
     const body = await readJsonBody(request)
     const updated = await assignTask(taskId, body)

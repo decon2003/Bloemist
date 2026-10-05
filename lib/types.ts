@@ -229,13 +229,16 @@ export interface User {
   createdAt: string
   baseSalary?: string
   commissionRate?: number
+  mustChangePassword?: boolean
+  /** Write-only: a temporary password set by a manager. Never returned. */
+  password?: string
 }
 
 export interface AuthContextValue {
   user: User | null
   isLoading: boolean
   isAuthenticated: boolean
-  login: (email: string, password: string) => Promise<void>
-  logout: () => void
+  login: (email: string, password: string) => Promise<User>
+  logout: () => Promise<void>
   updateUser: (user: User) => void
 }

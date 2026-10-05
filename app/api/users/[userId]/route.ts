@@ -2,7 +2,11 @@ import { NextResponse } from 'next/server'
 import db from '@/lib/server/db'
 import { ApiError } from '@/lib/server/data-store'
 import { handleRouteError, readJsonBody } from '@/lib/server/route-helpers'
+import { hashPassword, validateNewPassword } from '@/lib/server/password'
+import { MANAGER_ROLES, isManager, requireUser } from '@/lib/server/session'
 import {
+    PRIVILEGED_USER_SELECT,
+    PUBLIC_USER_SELECT,
     USER_ROLES,
     USER_STATUSES,
     assertOneOf,
@@ -21,8 +25,15 @@ interface RouteContext {
 // GET: Get single user
 export async function GET(request: Request, context: RouteContext) {
     try {
+        const me = await requireUser(request)
         const { userId } = await context.params
-        const user = await db.user.findUnique({ where: { id: userId } })
+        if (userId !== me.id && !isManager(me)) {
+            throw new ApiError(403, 'Bạn không có quyền xem thông tin này')
+        }
+        const user = await db.user.findUnique({
+            where: { id: userId },
+            select: isManager(me) ? PRIVILEGED_USER_SELECT : PUBLIC_USER_SELECT,
+        })
 
         if (!user) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 })
@@ -45,6 +56,7 @@ export async function GET(request: Request, context: RouteContext) {
 // arbitrary role strings, negative commission rates and NaN.
 export async function PATCH(request: Request, context: RouteContext) {
     try {
+        const me = await requireUser(request, MANAGER_ROLES)
         const { userId } = await context.params
         const body = await readJsonBody(request)
 
@@ -58,6 +70,15 @@ export async function PATCH(request: Request, context: RouteContext) {
         if (body.avatar !== undefined) data.avatar = requireNonBlank(body.avatar, 'avatar', 64)
         if (body.baseSalary !== undefined) data.baseSalary = parseMoneyString(body.baseSalary, 'baseSalary')
         if (body.commissionRate !== undefined) data.commissionRate = parseCommissionRate(body.commissionRate)
+        // Password reset by a manager: issue a new temporary password, force a
+        // change on next login and sign the user out everywhere.
+        if (body.password !== undefined && body.password !== '') {
+            data.passwordHash = await hashPassword(validateNewPassword(body.password))
+            data.mustChangePassword = userId !== me.id
+            data.sessionVersion = { increment: 1 }
+            data.failedLoginCount = 0
+            data.lockedUntil = null
+        }
 
         if (Object.keys(data).length === 0) {
             throw new ApiError(400, 'No updatable fields supplied')
@@ -76,7 +97,8 @@ export async function PATCH(request: Request, context: RouteContext) {
 
         const user = await db.user.update({
             where: { id: userId },
-            data
+            data,
+            select: PRIVILEGED_USER_SELECT,
         })
 
         return NextResponse.json({
@@ -91,7 +113,12 @@ export async function PATCH(request: Request, context: RouteContext) {
 // DELETE: Delete user
 export async function DELETE(request: Request, context: RouteContext) {
     try {
+        const me = await requireUser(request, MANAGER_ROLES)
         const { userId } = await context.params
+
+        if (userId === me.id) {
+            throw new ApiError(403, 'Không thể tự xoá tài khoản của chính mình')
+        }
 
         const user = await db.user.findUnique({ where: { id: userId } })
         if (!user) {

@@ -22,6 +22,12 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
       return
     }
 
+    // A temporary password set by a manager must be replaced before anything else.
+    if (user?.mustChangePassword && !pathname.includes('/change-password')) {
+      router.replace(`/${lang}/change-password`)
+      return
+    }
+
     if ((user?.role === 'florist' || user?.role === 'sales') && pathname.includes('/dashboard')) {
       router.replace(`/${lang}/checkins`)
       return
@@ -31,7 +37,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
       router.push(`/${lang}/access-denied`)
       return
     }
-  }, [isAuthenticated, isLoading, pathname, user?.role, router, lang, isPublicRoute])
+  }, [isAuthenticated, isLoading, pathname, user?.role, user?.mustChangePassword, router, lang, isPublicRoute])
 
   if (isPublicRoute) {
     return children

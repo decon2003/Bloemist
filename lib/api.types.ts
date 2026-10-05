@@ -32,6 +32,9 @@ export interface ApiClient {
   fetchDashboardStats: () => Promise<DashboardStats>
   fetchWorkspaceSettings: () => Promise<WorkspaceSettings>
   login: (email: string, password: string) => Promise<User>
+  logout: () => Promise<void>
+  fetchCurrentUser: () => Promise<User>
+  changePassword: (currentPassword: string, newPassword: string) => Promise<User>
   fetchUsers: () => Promise<User[]>
   createUser: (input: Partial<User>) => Promise<User>
   updateUser: (userId: string, input: Partial<User>) => Promise<User>

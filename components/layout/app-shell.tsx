@@ -33,7 +33,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const { lang, t } = useLocale()
   const { user, logout, isAuthenticated } = useAuth()
 
-  const isPublicRoute = pathname?.includes('/login') || pathname?.includes('/access-denied')
+  // change-password is signed-in only (RouteGuard enforces that) but renders
+  // without the navigation, since a forced change must not be skipped.
+  const isPublicRoute =
+    pathname?.includes('/login') || pathname?.includes('/access-denied') || pathname?.includes('/change-password')
 
   const navItems = useMemo(() => {
     const staffNav = [
@@ -79,10 +82,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     setNavOpen(false)
   }
 
-  const handleLogout = () => {
-    logout()
-    router.push(`/${lang}/login`)
+  const handleLogout = async () => {
     setUserMenuOpen(false)
+    await logout().catch(() => undefined)
+    // Full navigation so no cached data from this session survives.
+    window.location.assign(`/${lang}/login`)
   }
 
   if (isPublicRoute) {
@@ -150,11 +154,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 </div>
               </div>
               <button
-                onClick={() => setUserMenuOpen(false)}
+                onClick={() => {
+                  setUserMenuOpen(false)
+                  router.push(`/${lang}/change-password`)
+                }}
                 className="w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted flex items-center gap-2"
               >
                 <User className="h-4 w-4" />
-                {t('auth.profile')}
+                {t('auth.changePassword', 'Đổi mật khẩu')}
               </button>
               <button
                 onClick={handleLogout}
@@ -214,6 +221,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 <div className={`inline-block px-2 py-1 rounded-lg text-xs font-semibold ${roleBadge.color} mb-3`}>
                   {roleBadge.label}
                 </div>
+                <Link
+                  href={`/${lang}/change-password`}
+                  onClick={() => setNavOpen(false)}
+                  className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-muted rounded-lg flex items-center gap-2 font-medium"
+                >
+                  <User className="h-4 w-4" />
+                  {t('auth.changePassword', 'Đổi mật khẩu')}
+                </Link>
                 <button
                   onClick={handleLogout}
                   className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-2 font-medium"

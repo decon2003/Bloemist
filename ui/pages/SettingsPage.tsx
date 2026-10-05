@@ -52,6 +52,7 @@ interface UserFormData {
   email: string
   phone: string
   role: User['role']
+  password: string
 }
 
 const UserFormModal = ({
@@ -61,7 +62,8 @@ const UserFormModal = ({
   onSubmit,
   submitLabel,
   initialData,
-  isSubmitting
+  isSubmitting,
+  passwordRequired,
 }: {
   isOpen: boolean
   title: string
@@ -70,13 +72,16 @@ const UserFormModal = ({
   submitLabel: string
   initialData?: UserFormData
   isSubmitting: boolean
+  /** New staff need a temporary password; when editing it is an optional reset. */
+  passwordRequired: boolean
 }) => {
   // Modal manages its own state
   const [localData, setLocalData] = useState<UserFormData>({
     name: '',
     email: '',
     phone: '',
-    role: 'sales'
+    role: 'sales',
+    password: '',
   })
 
   // Reset or initialize state when modal opens or initialData changes
@@ -85,7 +90,7 @@ const UserFormModal = ({
       if (initialData) {
         setLocalData(initialData)
       } else {
-        setLocalData({ name: '', email: '', phone: '', role: 'sales' })
+        setLocalData({ name: '', email: '', phone: '', role: 'sales', password: '' })
       }
     }
   }, [isOpen, initialData])
@@ -149,6 +154,23 @@ const UserFormModal = ({
               <option value="admin">Admin</option>
             </select>
           </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1">
+              {passwordRequired ? 'Mật khẩu tạm' : 'Cấp lại mật khẩu tạm'}
+            </label>
+            <input
+              type="text"
+              autoComplete="off"
+              value={localData.password}
+              onChange={(e) => setLocalData(prev => ({ ...prev, password: e.target.value }))}
+              className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              placeholder={passwordRequired ? 'Ít nhất 8 ký tự' : 'Để trống nếu không đổi'}
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Đưa trực tiếp cho nhân viên. Nhân viên sẽ phải đổi mật khẩu ở lần đăng nhập tiếp theo.
+            </p>
+          </div>
         </div>
 
         <div className="flex gap-2 justify-end pt-4 border-t border-border">
@@ -208,6 +230,11 @@ export default function SettingsPage() {
       return
     }
 
+    if (data.password.length < 8) {
+      alert('Mật khẩu tạm phải có ít nhất 8 ký tự')
+      return
+    }
+
     setIsSubmitting(true)
     try {
       const { createUser } = await import('@/lib/api')
@@ -216,6 +243,7 @@ export default function SettingsPage() {
         email: data.email,
         phone: data.phone,
         role: data.role,
+        password: data.password,
       })
       alert('Thêm nhân viên thành công!')
       setShowAddUserModal(false)
@@ -241,6 +269,11 @@ export default function SettingsPage() {
       return
     }
 
+    if (data.password && data.password.length < 8) {
+      alert('Mật khẩu tạm phải có ít nhất 8 ký tự')
+      return
+    }
+
     setIsSubmitting(true)
     try {
       const { updateUser } = await import('@/lib/api')
@@ -249,8 +282,9 @@ export default function SettingsPage() {
         email: data.email,
         phone: data.phone,
         role: data.role,
+        ...(data.password ? { password: data.password } : {}),
       })
-      alert('Cập nhật thành công!')
+      alert(data.password ? 'Đã cập nhật và cấp mật khẩu tạm mới.' : 'Cập nhật thành công!')
       setShowEditUserModal(false)
       setEditingUser(null)
       window.location.reload()
@@ -496,6 +530,7 @@ export default function SettingsPage() {
         onSubmit={handleAddUser}
         submitLabel="Thêm"
         isSubmitting={isSubmitting}
+        passwordRequired
       />
 
       {/* Edit User Modal */}
@@ -509,9 +544,11 @@ export default function SettingsPage() {
           name: editingUser.name,
           email: editingUser.email,
           phone: editingUser.phone || '',
-          role: editingUser.role
+          role: editingUser.role,
+          password: '',
         } : undefined}
         isSubmitting={isSubmitting}
+        passwordRequired={false}
       />
     </div>
   )

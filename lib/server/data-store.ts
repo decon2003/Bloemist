@@ -96,6 +96,14 @@ const parseRequiredDate = (value: string | Date, field: string) => {
   return date
 }
 
+// Florists work from the bouquet and the deadline; they never need the
+// customer's or receiver's phone number, so it is not sent to them at all
+// (the UI already hid it, but the API used to return it to everyone).
+export const redactOrderFor = <T extends { customerPhone?: string; receiverPhone?: string }>(
+  viewer: { role: string },
+  order: T,
+): T => (viewer.role === 'florist' ? { ...order, customerPhone: '', receiverPhone: '' } : order)
+
 export const listTasks = async () => {
   const tasks = await db.task.findMany({
     orderBy: { createdAt: 'desc' },

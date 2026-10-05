@@ -26,6 +26,14 @@ model User {
   messagesReceived Message[]      @relation("ReceivedMessages")
   baseSalary       String?        @default("0")
   commissionRate   Float?         @default(0)
+
+  // Auth. passwordHash is null until a manager sets a temporary password.
+  passwordHash       String?
+  mustChangePassword Boolean   @default(false)
+  // Bumped on password change/reset so every existing session cookie dies.
+  sessionVersion     Int       @default(0)
+  failedLoginCount   Int       @default(0)
+  lockedUntil        DateTime?
 }
 
 model StoreLocation {

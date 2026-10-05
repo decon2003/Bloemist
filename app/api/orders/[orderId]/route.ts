@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server'
-import { getOrder, updateOrder, deleteOrder } from '@/lib/server/data-store'
+import { getOrder, updateOrder, deleteOrder, redactOrderFor } from '@/lib/server/data-store'
 import { handleRouteError, readJsonBody } from '@/lib/server/route-helpers'
+import { requireUser, ORDER_WRITE_ROLES } from '@/lib/server/session'
 
-export async function GET(_request: Request, { params }: { params: Promise<{ orderId: string }> }) {
+export async function GET(request: Request, { params }: { params: Promise<{ orderId: string }> }) {
   try {
+    const me = await requireUser(request)
     const { orderId } = await params
     const order = await getOrder(orderId)
-    return NextResponse.json(order)
+    return NextResponse.json(redactOrderFor(me, order))
   } catch (error) {
     return handleRouteError(error)
   }
@@ -14,6 +16,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ ord
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ orderId: string }> }) {
   try {
+    await requireUser(request, ORDER_WRITE_ROLES)
     const { orderId } = await params
     const json = await readJsonBody(request)
     const updated = await updateOrder(orderId, json)
@@ -23,8 +26,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ or
   }
 }
 
-export async function DELETE(_request: Request, { params }: { params: Promise<{ orderId: string }> }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ orderId: string }> }) {
   try {
+    await requireUser(request, ORDER_WRITE_ROLES)
     const { orderId } = await params
     await deleteOrder(orderId)
     return new NextResponse(null, { status: 204 })

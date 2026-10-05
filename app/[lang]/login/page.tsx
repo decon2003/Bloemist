@@ -1,14 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { useLocale } from '@/components/providers/locale-provider'
 import { useAuth } from '@/components/providers/auth-provider'
 import Image from 'next/image'
-import Link from 'next/link'
 
 export default function LoginPage() {
-  const router = useRouter()
   const { lang, t } = useLocale()
   const { login, isLoading } = useAuth()
 
@@ -22,8 +19,14 @@ export default function LoginPage() {
     setError('')
 
     try {
-      await login(email, password)
-      router.push(`/${lang}/dashboard`)
+      const signedIn = await login(email, password)
+      const destination = signedIn.mustChangePassword
+        ? 'change-password'
+        : signedIn.role === 'boss' || signedIn.role === 'admin'
+          ? 'dashboard'
+          : 'orders'
+      // Full navigation so data queries that failed while signed out start fresh.
+      window.location.assign(`/${lang}/${destination}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : t('auth.loginFailed', 'Login failed'))
     }
@@ -78,8 +81,9 @@ export default function LoginPage() {
               </label>
               <input
                 id="email"
-                type="text"
-                placeholder="admin@bloemist.com"
+                type="email"
+                autoComplete="username"
+                placeholder="ten@bloemistflorals.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={isLoading}
@@ -96,6 +100,7 @@ export default function LoginPage() {
                 <input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
                   placeholder={t('auth.passwordLabel')}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -129,16 +134,10 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Forgot Password Link */}
-          <div className="text-center">
-            <Link
-              href="#"
-              className="text-sm text-primary hover:underline"
-              onClick={(e) => e.preventDefault()}
-            >
-              {t('auth.forgotPassword')}
-            </Link>
-          </div>
+          {/* There is no self-service reset: a manager issues a new temporary password. */}
+          <p className="text-center text-sm text-muted-foreground">
+            {t('auth.forgotPasswordHint', 'Quên mật khẩu? Liên hệ quản lý để được cấp mật khẩu tạm.')}
+          </p>
         </div>
       </div>
     </div>

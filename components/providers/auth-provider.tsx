@@ -2,52 +2,62 @@
 
 import { createContext, useContext, useState, useCallback, useMemo, ReactNode, useEffect } from 'react'
 import { User, AuthContextValue } from '@/lib/types'
+import { fetchCurrentUser, login as apiLogin, logout as apiLogout } from '@/lib/api'
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
-
-
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
-  // Load user from localStorage on mount
+  // The session lives in an httpOnly cookie; ask the server who we are rather
+  // than trusting anything stored in the browser.
   useEffect(() => {
-    const savedUser = localStorage.getItem('auth_user')
-    if (savedUser) {
-      try {
-        setUser(JSON.parse(savedUser))
-      } catch (error) {
-        console.error('Failed to parse saved user:', error)
-      }
+    // Older builds kept the whole user object here and treated it as a login.
+    try {
+      localStorage.removeItem('auth_user')
+    } catch {
+      // storage unavailable - nothing to clean up
     }
-    setIsLoading(false)
+
+    fetchCurrentUser()
+      .then(setUser)
+      .catch(() => setUser(null))
+      .finally(() => setIsLoading(false))
+
+    const onUnauthorized = () => setUser(null)
+    const onPasswordChangeRequired = () =>
+      setUser((current) => (current ? { ...current, mustChangePassword: true } : current))
+
+    window.addEventListener('auth:unauthorized', onUnauthorized)
+    window.addEventListener('auth:password-change-required', onPasswordChangeRequired)
+    return () => {
+      window.removeEventListener('auth:unauthorized', onUnauthorized)
+      window.removeEventListener('auth:password-change-required', onPasswordChangeRequired)
+    }
   }, [])
 
   const login = useCallback(async (email: string, password: string) => {
     setIsLoading(true)
     try {
-      const { login: apiLogin } = await import('@/lib/api')
       const userData = await apiLogin(email, password)
-
       setUser(userData)
-      localStorage.setItem('auth_user', JSON.stringify(userData))
-    } catch (error) {
-      console.error('Login failed:', error)
-      throw error
+      return userData
     } finally {
       setIsLoading(false)
     }
   }, [])
 
-  const logout = useCallback(() => {
-    setUser(null)
-    localStorage.removeItem('auth_user')
+  const logout = useCallback(async () => {
+    try {
+      await apiLogout()
+    } finally {
+      setUser(null)
+    }
   }, [])
 
   const updateUser = useCallback((updatedUser: User) => {
     setUser(updatedUser)
-    localStorage.setItem('auth_user', JSON.stringify(updatedUser))
   }, [])
 
   const value = useMemo<AuthContextValue>(

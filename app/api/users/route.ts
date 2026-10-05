@@ -2,7 +2,11 @@ import { NextResponse } from 'next/server'
 import db from '@/lib/server/db'
 import { ApiError } from '@/lib/server/data-store'
 import { handleRouteError, readJsonBody } from '@/lib/server/route-helpers'
+import { hashPassword, validateNewPassword } from '@/lib/server/password'
+import { MANAGER_ROLES, isManager, requireUser } from '@/lib/server/session'
 import {
+    PRIVILEGED_USER_SELECT,
+    PUBLIC_USER_SELECT,
     USER_ROLES,
     assertOneOf,
     normalizeEmail,
@@ -11,19 +15,14 @@ import {
     requireNonBlank,
 } from '@/lib/server/validation'
 
-// GET: List all users
-//
-// SECURITY DEBT: this response includes baseSalary and commissionRate, the most
-// sensitive columns in the schema, and the route has no authentication in front
-// of it. Narrowing the select here was considered and rejected: it would break
-// the staff salary report without actually protecting anything, because any
-// replacement endpoint would be equally unauthenticated. The real fix is
-// server-side auth + a role gate on this route; salary must move behind it at
-// the same time. Do not ship this to a wider audience until that lands.
-export async function GET() {
+// GET: List all users. Salary columns only go to bosses/admins; password and
+// lockout columns never leave the server.
+export async function GET(request: Request) {
     try {
+        const me = await requireUser(request)
         const users = await db.user.findMany({
-            orderBy: { createdAt: 'desc' }
+            orderBy: { createdAt: 'desc' },
+            select: isManager(me) ? PRIVILEGED_USER_SELECT : PUBLIC_USER_SELECT,
         })
         return NextResponse.json(users.map(u => ({
             ...u,
@@ -37,6 +36,7 @@ export async function GET() {
 // POST: Create a new user
 export async function POST(request: Request) {
     try {
+        await requireUser(request, MANAGER_ROLES)
         const body = await readJsonBody(request)
 
         const name = requireNonBlank(body.name, 'name', 120)
@@ -52,6 +52,9 @@ export async function POST(request: Request) {
         const commissionRate = body.commissionRate === undefined || body.commissionRate === null
             ? 0
             : parseCommissionRate(body.commissionRate)
+        // The manager hands this temporary password over in person; the staff
+        // member must replace it on first login.
+        const password = validateNewPassword(body.password)
 
         // Emails are normalised to lower case so that this check and the unique
         // index agree; previously Admin@x and admin@x created shadow accounts.
@@ -70,7 +73,10 @@ export async function POST(request: Request) {
                 avatar: typeof body.avatar === 'string' && body.avatar.trim() ? body.avatar.trim() : '👤',
                 baseSalary,
                 commissionRate,
-            }
+                passwordHash: await hashPassword(password),
+                mustChangePassword: true,
+            },
+            select: PRIVILEGED_USER_SELECT,
         })
 
         return NextResponse.json({

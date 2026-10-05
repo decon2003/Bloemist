@@ -14,7 +14,23 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers })
 
   if (!response.ok) {
-    const message = await response.text()
+    const text = await response.text()
+    let message = text
+    try {
+      message = JSON.parse(text).error ?? text
+    } catch {
+      // not JSON - keep the raw text
+    }
+
+    // Let the auth provider react (sign out / force a password change) without
+    // every caller having to know about sessions.
+    if (typeof window !== 'undefined' && !path.startsWith('/auth/')) {
+      if (response.status === 401) window.dispatchEvent(new Event('auth:unauthorized'))
+      if (response.status === 403 && message === 'PASSWORD_CHANGE_REQUIRED') {
+        window.dispatchEvent(new Event('auth:password-change-required'))
+      }
+    }
+
     throw new Error(message || `Request failed with status ${response.status}`)
   }
 
@@ -57,6 +73,10 @@ const apiClient: ApiClient = {
   updateUser: (userId: string, input: Partial<User>) => request<User>(`/users/${userId}`, { method: 'PATCH', body: JSON.stringify(input) }),
   deleteUser: (userId: string) => request<void>(`/users/${userId}`, { method: 'DELETE' }),
   login: (email, password) => request<User>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+  logout: () => request<void>('/auth/logout', { method: 'POST' }),
+  fetchCurrentUser: () => request<User>('/auth/me'),
+  changePassword: (currentPassword, newPassword) =>
+    request<User>('/auth/change-password', { method: 'POST', body: JSON.stringify({ currentPassword, newPassword }) }),
 
   // Check-ins
   fetchCheckIns: () => request<StaffCheckIn[]>('/checkins'),
@@ -91,6 +111,9 @@ export const checkOut = apiClient.checkOut
 export const fetchDashboardStats = apiClient.fetchDashboardStats
 export const fetchWorkspaceSettings = apiClient.fetchWorkspaceSettings
 export const login = apiClient.login
+export const logout = apiClient.logout
+export const fetchCurrentUser = apiClient.fetchCurrentUser
+export const changePassword = apiClient.changePassword
 export const fetchUsers = apiClient.fetchUsers
 export const createUser = apiClient.createUser
 export const updateUser = apiClient.updateUser

@@ -23,7 +23,7 @@ Next.js 16 · Prisma 5 + Postgres (Neon) · ảnh trên Cloudflare R2 · triển
 cp .env.example .env   # điền DATABASE_URL (một database thử, không dùng database thật)
 npm install
 npx prisma migrate deploy
-npx tsx prisma/seed.ts
+npx tsx --env-file=.env prisma/seed.ts
 node scripts/set-password.mjs admin@bloemist.com 'MatKhau123'
 npm run dev
 ```

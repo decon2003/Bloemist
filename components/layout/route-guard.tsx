@@ -47,5 +47,10 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     return null
   }
 
+  // Don't render (and let fetch) protected pages while a password change is pending.
+  if (user?.mustChangePassword && !pathname.includes('/change-password')) {
+    return null
+  }
+
   return children
 }

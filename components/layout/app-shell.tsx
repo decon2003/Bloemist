@@ -93,8 +93,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return <>{children}</>
   }
 
+  // Signed out: render no shell, but still mount RouteGuard (our children) so it
+  // can redirect to the login page. Returning null here left a blank screen.
   if (!isAuthenticated) {
-    return null
+    return <>{children}</>
   }
 
   const getRoleBadge = () => {

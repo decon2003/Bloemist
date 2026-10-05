@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useMemo, useState } from 'react'
 import { usePathname } from 'next/navigation'
+import { useAuth } from '@/components/providers/auth-provider'
 import type { CreateOrderInput, CreateTaskInput, Task, TaskStatus, Order, Florist, StaffCheckIn, WorkspaceSettings, User } from '@/lib/types'
 import {
   fetchTasks,
@@ -64,6 +65,9 @@ const AppDataContext = createContext<AppDataContextValue | undefined>(undefined)
 const AppDataContextProvider = ({ children }: { children: React.ReactNode }) => {
   const queryClient = useQueryClient()
   const pathname = usePathname()
+  const { user } = useAuth()
+  // Every API route needs a session, so don't fire requests that can only 401/403.
+  const canLoad = !!user && !user.mustChangePassword
 
   const dataNeeds = useMemo(() => {
     const route = pathname ?? ''
@@ -72,17 +76,16 @@ const AppDataContextProvider = ({ children }: { children: React.ReactNode }) => 
     const isCheckinsRoute = route.includes('/checkins')
     const isStaffRoute = route.includes('/staff')
     const isSettingsRoute = route.includes('/settings')
-    const isCustomersRoute = route.includes('/customers')
 
     return {
-      orders: isOrdersRoute || isCustomersRoute || isStaffRoute,
-      tasks: isOrdersRoute || isTasksRoute || isStaffRoute,
-      florists: isOrdersRoute || isTasksRoute,
-      checkins: isCheckinsRoute || isStaffRoute,
-      settings: isCheckinsRoute || isSettingsRoute,
-      users: isStaffRoute || isSettingsRoute,
+      orders: canLoad && (isOrdersRoute || isStaffRoute),
+      tasks: canLoad && (isOrdersRoute || isTasksRoute || isStaffRoute),
+      florists: canLoad && (isOrdersRoute || isTasksRoute),
+      checkins: canLoad && (isCheckinsRoute || isStaffRoute),
+      settings: canLoad && (isCheckinsRoute || isSettingsRoute),
+      users: canLoad && (isStaffRoute || isSettingsRoute),
     }
-  }, [pathname])
+  }, [pathname, canLoad])
 
   const tasksQuery = useQuery({ queryKey: ['tasks'], queryFn: fetchTasks, enabled: dataNeeds.tasks })
   const ordersQuery = useQuery({ queryKey: ['orders'], queryFn: fetchOrders, enabled: dataNeeds.orders })

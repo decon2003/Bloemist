@@ -1,18 +1,33 @@
-# Florist CRM UI
+# Bloemist Ops
 
-*Automatically synced with your [v0.app](https://v0.app) deployments*
+Hệ thống quản lý vận hành nội bộ của tiệm hoa Bloemist: https://noibo.bloemistflorals.com
 
-[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/cthanhng03s-projects/v0-florist-crm-ui)
-[![Built with v0](https://img.shields.io/badge/Built%20with-v0.app-black?style=for-the-badge)](https://v0.app/chat/mSgmrnJb4WR)
+## Chức năng
 
-## Overview
+- **Đơn hàng**: tạo đơn, tính tiền (giảm giá, phí ship, VAT, tiền cọc), giao đơn cho thợ, theo dõi trạng thái.
+- **Công việc**: giao việc cắm hoa cho thợ, ảnh mẫu, hạn hoàn thành, ảnh chứng minh khi hoàn thành.
+- **Khách hàng**: tự nhận khách cũ theo SĐT, ghi chú, nguồn khách, người nhận trước đây (chỉ quản lý xem danh sách).
+- **Chấm công**: check-in/check-out, số giờ làm.
+- **Nhân sự & lương**: lương cơ bản, % hoa hồng, báo cáo theo tháng.
+- **Dashboard**: doanh thu tháng/tuần, đơn đang xử lý.
 
-This repository will stay in sync with your deployed chats on [v0.app](https://v0.app).
-Any changes you make to your deployed app will be automatically pushed to this repository from [v0.app](https://v0.app).
+Vai trò: `boss`, `admin` (quản lý), `sales`, `florist`. Quyền được kiểm tra ở máy chủ (`lib/server/session.ts`).
 
-## Deployment
+## Công nghệ
 
-Your project is live at:
+Next.js 16 · Prisma 5 + Postgres (Neon) · ảnh trên Cloudflare R2 · triển khai trên Vercel.
 
-https://bloemist.vercel.app/
+## Chạy trên máy
 
+```bash
+cp .env.example .env   # điền DATABASE_URL (một database thử, không dùng database thật)
+npm install
+npx prisma migrate deploy
+npx tsx prisma/seed.ts
+node scripts/set-password.mjs admin@bloemist.com 'MatKhau123'
+npm run dev
+```
+
+## Triển khai, sao lưu, khôi phục
+
+Xem [DEPLOY.md](DEPLOY.md).

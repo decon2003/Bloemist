@@ -1,4 +1,4 @@
-import { CreateOrderInput, CreateTaskInput, DashboardStats, Order, Task, TaskStatus, Florist, StaffCheckIn, WorkspaceSettings, User } from './types'
+import { CreateOrderInput, CreateTaskInput, DashboardStats, Order, Task, TaskStatus, Florist, StaffCheckIn, WorkspaceSettings, User, CustomerPage, CustomerLookup, CustomerSummary } from './types'
 
 export interface AssignTaskPayload {
   userId: string
@@ -34,6 +34,9 @@ export interface ApiClient {
   login: (email: string, password: string) => Promise<User>
   logout: () => Promise<void>
   uploadPhoto: (file: File | Blob) => Promise<string>
+  fetchCustomers: (params: { q?: string; sort?: 'spend' | 'recent' | 'orders'; page?: number }) => Promise<CustomerPage>
+  lookupCustomer: (phone: string) => Promise<CustomerLookup | null>
+  updateCustomer: (customerId: string, input: Partial<Pick<CustomerSummary, 'name' | 'notes' | 'source' | 'marketingConsent'>>) => Promise<CustomerSummary>
   fetchCurrentUser: () => Promise<User>
   changePassword: (currentPassword: string, newPassword: string) => Promise<User>
   fetchUsers: () => Promise<User[]>

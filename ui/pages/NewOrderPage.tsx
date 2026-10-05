@@ -6,10 +6,10 @@ import { useRouter } from 'next/navigation'
 import { useLocale } from '@/components/providers/locale-provider'
 import { useAppData } from '@/components/providers/app-data-provider'
 import { useAuth } from '@/components/providers/auth-provider'
-import { uploadPhoto } from '@/lib/api'
+import { lookupCustomer, uploadPhoto } from '@/lib/api'
+import type { CustomerLookup } from '@/lib/types'
 import { formatCurrencyFromNumber, formatCurrencyInput, parseCurrencyToNumber } from '@/lib/utils'
 
-const normalizePhone = (value: string) => value.replace(/\D/g, '')
 
 type ProductForm = {
   name: string
@@ -44,40 +44,47 @@ export default function NewOrderPage() {
   const [products, setProducts] = useState<ProductForm[]>([
     { name: '', quantity: 1, note: '', samplePhotoUrls: [], draftSampleUrl: '' },
   ])
-  const [customerNameLocked, setCustomerNameLocked] = useState(false)
+  const [knownCustomer, setKnownCustomer] = useState<CustomerLookup | null>(null)
+  const [customerNameAutofilled, setCustomerNameAutofilled] = useState(false)
   const [productError, setProductError] = useState<string | null>(null)
   const [productPreviewUrl, setProductPreviewUrl] = useState<string | null>(null)
 
-  const existingCustomers = useMemo(() => {
-    const registry = new Map<string, { phone: string; name: string }>()
-    orders.forEach((order) => {
-      const key = normalizePhone(order.customerPhone)
-      if (key && !registry.has(key)) {
-        registry.set(key, { phone: order.customerPhone, name: order.customerName })
-      }
-    })
-    return Array.from(registry.values())
-  }, [orders])
-
+  // Look the phone number up once it is long enough to be a real number.
   useEffect(() => {
-    if (!customerPhone) {
-      setCustomerNameLocked(false)
+    const digits = customerPhone.replace(/\D/g, '')
+    if (digits.length < 9) {
+      setKnownCustomer(null)
       return
     }
-    const match = existingCustomers.find((entry) => normalizePhone(entry.phone) === normalizePhone(customerPhone))
-    if (match) {
-      setCustomerName(match.name)
-      setCustomerNameLocked(true)
-    } else if (customerNameLocked) {
-      setCustomerName('')
-      setCustomerNameLocked(false)
+    let cancelled = false
+    const timer = setTimeout(() => {
+      lookupCustomer(customerPhone)
+        .then((found) => {
+          if (cancelled) return
+          setKnownCustomer(found)
+          // Fill the name only if the user has not typed one themselves.
+          setCustomerName((current) => {
+            if (found && (!current || customerNameAutofilled)) {
+              setCustomerNameAutofilled(true)
+              return found.name
+            }
+            if (!found && customerNameAutofilled) {
+              setCustomerNameAutofilled(false)
+              return ''
+            }
+            return current
+          })
+        })
+        .catch(() => !cancelled && setKnownCustomer(null))
+    }, 300)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
     }
-  }, [customerPhone, existingCustomers, customerNameLocked])
+    // customerNameAutofilled is read, not reacted to.
+  }, [customerPhone])
 
-  const isNewCustomer = useMemo(
-    () => !existingCustomers.some((entry) => normalizePhone(entry.phone) === normalizePhone(customerPhone)),
-    [customerPhone, existingCustomers],
-  )
+  const isNewCustomer = !knownCustomer
 
   const dueTimeForTasks = useMemo(() => {
     const receiveDate = new Date(receiveTime)
@@ -299,8 +306,10 @@ export default function NewOrderPage() {
                 <input
                   required
                   value={customerName}
-                  onChange={(event) => setCustomerName(event.target.value)}
-                  disabled={customerNameLocked}
+                  onChange={(event) => {
+                    setCustomerName(event.target.value)
+                    setCustomerNameAutofilled(false)
+                  }}
                   className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:cursor-not-allowed disabled:bg-muted/50"
                 />
               </label>
@@ -310,17 +319,43 @@ export default function NewOrderPage() {
                   required
                   value={customerPhone}
                   onChange={(event) => setCustomerPhone(event.target.value)}
-                  list="customer-phone-options"
+                  type="tel"
+                  inputMode="tel"
                   className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 />
-                <datalist id="customer-phone-options">
-                  {existingCustomers.map((entry) => (
-                    <option key={entry.phone} value={entry.phone}>
-                      {entry.name}
-                    </option>
-                  ))}
-                </datalist>
               </label>
+              {knownCustomer && (
+                <div className="col-span-1 md:col-span-2 rounded-xl border border-primary/30 bg-primary/5 p-3 text-sm space-y-2">
+                  <p className="font-medium text-foreground">
+                    Khách cũ · {knownCustomer.orderCount} đơn
+                    {knownCustomer.lastBouquet ? ` · lần trước: ${knownCustomer.lastBouquet}` : ''}
+                  </p>
+                  {knownCustomer.notes && <p className="text-muted-foreground italic">“{knownCustomer.notes}”</p>}
+                  {knownCustomer.recentReceivers.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      <span className="text-muted-foreground">Người nhận trước:</span>
+                      {knownCustomer.recentReceivers.map((receiver) => (
+                        <button
+                          key={`${receiver.receiverName}|${receiver.receiverPhone}|${receiver.deliveryAddress ?? ''}`}
+                          type="button"
+                          onClick={() => {
+                            setReceiverName(receiver.receiverName)
+                            setReceiverPhone(receiver.receiverPhone)
+                            if (receiver.deliveryAddress) {
+                              setDeliveryType('DELIVERY')
+                              setDeliveryAddress(receiver.deliveryAddress)
+                            }
+                          }}
+                          className="rounded-lg border border-border bg-white px-2 py-1 text-xs hover:border-primary"
+                        >
+                          {receiver.receiverName}
+                          {receiver.deliveryAddress ? ` · ${receiver.deliveryAddress}` : ''}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
               <label className="space-y-2 text-sm font-medium text-foreground">
                 <span>{t('orders.new.receiverName', 'Receiver name')}</span>
                 <input

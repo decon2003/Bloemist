@@ -7,6 +7,8 @@ import type { CreateOrderInput, CreateTaskInput, Florist, Order, Task, TaskStatu
 
 import { ApiError } from './api-error'
 import { storePhoto } from './storage'
+import { parseCurrencyToNumber } from './money'
+import { linkCustomer, normalizeCustomerPhone } from './customers'
 import { TASK_STATUSES, assertOneOf } from './validation'
 
 // Helper to map Prisma entity to App entity
@@ -46,37 +48,6 @@ const mapUser = (u: any) => ({
   ...u,
   createdAt: u.createdAt.toISOString(),
 })
-
-// Money arrives as free-form strings ("1.500.000 d", "-50000", "1 234,56").
-// Strip grouping separators and currency decoration but preserve the sign and
-// the decimal separator - dropping either silently turns refunds into revenue
-// and inflates decimal amounts by 10x/100x.
-const parseCurrencyToNumber = (value: string | number | null | undefined) => {
-  if (value === null || value === undefined || value === '') return 0
-  if (typeof value === 'number') return Number.isFinite(value) ? value : 0
-
-  let text = value.trim().replace(/[^\d,.\-]/g, '')
-  const negative = text.startsWith('-')
-  text = text.replace(/-/g, '')
-
-  const lastComma = text.lastIndexOf(',')
-  const lastDot = text.lastIndexOf('.')
-  const decimalAt = Math.max(lastComma, lastDot)
-
-  // A separator is decimal only when it is the last one and leaves 1-2 digits
-  // after it; otherwise every separator is thousands grouping (VN style).
-  if (decimalAt !== -1 && text.length - decimalAt - 1 <= 2 && text.length - decimalAt - 1 > 0) {
-    const whole = text.slice(0, decimalAt).replace(/[.,]/g, '')
-    const fraction = text.slice(decimalAt + 1)
-    text = `${whole}.${fraction}`
-  } else {
-    text = text.replace(/[.,]/g, '')
-  }
-
-  const numeric = Number(text)
-  if (!Number.isFinite(numeric)) return 0
-  return negative ? -numeric : numeric
-}
 
 // Local-time date key. Must match lib/date-utils.ts so that server buckets and
 // client buckets agree; toISOString() here would shift every VN evening order
@@ -200,9 +171,12 @@ export const listFlorists = async () => {
 export const createOrder = async (input: CreateOrderInput) => {
   const code = input.code || `ORD-${Math.floor(1000 + Math.random() * 9000)}-${Date.now().toString().slice(-4)}`
 
+  const customerId = await linkCustomer(input.customerPhone, input.customerName)
+
   const order = await db.order.create({
     data: {
       code,
+      customerId,
       customerName: input.customerName,
       customerPhone: input.customerPhone,
       receiverName: input.receiverName,
@@ -253,6 +227,14 @@ export const updateOrder = async (orderId: string, input: Partial<CreateOrderInp
 
   if (input.receiveTime !== undefined) {
     data.receiveTime = parseRequiredDate(input.receiveTime, 'receiveTime')
+  }
+
+  // A corrected phone number moves the order to the right customer.
+  if (input.customerPhone !== undefined) {
+    const current = await db.order.findUnique({ where: { id: orderId }, select: { customerPhone: true, customerName: true } })
+    if (current && normalizeCustomerPhone(current.customerPhone) !== normalizeCustomerPhone(input.customerPhone)) {
+      data.customerId = await linkCustomer(input.customerPhone, input.customerName ?? current.customerName)
+    }
   }
 
   if (Object.keys(data).length === 0) {

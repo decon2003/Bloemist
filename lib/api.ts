@@ -1,7 +1,7 @@
 // ============================================================
 // API Layer - Calls Real Backend API Routes
 // ============================================================
-import type { CreateOrderInput, CreateTaskInput, DashboardStats, Order, Task, TaskStatus, Florist, User, StaffCheckIn, WorkspaceSettings } from './types'
+import type { CreateOrderInput, CreateTaskInput, CustomerLookup, CustomerPage, CustomerSummary, DashboardStats, Order, Task, TaskStatus, Florist, User, StaffCheckIn, WorkspaceSettings } from './types'
 import type { ApiClient, AssignTaskPayload, CompleteTaskPayload } from './api.types'
 import { compressImage } from './image-compress'
 
@@ -65,6 +65,13 @@ const apiClient: ApiClient = {
     return url
   },
 
+  // Customers
+  fetchCustomers: ({ q = '', sort = 'spend', page = 1 }) =>
+    request<CustomerPage>(`/customers?${new URLSearchParams({ q, sort, page: String(page) })}`),
+  lookupCustomer: (phone) => request<CustomerLookup | null>(`/customers/lookup?${new URLSearchParams({ phone })}`),
+  updateCustomer: (customerId, input) =>
+    request<CustomerSummary>(`/customers/${customerId}`, { method: 'PATCH', body: JSON.stringify(input) }),
+
   // Orders
   fetchOrders: () => request<Order[]>('/orders'),
   fetchOrder: (orderId) => request<Order>(`/orders/${orderId}`),
@@ -120,6 +127,9 @@ export const fetchWorkspaceSettings = apiClient.fetchWorkspaceSettings
 export const login = apiClient.login
 export const logout = apiClient.logout
 export const uploadPhoto = apiClient.uploadPhoto
+export const fetchCustomers = apiClient.fetchCustomers
+export const lookupCustomer = apiClient.lookupCustomer
+export const updateCustomer = apiClient.updateCustomer
 export const fetchCurrentUser = apiClient.fetchCurrentUser
 export const changePassword = apiClient.changePassword
 export const fetchUsers = apiClient.fetchUsers

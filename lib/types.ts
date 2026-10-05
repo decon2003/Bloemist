@@ -234,6 +234,33 @@ export interface User {
   password?: string
 }
 
+export type CustomerSource = 'facebook' | 'zalo' | 'instagram' | 'walk_in' | 'referral' | 'other'
+
+export interface CustomerSummary {
+  id: string
+  phone: string
+  name: string
+  notes: string | null
+  source: CustomerSource | null
+  marketingConsent: boolean
+  createdAt: string
+  orderCount: number
+  totalSpend: number
+  lastOrderAt: string | null
+  lastBouquet: string | null
+}
+
+export interface CustomerLookup extends CustomerSummary {
+  recentReceivers: { receiverName: string; receiverPhone: string; deliveryAddress: string | null }[]
+}
+
+export interface CustomerPage {
+  total: number
+  page: number
+  pageSize: number
+  items: CustomerSummary[]
+}
+
 export interface AuthContextValue {
   user: User | null
   isLoading: boolean

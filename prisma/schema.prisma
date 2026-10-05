@@ -74,10 +74,30 @@ model Order {
   assigneeName          String?
   new_customer          Boolean? @default(false)
   createdAt             DateTime @default(now())
+  customerId            String?
 
-  createdBy User?  @relation("CreatedOrders", fields: [createdById], references: [id])
-  assignee  User?  @relation("AssignedOrders", fields: [assigneeId], references: [id])
+  createdBy User?     @relation("CreatedOrders", fields: [createdById], references: [id])
+  customer  Customer? @relation(fields: [customerId], references: [id])
+  assignee  User?     @relation("AssignedOrders", fields: [assigneeId], references: [id])
   tasks     Task[]
+
+  @@index([customerId])
+}
+
+// One row per buyer, keyed by normalised phone (digits only, +84 -> 0) so that
+// "0901 234 567", "0901234567" and "+84901234567" are the same customer.
+// Orders keep their own name/phone snapshot; this holds what sales learns over time.
+model Customer {
+  id               String   @id @default(uuid())
+  phone            String   @unique
+  name             String
+  notes            String?
+  source           String?
+  marketingConsent Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  orders Order[]
 }
 
 model Task {
@@ -98,11 +118,11 @@ model Task {
   quantity           Int       @default(1)
   price              String?
 
-  order        Order?    @relation(fields: [orderId], references: [id])
+  order        Order?  @relation(fields: [orderId], references: [id])
   assigneeId   String?
-  assignee     User?     @relation("AssignedTasks", fields: [assigneeId], references: [id])
+  assignee     User?   @relation("AssignedTasks", fields: [assigneeId], references: [id])
   assigneeName String?
-  
+
   lastAssigneeName String?
   lastAssignedAt   DateTime?
   createdAt        DateTime  @default(now())

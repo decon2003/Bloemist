@@ -36,64 +36,37 @@ Khi chưa cấu hình R2, ảnh mới vẫn được lưu vào cơ sở dữ li�
 
 ---
 
-## 2. Lần triển khai đầu tiên sau bản cập nhật này (làm đúng thứ tự)
+## 2. Hiện trạng và dựng lại từ đầu
 
-Bản cập nhật thêm cột mới vào cơ sở dữ liệu (mật khẩu, khách hàng). Vì vậy **phải cập nhật cơ sở dữ liệu trước, rồi mới đẩy code lên**.
+**Đã dựng ngày 05/10/2026:**
 
-Nếu lỡ đẩy code trước cũng không sao: bước build trên Vercel sẽ thất bại, và Vercel giữ nguyên bản đang chạy.
+- Neon project `bloemist`, region AWS ap-southeast-1 (Singapore), Postgres 17. Đã chạy toàn bộ migration và seed.
+- Vercel đặt functions ở `sin1` (file `vercel.json`) và đã có đủ biến môi trường ở mục 1.
+- R2 bucket `bloemist-photos`, riêng tư.
 
-### 2.1. Tạo bản lưu dự phòng
-
-Vào Neon, mở **Branches**, tạo branch mới từ `main`, đặt tên ví dụ `truoc-cap-nhat-2026-10`. Branch này là bản chụp dữ liệu ngay lúc đó. Nếu có sự cố, có thể khôi phục từ đây.
-
-### 2.2. Cập nhật cơ sở dữ liệu (chạy trên máy tính)
-
-Tạo file `.env` ở thư mục gốc. File này đã có trong `.gitignore`, **không bao giờ commit**:
-
-```env
-DATABASE_URL="postgresql://...neon.tech/neondb?sslmode=require"
-```
-
-Dùng chuỗi kết nối **direct** (không có `-pooler`) cho các lệnh sau:
+Nếu phải dựng lại trên một database **trống** (chạy trên máy, `.env` dùng chuỗi Neon **direct**):
 
 ```bash
 npm install
+npx prisma migrate deploy                                   # tạo toàn bộ bảng
+npx tsx --env-file=.env prisma/seed.ts                      # tài khoản admin@bloemist.com + địa điểm cửa hàng
+node scripts/set-password.mjs admin@bloemist.com 'MatKhauTam123' --temporary
+```
 
-# Đánh dấu cấu trúc bảng hiện có là "điểm xuất phát" (chỉ làm MỘT lần)
-npx prisma migrate resolve --applied 0_init
+Kiểm tra database khớp với code. Lệnh phải in ra "No difference detected.":
 
-# Thêm cột mật khẩu, bảng khách hàng, và tạo khách từ các đơn cũ
-npx prisma migrate deploy
-
-# Kiểm tra cơ sở dữ liệu đã khớp với code: phải in ra "No difference detected."
+```bash
 npx prisma migrate diff --from-schema-datasource prisma/schema.prisma --to-schema-datamodel prisma/schema.prisma --exit-code
 ```
 
-Nếu lệnh cuối in ra danh sách thay đổi, **dừng lại**. Cơ sở dữ liệu thật khác với dự kiến, cần xem kỹ trước khi đi tiếp.
+**Cấp mật khẩu cho nhân viên:** vào **Cài đặt → Quản lý nhân sự**. Khi thêm hoặc sửa một nhân viên, điền mật khẩu tạm rồi đưa trực tiếp cho người đó. Nhân viên phải đổi mật khẩu ở lần đăng nhập đầu tiên.
 
-### 2.3. Đặt mật khẩu cho tài khoản quản lý đầu tiên
+- Quên mật khẩu: quản lý cấp lại mật khẩu tạm theo cách trên.
+- Sai mật khẩu 5 lần thì tài khoản bị khoá 15 phút.
 
-Sau khi cập nhật, **chưa ai có mật khẩu**, kể cả quản lý. Đặt mật khẩu cho một tài khoản boss/admin:
+**Đổi mật khẩu database:** vào Neon, chọn **Branches → main → Roles → `neondb_owner` → Reset password**. Sau đó cập nhật `DATABASE_URL` ở ba nơi: Vercel (Production và Preview, dùng chuỗi pooled), GitHub secret (dùng chuỗi direct), và file `.env`. Cuối cùng bấm Redeploy trên Vercel.
 
-```bash
-node scripts/set-password.mjs email-cua-ban@... 'MatKhauManh123'
-```
-
-Muốn xem danh sách email đang có: `node scripts/list-users.js`.
-
-### 2.4. Đẩy code lên
-
-1. Thêm `AUTH_SECRET` trên Vercel (mục 1).
-2. `git push origin main`. Vercel tự build và deploy.
-3. Mở `https://noibo.bloemistflorals.com` và đăng nhập bằng tài khoản ở bước 2.3.
-
-### 2.5. Cấp mật khẩu cho nhân viên
-
-Vào **Cài đặt → Quản lý nhân sự**. Với từng người, bấm *Chỉnh sửa*, điền **Cấp lại mật khẩu tạm**, rồi đưa trực tiếp cho nhân viên. Nhân viên phải đổi mật khẩu ở lần đăng nhập đầu tiên.
-
-Nhân viên quên mật khẩu: quản lý cấp lại mật khẩu tạm theo cách trên.
-
-Tài khoản bị khoá 15 phút sau 5 lần nhập sai mật khẩu.
+**Đổi khoá R2:** vào Cloudflare, chọn **R2 → Manage API Tokens → `bloemist-app` → Roll**. Sau đó cập nhật `R2_ACCESS_KEY_ID` và `R2_SECRET_ACCESS_KEY` trên Vercel, GitHub secret và file `.env`.
 
 ---
 
@@ -105,7 +78,7 @@ Tài khoản bị khoá 15 phút sau 5 lần nhập sai mật khẩu.
    - Phạm vi: chỉ bucket `bloemist-photos`
    - Ghi lại *Access Key ID* và *Secret Access Key*. Secret chỉ hiện một lần.
 3. Điền 4 biến `R2_*` trên Vercel (mục 1), rồi **Redeploy**.
-4. Chuyển ảnh cũ từ cơ sở dữ liệu sang R2 (chạy trên máy, thêm 4 biến `R2_*` vào `.env`):
+4. Chỉ khi database đã có ảnh lưu kiểu cũ (base64), chuyển chúng sang R2. Chạy trên máy, với 4 biến `R2_*` trong `.env`:
 
    ```bash
    node scripts/migrate-photos-to-r2.mjs          # chạy thử: chỉ đếm, không ghi gì

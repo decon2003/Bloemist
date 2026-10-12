@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto'
+import { request as httpsRequest } from 'https'
 import { AwsClient } from 'aws4fetch'
 import { ApiError } from './api-error'
 
@@ -96,13 +97,32 @@ export async function storePhoto(file: unknown, folder: PhotoFolder): Promise<st
 export async function putObject(key: string, body: Buffer, contentType: string) {
   const r2 = getR2()
   if (!r2) throw new Error('R2 is not configured')
-  const response = await r2.client.fetch(objectUrl(r2, key), {
+
+  // Sign with aws4fetch but send with node:https. On Vercel, fetch() streams
+  // the body chunked without a Content-Length, and R2 rejects that with
+  // 411 MissingContentLength (it worked locally, which hid the problem).
+  const signed = await r2.client.sign(objectUrl(r2, key), {
     method: 'PUT',
     body: new Uint8Array(body),
     headers: { 'content-type': contentType },
   })
-  if (!response.ok) {
-    console.error('R2 upload failed', response.status, await response.text())
+  const headers: Record<string, string | number> = Object.fromEntries(signed.headers.entries())
+  headers['content-length'] = body.length
+
+  const { status, text } = await new Promise<{ status: number; text: string }>((resolve, reject) => {
+    const request = httpsRequest(signed.url, { method: 'PUT', headers }, (response) => {
+      let text = ''
+      response.setEncoding('utf8')
+      response.on('data', (chunk) => (text += chunk))
+      response.on('end', () => resolve({ status: response.statusCode ?? 0, text }))
+    })
+    request.on('error', reject)
+    request.setTimeout(20_000, () => request.destroy(new Error('R2 upload timed out')))
+    request.end(body)
+  }).catch((error: Error) => ({ status: 0, text: error.message }))
+
+  if (status < 200 || status >= 300) {
+    console.error('R2 upload failed', status, text)
     throw new ApiError(502, 'Không tải được ảnh lên kho lưu trữ, vui lòng thử lại')
   }
 }

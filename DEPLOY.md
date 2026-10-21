@@ -130,17 +130,38 @@ Nên thử khôi phục mỗi vài tháng một lần, và bắt buộc làm tr�
 
 ## 6. Các bản cập nhật sau
 
-- Thay đổi cấu trúc bảng: sửa `prisma/schema.prisma`, chạy `npx prisma migrate dev --name ten-thay-doi` với một cơ sở dữ liệu thử, rồi commit thư mục `prisma/migrations/`.
-- Khi push lên `main`, bản build production tự chạy `prisma migrate deploy`. Bản Preview (các nhánh khác) **không bao giờ** đụng vào cơ sở dữ liệu.
-- **Lưu ý:** Preview dùng chung cơ sở dữ liệu với bản thật (gói Neon miễn phí). Thao tác trên link preview là sửa dữ liệu thật.
+- **Đổi cấu trúc bảng:** sửa `prisma/schema.prisma`, tạo migration bằng `npx prisma migrate dev --name ten-thay-doi` trên một database thử, rồi commit thư mục `prisma/migrations/`.
+- Khi push lên `main`, bản build production tự chạy `prisma migrate deploy`. Bản Preview (các nhánh khác) **không bao giờ** đụng vào database.
+- **Migration chạy ở đầu bước build**, trước khi code mới thay code cũ (khoảng 1 phút). Vì vậy:
+  - **Thêm** cột/bảng: làm thẳng được.
+  - **Đổi kiểu** hoặc **xoá** cột: chia làm 2 lần deploy. Lần 1 thêm cột mới và cho code ghi cả hai cột. Lần 2 mới bỏ cột cũ. Nếu bắt buộc đổi trực tiếp (như `4_money_integers`), làm ngoài giờ bán và chạy `/api/cron/backup` trước.
+  - Kiểm tra migration trên database thử có dữ liệu giống thật trước khi push. Lệnh Prisma tự sinh có thể xoá cột thay vì chuyển đổi dữ liệu.
+- **Lưu ý:** Preview dùng chung database với bản thật (gói Neon miễn phí). Thao tác trên link preview là sửa dữ liệu thật.
 
 ---
 
-## 7. Theo dõi giới hạn miễn phí
+## 7. Giám sát
+
+**Trang còn sống không:** tạo tài khoản miễn phí ở [UptimeRobot](https://uptimerobot.com) (hoặc Better Stack). Thêm monitor kiểu HTTP(s):
+
+- URL: `https://noibo.bloemistflorals.com/api/health`
+- Chu kỳ: 5 phút
+- Bật cảnh báo qua email hoặc app điện thoại của người phụ trách.
+
+`/api/health` **không** chạm vào database, để Neon được ngủ khi không có ai dùng. Nếu một monitor gọi database mỗi 5 phút, Neon thức suốt ngày đêm và hết giờ chạy miễn phí. Khi cần kiểm tra database thì mở tay `/api/health?db=1`.
+
+**Ai làm gì:** quản lý xem ở **Cài đặt → Hoạt động gần đây**, và ở cuối trang chi tiết từng đơn (**Lịch sử thay đổi**). Nhật ký ghi tạo/sửa/xoá đơn, việc, nhân viên, khách hàng, và mọi lần đăng nhập (kể cả đăng nhập sai).
+
+**Lỗi máy chủ:** xem ở **Vercel → Project → Logs**. Gói Hobby chỉ giữ log trong thời gian ngắn, nên khi có lỗi thì xem ngay.
+
+---
+
+## 8. Theo dõi giới hạn miễn phí
 
 | Dịch vụ | Xem ở đâu | Ngưỡng cần chú ý |
 |---|---|---|
-| Neon | Dashboard → Usage | Dung lượng > 400 MB |
+| Neon | Dashboard → Usage | Dung lượng > 400 MB, hoặc giờ chạy (compute) > 80% |
 | R2 | Cloudflare → R2 → Overview | Dung lượng > 8 GB |
-| Vercel | Usage | Băng thông hoặc lượt gọi > 80% |
-| GitHub Actions | Settings → Billing | > 1.500 phút/tháng |
+| Vercel | Usage | Băng thông, lượt gọi hoặc thời gian chạy hàm > 80% |
+
+Khi chạm ngưỡng, chuyển sang phương án A (Vercel Pro + Neon trả phí).

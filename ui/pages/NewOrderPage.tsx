@@ -225,9 +225,7 @@ export default function NewOrderPage() {
         deliveryCoveredByShop,
         vatPercent,
         deposit,
-        sellingPrice: formattedSellingPrice,
-        remainingBalance: formattedRemainingBalance,
-        total: formattedOrderTotal,
+        // Selling price, total and remaining balance are recomputed by the server.
         notes,
         createdById: user?.id,
         createdByName: user?.name,

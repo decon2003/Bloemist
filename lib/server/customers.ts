@@ -1,6 +1,5 @@
 import db from './db'
 import { ApiError } from './api-error'
-import { parseCurrencyToNumber } from './money'
 
 export const CUSTOMER_SOURCES = ['facebook', 'zalo', 'instagram', 'walk_in', 'referral', 'other'] as const
 
@@ -36,7 +35,7 @@ type CustomerRow = {
   source: string | null
   marketingConsent: boolean
   createdAt: Date
-  orders: { total: string; status: string; createdAt: Date; bouquetName: string }[]
+  orders: { total: number; status: string; createdAt: Date; bouquetName: string }[]
 }
 
 const summarise = (customer: CustomerRow) => {
@@ -51,7 +50,7 @@ const summarise = (customer: CustomerRow) => {
     marketingConsent: customer.marketingConsent,
     createdAt: customer.createdAt.toISOString(),
     orderCount: counted.length,
-    totalSpend: counted.reduce((sum, order) => sum + parseCurrencyToNumber(order.total), 0),
+    totalSpend: counted.reduce((sum, order) => sum + order.total, 0),
     lastOrderAt: latest?.createdAt.toISOString() ?? null,
     lastBouquet: latest?.bouquetName ?? null,
   }

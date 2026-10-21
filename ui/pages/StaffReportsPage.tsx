@@ -30,7 +30,7 @@ interface StaffReportRow {
 }
 
 function SalaryConfigModal({ user, onClose, onSave }: { user: User, onClose: () => void, onSave: (id: string, data: Partial<User>) => Promise<any> }) {
-  const [base, setBase] = useState(user.baseSalary || '0')
+  const [base, setBase] = useState(String(user.baseSalary ?? 0))
   const [rate, setRate] = useState(user.commissionRate?.toString() || '0')
   const [saving, setSaving] = useState(false)
 
@@ -38,7 +38,7 @@ function SalaryConfigModal({ user, onClose, onSave }: { user: User, onClose: () 
     setSaving(true)
     try {
       await onSave(user.id, {
-        baseSalary: base.replace(/\D/g, ''), // Ensure clean number string
+        baseSalary: Number(base.replace(/\D/g, '') || 0),
         commissionRate: parseFloat(rate)
       })
       onClose()

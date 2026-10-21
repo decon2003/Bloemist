@@ -11,7 +11,7 @@ import { useAuth } from "@/components/providers/auth-provider"
 import AddTaskDialog from "@/components/tasks/add-task-dialog"
 import { PhotoViewer } from "@/components/photo-viewer"
 import { fetchOrder, updateOrder, deleteOrder } from "@/lib/api"
-import type { Order } from "@/lib/types"
+import type { CreateOrderInput, Order } from "@/lib/types"
 import { getDateKey } from "@/lib/date-utils"
 import { formatCurrencyDisplay, formatDateTime, fromDateTimeLocalValue, toDateTimeLocalValue } from "@/lib/utils"
 import { thumbUrl } from "@/lib/image-compress"
@@ -120,7 +120,10 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
   const handleEditSave = async () => {
     if (order && editForm) {
       try {
-        const updated = await updateOrder(order.id, editForm)
+        // The edit form covers contact and delivery details; amounts are left
+        // out so they are not re-sent (the server derives totals from prices).
+        const { listedPrice, discount, deliveryFee, deposit, sellingPrice, remainingBalance, total, ...details } = editForm
+        const updated = await updateOrder(order.id, details as Partial<CreateOrderInput>)
         setOrder(updated)
         setIsEditMode(false)
         setToastMessage(t("orders.detail.updateSuccess", "Order updated successfully"))

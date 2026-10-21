@@ -22,7 +22,8 @@ export interface Task {
   bouquetName: string
   bouquetImage?: string
   taskTitle: string
-  price?: string
+  /** Whole VND. */
+  price?: number | null
   assigneeId?: string
   assigneeName?: string
   samplePhotoUrls?: string[]
@@ -59,15 +60,16 @@ export interface Order {
   receiveTime: string
   deliveryType: 'DELIVERY' | 'PICKUP'
   status: 'NEW' | 'IN_PROGRESS' | 'READY' | 'DELIVERED'
-  listedPrice: string
-  discount?: string
-  deliveryFee?: string
+  // Money is whole VND.
+  listedPrice: number
+  discount?: number | null
+  deliveryFee?: number | null
   deliveryCoveredByShop?: boolean
-  vatPercent?: number
-  deposit?: string
-  sellingPrice?: string
-  remainingBalance?: string
-  total: string
+  vatPercent?: number | null
+  deposit?: number | null
+  sellingPrice?: number | null
+  remainingBalance?: number | null
+  total: number
   notes?: string
   createdById?: string
   createdByName?: string
@@ -108,15 +110,14 @@ export interface CreateOrderInput {
   receiveTime: string
   deliveryType: 'DELIVERY' | 'PICKUP'
   status?: Order['status']
-  listedPrice: string
-  discount?: string
-  deliveryFee?: string
+  // Price inputs: whole VND or typed text ("1.250.000"). The server derives
+  // sellingPrice, total and remainingBalance itself.
+  listedPrice: number | string
+  discount?: number | string
+  deliveryFee?: number | string
   deliveryCoveredByShop?: boolean
   vatPercent?: number
-  deposit?: string
-  sellingPrice?: string
-  remainingBalance?: string
-  total: string
+  deposit?: number | string
   notes?: string
   code?: string
   createdById?: string
@@ -144,7 +145,8 @@ export interface CreateTaskInput {
   samplePhotoUrls?: string[]
   dueTime: string
   status?: TaskStatus
-  price?: string
+  /** Whole VND, or typed text such as "150.000". */
+  price?: number | string
   notes?: string
   taskTitle?: string
   type?: TaskType
@@ -227,7 +229,8 @@ export interface User {
   status: 'active' | 'disabled'
   avatar?: string
   createdAt: string
-  baseSalary?: string
+  /** Whole VND. */
+  baseSalary?: number | null
   commissionRate?: number
   mustChangePassword?: boolean
   /** Write-only: a temporary password set by a manager. Never returned. */

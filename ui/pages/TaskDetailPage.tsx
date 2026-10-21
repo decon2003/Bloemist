@@ -10,7 +10,7 @@ import { useLocale } from '@/components/providers/locale-provider'
 import { useAuth } from '@/components/providers/auth-provider'
 import { Task, TaskStatus } from '@/lib/types'
 import { fetchTask, uploadPhoto } from '@/lib/api'
-import { formatDateTime, fromDateTimeLocalValue, toDateTimeLocalValue } from '@/lib/utils'
+import { formatCurrencyDisplay, formatDateTime, fromDateTimeLocalValue, toDateTimeLocalValue } from '@/lib/utils'
 import { thumbUrl } from '@/lib/image-compress'
 
 interface TaskDetailPageProps {
@@ -533,7 +533,7 @@ export default function TaskDetailPage({ taskId }: TaskDetailPageProps) {
               </div>
               <div>
                 <dt className="text-muted-foreground">{t('taskDetail.priceLabel', 'Task price')}</dt>
-                <dd className="font-semibold text-foreground">{task.price || '—'}</dd>
+                <dd className="font-semibold text-foreground">{task.price ? formatCurrencyDisplay(task.price) : '—'}</dd>
               </div>
             </dl>
           </div>

@@ -3,6 +3,7 @@ import db from '@/lib/server/db'
 import { ApiError } from '@/lib/server/data-store'
 import { handleRouteError, readJsonBody } from '@/lib/server/route-helpers'
 import { hashPassword, validateNewPassword } from '@/lib/server/password'
+import { toVnd } from '@/lib/server/money'
 import { MANAGER_ROLES, isManager, requireUser } from '@/lib/server/session'
 import {
     PRIVILEGED_USER_SELECT,
@@ -12,7 +13,6 @@ import {
     assertOneOf,
     normalizeEmail,
     parseCommissionRate,
-    parseMoneyString,
     requireNonBlank,
 } from '@/lib/server/validation'
 
@@ -68,7 +68,7 @@ export async function PATCH(request: Request, context: RouteContext) {
         if (body.role !== undefined) data.role = assertOneOf(body.role, USER_ROLES, 'role')
         if (body.status !== undefined) data.status = assertOneOf(body.status, USER_STATUSES, 'status')
         if (body.avatar !== undefined) data.avatar = requireNonBlank(body.avatar, 'avatar', 64)
-        if (body.baseSalary !== undefined) data.baseSalary = parseMoneyString(body.baseSalary, 'baseSalary')
+        if (body.baseSalary !== undefined) data.baseSalary = toVnd(body.baseSalary, 'baseSalary') ?? 0
         if (body.commissionRate !== undefined) data.commissionRate = parseCommissionRate(body.commissionRate)
         // Password reset by a manager: issue a new temporary password, force a
         // change on next login and sign the user out everywhere.

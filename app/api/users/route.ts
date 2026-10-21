@@ -3,6 +3,7 @@ import db from '@/lib/server/db'
 import { ApiError } from '@/lib/server/data-store'
 import { handleRouteError, readJsonBody } from '@/lib/server/route-helpers'
 import { hashPassword, validateNewPassword } from '@/lib/server/password'
+import { toVnd } from '@/lib/server/money'
 import { MANAGER_ROLES, isManager, requireUser } from '@/lib/server/session'
 import {
     PRIVILEGED_USER_SELECT,
@@ -11,7 +12,6 @@ import {
     assertOneOf,
     normalizeEmail,
     parseCommissionRate,
-    parseMoneyString,
     requireNonBlank,
 } from '@/lib/server/validation'
 
@@ -46,9 +46,7 @@ export async function POST(request: Request) {
         // caller could mint themselves an arbitrary (or misspelled) role.
         const role = assertOneOf(body.role, USER_ROLES, 'role')
 
-        const baseSalary = body.baseSalary === undefined || body.baseSalary === null
-            ? '0'
-            : parseMoneyString(body.baseSalary, 'baseSalary')
+        const baseSalary = toVnd(body.baseSalary, 'baseSalary') ?? 0
         const commissionRate = body.commissionRate === undefined || body.commissionRate === null
             ? 0
             : parseCommissionRate(body.commissionRate)

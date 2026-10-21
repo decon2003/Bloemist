@@ -1,5 +1,4 @@
 import db from './db'
-import { parseCurrencyToNumber } from './money'
 
 export type StaffReportRow = {
   profile: {
@@ -7,7 +6,7 @@ export type StaffReportRow = {
     name: string
     title: string
     specialty: string
-    baseSalary?: string
+    baseSalary?: number
     commissionRate?: number
   }
   checkins: number
@@ -101,14 +100,14 @@ export async function getStaffReport(month: { start: Date; end: Date }): Promise
   for (const order of orders) {
     const row = rows.get(order.createdById!)
     if (!row) continue
-    row.commissionAmount += parseCurrencyToNumber(order.sellingPrice || order.total) * ((row.profile.commissionRate ?? 0) / 100)
+    row.commissionAmount += (order.sellingPrice || order.total) * ((row.profile.commissionRate ?? 0) / 100)
   }
 
   for (const task of completedTasks) {
     const row = rows.get(task.assigneeId!)
     if (!row) continue
     row.tasksCompleted += 1
-    row.commissionAmount += parseCurrencyToNumber(task.price || '0') * ((row.profile.commissionRate ?? 0) / 100)
+    row.commissionAmount += (task.price ?? 0) * ((row.profile.commissionRate ?? 0) / 100)
   }
 
   for (const group of inProgress) {
@@ -120,7 +119,7 @@ export async function getStaffReport(month: { start: Date; end: Date }): Promise
     .map((row) => ({
       ...row,
       commissionAmount: Math.round(row.commissionAmount),
-      salary: Math.round(parseCurrencyToNumber(row.profile.baseSalary || '0') + row.commissionAmount),
+      salary: Math.round((row.profile.baseSalary ?? 0) + row.commissionAmount),
     }))
     .sort((a, b) => a.profile.name.localeCompare(b.profile.name, 'vi'))
 }

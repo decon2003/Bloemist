@@ -7,7 +7,7 @@ import type { CreateOrderInput, CreateTaskInput, Florist, Order, Task, TaskStatu
 
 import { ApiError } from './api-error'
 import { storePhoto } from './storage'
-import { parseCurrencyToNumber } from './money'
+import { computeOrderTotals, parseCurrencyToNumber, toVatPercent, toVnd, type OrderMoneyInput } from './money'
 import { addVnDays, startOfVnMonth, vnDateKey } from './vn-time'
 import { LIST_LIMIT, SEARCH_LIMIT, searchDigits, type ListScope } from './list-scope'
 import type { Prisma } from '@prisma/client'
@@ -224,6 +224,7 @@ export const createOrder = async (input: CreateOrderInput) => {
   const code = await nextOrderCode()
 
   const customerId = await linkCustomer(input.customerPhone, input.customerName)
+  const money = readOrderMoney(input)
 
   const order = await db.order.create({
     data: {
@@ -239,15 +240,8 @@ export const createOrder = async (input: CreateOrderInput) => {
       deliveryType: input.deliveryType,
       deliveryAddress: input.deliveryAddress,
       status: input.status || 'NEW',
-      listedPrice: input.listedPrice,
-      discount: input.discount,
-      deliveryFee: input.deliveryFee,
-      deliveryCoveredByShop: input.deliveryCoveredByShop,
-      vatPercent: input.vatPercent,
-      deposit: input.deposit,
-      sellingPrice: input.sellingPrice,
-      remainingBalance: input.remainingBalance,
-      total: input.total,
+      ...money,
+      ...computeOrderTotals(money),
       notes: input.notes,
       createdById: input.createdById,
       createdByName: input.createdByName,
@@ -266,10 +260,26 @@ export const createOrder = async (input: CreateOrderInput) => {
 const ORDER_UPDATABLE_FIELDS = [
   'customerName', 'customerPhone', 'receiverName', 'receiverPhone',
   'deliveryAddress', 'bouquetName', 'bouquetImage', 'deliveryType', 'status',
-  'listedPrice', 'discount', 'deliveryFee', 'deliveryCoveredByShop',
-  'vatPercent', 'deposit', 'sellingPrice', 'remainingBalance', 'total',
   'notes', 'assigneeId', 'assigneeName', 'new_customer',
 ] as const
+
+// Price inputs; sellingPrice, total and remainingBalance are always derived.
+const ORDER_MONEY_FIELDS = ['listedPrice', 'discount', 'deliveryFee', 'deliveryCoveredByShop', 'vatPercent', 'deposit'] as const
+
+/** Validated price inputs as whole VND. `fallback` supplies the stored values
+ *  for fields an update leaves out. */
+const readOrderMoney = (input: Partial<CreateOrderInput>, fallback?: OrderMoneyInput): OrderMoneyInput => {
+  const pick = <K extends keyof OrderMoneyInput>(key: K, read: () => OrderMoneyInput[K]) =>
+    input[key] !== undefined ? read() : fallback ? fallback[key] : read()
+  return {
+    listedPrice: pick('listedPrice', () => toVnd(input.listedPrice, 'listedPrice', { required: true })!),
+    discount: pick('discount', () => toVnd(input.discount, 'discount')),
+    deliveryFee: pick('deliveryFee', () => toVnd(input.deliveryFee, 'deliveryFee')),
+    deliveryCoveredByShop: pick('deliveryCoveredByShop', () => input.deliveryCoveredByShop === true),
+    vatPercent: pick('vatPercent', () => toVatPercent(input.vatPercent)),
+    deposit: pick('deposit', () => toVnd(input.deposit, 'deposit')),
+  }
+}
 
 export const updateOrder = async (orderId: string, input: Partial<CreateOrderInput>) => {
   const data: any = {}
@@ -279,6 +289,21 @@ export const updateOrder = async (orderId: string, input: Partial<CreateOrderInp
 
   if (input.receiveTime !== undefined) {
     data.receiveTime = parseRequiredDate(input.receiveTime, 'receiveTime')
+  }
+
+  // Changing any price input recomputes the derived amounts from the merged values.
+  if (ORDER_MONEY_FIELDS.some((field) => input[field] !== undefined)) {
+    const current = await db.order.findUnique({ where: { id: orderId } })
+    if (!current) throw new ApiError(404, 'Order not found')
+    const money = readOrderMoney(input, {
+      listedPrice: current.listedPrice,
+      discount: current.discount,
+      deliveryFee: current.deliveryFee,
+      deliveryCoveredByShop: current.deliveryCoveredByShop ?? false,
+      vatPercent: current.vatPercent,
+      deposit: current.deposit,
+    })
+    Object.assign(data, money, computeOrderTotals(money))
   }
 
   // A corrected phone number moves the order to the right customer.
@@ -339,7 +364,7 @@ export const createTask = async (input: CreateTaskInput) => {
       notes: input.notes || '',
       type: input.type || 'CAM_HOA',
       quantity: input.quantity ?? 1,
-      price: input.price,
+      price: toVnd(input.price, 'price'),
       assigneeId: input.assigneeId || linkedOrder?.assigneeId,
       assigneeName: input.assigneeName || linkedOrder?.assigneeName,
     }
@@ -348,34 +373,43 @@ export const createTask = async (input: CreateTaskInput) => {
   return getTask(task.id)
 }
 
+/** Edit a task's details. Only these fields are writable here: the body used
+ *  to be spread straight into Prisma, so any caller could overwrite any column
+ *  (completion proof, order link, completedAt). Status changes go through
+ *  updateTaskStatus (which enforces the proof-photo rule) and assignment
+ *  through assignTask/unassignTask. */
 export const updateTask = async (taskId: string, input: Partial<CreateTaskInput>) => {
-  const { status, assigneeId, assigneeName, ...rest } = input
-  const data: any = { ...rest }
+  const data: Prisma.TaskUpdateInput = {}
 
-  if (status) data.status = status
-  if (assigneeId !== undefined) data.assigneeId = assigneeId
-  if (assigneeName !== undefined) data.assigneeName = assigneeName
-  if (input.samplePhotoUrls) data.samplePhotoUrls = JSON.stringify(input.samplePhotoUrls)
-  if (input.dueTime) data.dueTime = new Date(input.dueTime)
-
-  // Handle start time logic
-  if (status === 'IN_PROGRESS') {
-    // Only set if not already set? Or update?
-    // Prisma doesn't support "COALESCE(start_time, NOW())" easily in update without raw, but we can read first or just assume override.
-    // Let's read first to be safe, or just set it if it's null?
-    // Optimization: Just set it.
-    // If strict logic:
-    const t = await db.task.findUnique({ where: { id: taskId } })
-    if (t && !t.startTime) {
-      data.startTime = new Date()
+  if (input.taskTitle !== undefined) {
+    if (typeof input.taskTitle !== 'string' || !input.taskTitle.trim()) throw new ApiError(400, 'Task title is required')
+    data.taskTitle = input.taskTitle.trim().slice(0, 300)
+  }
+  if (input.bouquetName !== undefined) data.bouquetName = String(input.bouquetName).slice(0, 300)
+  if (input.bouquetImage !== undefined) data.bouquetImage = input.bouquetImage || null
+  if (input.notes !== undefined) data.notes = typeof input.notes === 'string' ? input.notes : ''
+  if (input.type !== undefined) data.type = String(input.type)
+  if (input.quantity !== undefined) {
+    if (!Number.isInteger(input.quantity) || input.quantity < 1) throw new ApiError(400, 'Quantity must be a positive whole number')
+    data.quantity = input.quantity
+  }
+  if (input.price !== undefined) data.price = toVnd(input.price, 'price')
+  if (input.dueTime !== undefined) data.dueTime = parseRequiredDate(input.dueTime, 'dueTime')
+  if (input.samplePhotoUrls !== undefined) {
+    if (!Array.isArray(input.samplePhotoUrls) || input.samplePhotoUrls.some((url) => typeof url !== 'string')) {
+      throw new ApiError(400, 'samplePhotoUrls must be a list of links')
     }
+    data.samplePhotoUrls = JSON.stringify(input.samplePhotoUrls)
   }
 
-  const task = await db.task.update({
-    where: { id: taskId },
-    data
-  })
-  return getTask(task.id)
+  if (Object.keys(data).length > 0) {
+    await db.task.update({ where: { id: taskId }, data })
+  }
+  if (input.status !== undefined) {
+    return updateTaskStatus(taskId, input.status)
+  }
+  if (Object.keys(data).length === 0) throw new ApiError(400, 'No updatable fields supplied')
+  return getTask(taskId)
 }
 
 export const updateTaskStatus = async (taskId: string, status: TaskStatus) => {

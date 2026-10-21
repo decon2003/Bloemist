@@ -24,7 +24,8 @@ model User {
   staffCheckIns    StaffCheckIn[]
   messagesSent     Message[]      @relation("SentMessages")
   messagesReceived Message[]      @relation("ReceivedMessages")
-  baseSalary       String?        @default("0")
+  // Money is whole VND.
+  baseSalary       Int?           @default(0)
   commissionRate   Float?         @default(0)
 
   // Auth. passwordHash is null until a manager sets a temporary password.
@@ -58,15 +59,15 @@ model Order {
   deliveryType          String
   deliveryAddress       String?
   status                String
-  listedPrice           String
-  discount              String?
-  deliveryFee           String?
+  listedPrice           Int
+  discount              Int?
+  deliveryFee           Int?
   deliveryCoveredByShop Boolean?
   vatPercent            Float?
-  deposit               String?
-  sellingPrice          String?
-  remainingBalance      String?
-  total                 String
+  deposit               Int?
+  sellingPrice          Int?
+  remainingBalance      Int?
+  total                 Int
   notes                 String?
   createdById           String?
   createdByName         String?
@@ -123,7 +124,7 @@ model Task {
   notes              String?
   type               String
   quantity           Int       @default(1)
-  price              String?
+  price              Int?
 
   order        Order?  @relation(fields: [orderId], references: [id])
   assigneeId   String?

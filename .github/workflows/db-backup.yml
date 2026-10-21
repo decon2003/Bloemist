@@ -1,7 +1,8 @@
-# Nightly Postgres backup to Cloudflare R2 (free tiers only).
+# Manual pg_dump backup to Cloudflare R2.
 #
-# Neon's free plan keeps only a short restore window, so this is the copy that
-# survives a bad migration, an accidental delete or losing the Neon account.
+# The nightly backup now runs as a Vercel Cron job (/api/cron/backup, JSON
+# export) because this account's GitHub Actions is locked for billing. Keep
+# this workflow for an on-demand pg_dump once Actions works again.
 #
 # Repository secrets required (Settings -> Secrets and variables -> Actions):
 #   DATABASE_URL           Neon connection string (the direct one, not -pooler)
@@ -15,8 +16,6 @@
 name: Database backup
 
 on:
-  schedule:
-    - cron: '0 19 * * *' # 02:00 Vietnam time
   workflow_dispatch: {}
 
 permissions:

@@ -92,30 +92,32 @@ npx prisma migrate diff --from-schema-datasource prisma/schema.prisma --to-schem
 
 ---
 
-## 4. Sao lưu tự động (GitHub Actions)
+## 4. Sao lưu tự động (Vercel Cron → R2)
 
-Vào GitHub, mở **Settings → Secrets and variables → Actions → New repository secret**, thêm:
+Mỗi đêm khoảng **02:00 giờ Việt Nam** (gói Hobby có thể lệch trong vòng 1 tiếng), Vercel gọi `/api/cron/backup`. API này xuất toàn bộ bảng ra JSON, nén lại và lưu vào R2 tại `backups/bloemist-YYYY-MM-DD.json.gz`. Lịch chạy nằm trong `vercel.json`.
 
-| Secret | Giá trị |
-|---|---|
-| `DATABASE_URL` | Chuỗi Neon **direct** (không `-pooler`) |
-| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` | Như trên Vercel |
+- Cần biến `CRON_SECRET` trên Vercel (môi trường Production). Vercel tự gửi khoá này khi gọi; ai gọi mà không có khoá sẽ bị từ chối.
+- Bản cũ hơn 60 ngày tự xoá nhờ quy tắc lifecycle trên bucket (prefix `backups/`, xem mục 3).
+- Kiểm tra lần chạy gần nhất: vào **Vercel → Project → Settings → Cron Jobs**, hoặc xem Logs, tìm dòng `Backup written`.
+- Chạy ngay một lần: vào Settings → Cron Jobs → **Run**.
 
-Sau đó vào **Actions → Database backup → Run workflow** để chạy thử một lần. Kiểm tra trong R2 thấy file `backups/bloemist-YYYY-MM-DD.dump` là được. Từ đó workflow tự chạy lúc 02:00 mỗi đêm.
+Workflow `.github/workflows/db-backup.yml` (dùng `pg_dump`) chỉ còn chạy thủ công, vì tài khoản GitHub Actions đang bị khoá do thanh toán.
 
-### Khôi phục từ bản sao lưu
+### Khôi phục
 
-1. Tải file `.dump` từ R2 về.
-2. Tạo một branch Neon trống (hoặc một database mới).
-3. Chạy:
+Khôi phục vào một database **trống**, đã chạy migration. Script từ chối ghi vào database đã có dữ liệu.
 
-   ```bash
-   pg_restore --no-owner --no-privileges -d "<chuỗi kết nối đích>" bloemist-YYYY-MM-DD.dump
-   ```
+```bash
+# .env: DATABASE_URL trỏ tới database đích (ví dụ một branch Neon mới) + các biến R2_*
+npx prisma migrate deploy
+node scripts/restore-backup.mjs --list                     # xem các bản sao lưu
+node scripts/restore-backup.mjs --latest                   # chạy thử: chỉ in số dòng
+node scripts/restore-backup.mjs --date 2026-10-21 --apply  # khôi phục thật
+```
 
-4. Kiểm tra dữ liệu rồi mới trỏ `DATABASE_URL` của Vercel sang.
+Database đích phải ở **cùng migration** với lúc sao lưu. Script kiểm tra điều này và báo nếu lệch.
 
-Nên thử khôi phục mỗi vài tháng một lần, để chắc bản sao lưu dùng được.
+Nên thử khôi phục mỗi vài tháng một lần, và bắt buộc làm trước mỗi đợt cao điểm.
 
 ---
 

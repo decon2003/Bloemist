@@ -9,6 +9,7 @@ import { useAppData } from "@/components/providers/app-data-provider"
 import { useLocale } from "@/components/providers/locale-provider"
 import { useAuth } from "@/components/providers/auth-provider"
 import AddTaskDialog from "@/components/tasks/add-task-dialog"
+import { PhotoViewer } from "@/components/photo-viewer"
 import { fetchOrder, updateOrder, deleteOrder } from "@/lib/api"
 import type { Order } from "@/lib/types"
 import { formatCurrencyDisplay, formatDateTime, fromDateTimeLocalValue, toDateTimeLocalValue } from "@/lib/utils"
@@ -30,6 +31,7 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
 
   const [isEditMode, setIsEditMode] = useState(false)
   const [editForm, setEditForm] = useState<Partial<Order>>({})
+  const [viewer, setViewer] = useState<{ photos: string[]; index: number } | null>(null)
 
   useEffect(() => {
     let active = true
@@ -275,7 +277,8 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
               alt={order.bouquetName}
               width={160}
               height={160}
-              className="h-40 w-40 rounded-2xl object-cover"
+              className="h-40 w-40 cursor-zoom-in rounded-2xl object-cover"
+              onClick={() => setViewer({ photos: [orderThumbnail], index: 0 })}
             />
             <dl className="grid flex-1 grid-cols-2 gap-4 text-sm">
 
@@ -566,7 +569,11 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
                       <p className="text-sm font-medium text-muted-foreground">{t("addTask.fields.samplePhoto", "Sample Photos")}</p>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         {task.samplePhotoUrls.map((url, idx) => (
-                          <div key={idx} className="relative aspect-square overflow-hidden rounded-xl border border-border bg-muted">
+                          <div
+                            key={idx}
+                            className="relative aspect-square cursor-zoom-in overflow-hidden rounded-xl border border-border bg-muted"
+                            onClick={() => setViewer({ photos: task.samplePhotoUrls ?? [url], index: idx })}
+                          >
                             <Image
                               src={url}
                               alt={`Sample ${idx + 1}`}
@@ -581,7 +588,10 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
                     <div className="space-y-3">
                       <p className="text-sm font-medium text-muted-foreground">{t("addTask.fields.samplePhoto", "Sample Photos")}</p>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="relative aspect-square overflow-hidden rounded-xl border border-border bg-muted">
+                        <div
+                          className="relative aspect-square cursor-zoom-in overflow-hidden rounded-xl border border-border bg-muted"
+                          onClick={() => task.bouquetImage && setViewer({ photos: [task.bouquetImage], index: 0 })}
+                        >
                           <Image
                             src={task.bouquetImage}
                             alt="Bouquet"
@@ -608,6 +618,10 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
           </div>
         )}
       </section>
+
+      {viewer && (
+        <PhotoViewer photos={viewer.photos} startIndex={viewer.index} onClose={() => setViewer(null)} />
+      )}
 
       <AddTaskDialog
         open={dialogOpen}

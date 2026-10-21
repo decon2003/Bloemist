@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { useLocale } from '@/components/providers/locale-provider'
 import { useAppData } from '@/components/providers/app-data-provider'
 import { useAuth } from '@/components/providers/auth-provider'
+import { PhotoViewer } from '@/components/photo-viewer'
 import { lookupCustomer, uploadPhoto } from '@/lib/api'
 import type { CustomerLookup } from '@/lib/types'
 import { formatCurrencyFromNumber, formatCurrencyInput, parseCurrencyToNumber } from '@/lib/utils'
@@ -704,29 +705,16 @@ export default function NewOrderPage() {
             </button>
           </div>
         </form >
-        {productPreviewUrl && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-            onClick={() => setProductPreviewUrl(null)}
-          >
-            <div className="relative w-full max-w-4xl" onClick={(event) => event.stopPropagation()}>
-              <button
-                type="button"
-                onClick={() => setProductPreviewUrl(null)}
-                className="absolute right-4 top-4 rounded-full bg-black/60 p-2 text-white hover:bg-black/80"
-                aria-label={t('orders.new.closePreview', 'Close preview')}
-              >
-                <span className="text-lg leading-none">×</span>
-              </button>
-              <img
-                src={productPreviewUrl}
-                alt={t('orders.new.samplePhotoAlt', 'Sample arrangement inspiration')}
-                className="max-h-[80vh] w-full rounded-2xl object-contain shadow-2xl"
-              />
-            </div>
-          </div>
-        )
-        }
+        {productPreviewUrl && (() => {
+          const photos = products.find((product) => product.samplePhotoUrls.includes(productPreviewUrl))?.samplePhotoUrls ?? [productPreviewUrl]
+          return (
+            <PhotoViewer
+              photos={photos}
+              startIndex={Math.max(0, photos.indexOf(productPreviewUrl))}
+              onClose={() => setProductPreviewUrl(null)}
+            />
+          )
+        })()}
       </div >
     )
   )

@@ -7,6 +7,7 @@ import { useAppData } from '@/components/providers/app-data-provider'
 import { TaskType } from '@/lib/types'
 import { useLocale } from '@/components/providers/locale-provider'
 import { uploadPhoto } from '@/lib/api'
+import { PhotoViewer } from '@/components/photo-viewer'
 
 interface AddTaskDialogProps {
   open: boolean
@@ -452,20 +453,11 @@ export default function AddTaskDialog({
         </form>
       </div>
       {samplePreviewUrl && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setSamplePreviewUrl(null)}>
-          <div className="max-h-[90vh] max-w-3xl overflow-hidden rounded-2xl border border-border bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
-            <img src={samplePreviewUrl} alt={t('addTask.fields.samplePhotoAlt', 'Arrangement sample')} className="h-full w-full object-contain" />
-            <div className="p-3 text-right">
-              <button
-                type="button"
-                onClick={() => setSamplePreviewUrl(null)}
-                className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-foreground hover:bg-muted"
-              >
-                {t('addTask.fields.closePreview', 'Close')}
-              </button>
-            </div>
-          </div>
-        </div>
+        <PhotoViewer
+          photos={samplePhotoUrls.includes(samplePreviewUrl) ? samplePhotoUrls : [samplePreviewUrl]}
+          startIndex={Math.max(0, samplePhotoUrls.indexOf(samplePreviewUrl))}
+          onClose={() => setSamplePreviewUrl(null)}
+        />
       )}
     </div>
   )

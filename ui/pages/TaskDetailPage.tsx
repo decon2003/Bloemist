@@ -5,6 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { ArrowLeft, CheckCircle2, Clock, Pencil, Camera, X } from 'lucide-react'
 import { useAppData } from '@/components/providers/app-data-provider'
+import { PhotoViewer } from '@/components/photo-viewer'
 import { useLocale } from '@/components/providers/locale-provider'
 import { useAuth } from '@/components/providers/auth-provider'
 import { Task, TaskStatus } from '@/lib/types'
@@ -268,6 +269,11 @@ export default function TaskDetailPage({ taskId }: TaskDetailPageProps) {
 
   const samplePhotos = isEditing ? samplePhotoUrls : task?.samplePhotoUrls || []
   const thumbnailUrl = samplePhotos[0] || task?.bouquetImage || '/placeholder.jpg'
+  // The viewer pages through all sample photos; a photo outside that list
+  // (the completion proof, a bouquet image) opens on its own.
+  const viewerPhotos = samplePreviewUrl
+    ? samplePhotos.includes(samplePreviewUrl) ? samplePhotos : [samplePreviewUrl]
+    : []
 
   return (
     <div className="space-y-6 p-4 md:p-8 pb-24 md:pb-12">
@@ -390,7 +396,8 @@ export default function TaskDetailPage({ taskId }: TaskDetailPageProps) {
                 alt={task.bouquetName}
                 width={160}
                 height={160}
-                className="h-40 w-40 rounded-2xl object-cover"
+                className="h-40 w-40 cursor-zoom-in rounded-2xl object-cover"
+                onClick={() => setSamplePreviewUrl(thumbnailUrl)}
               />
               <button
                 type="button"
@@ -605,7 +612,12 @@ export default function TaskDetailPage({ taskId }: TaskDetailPageProps) {
                   {t('taskDetail.completionProof', 'Completion proof')}
                 </p>
                 <div className="overflow-hidden rounded-2xl border border-border/60">
-                  <img src={task.completionProofUrl} alt="Completion proof" className="h-48 w-full object-cover" />
+                  <img
+                    src={task.completionProofUrl}
+                    alt="Completion proof"
+                    className="h-48 w-full cursor-zoom-in object-cover"
+                    onClick={() => setSamplePreviewUrl(task.completionProofUrl ?? null)}
+                  />
                 </div>
               </div>
             )}
@@ -645,26 +657,11 @@ export default function TaskDetailPage({ taskId }: TaskDetailPageProps) {
       </div>
 
       {samplePreviewUrl && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-          onClick={() => setSamplePreviewUrl(null)}
-        >
-          <div className="relative w-full max-w-5xl" onClick={(event) => event.stopPropagation()}>
-            <button
-              type="button"
-              onClick={() => setSamplePreviewUrl(null)}
-              className="absolute right-4 top-4 rounded-full bg-black/60 p-2 text-white hover:bg-black/80"
-              aria-label={t('taskDetail.closePreview', 'Close preview')}
-            >
-              <X className="h-5 w-5" />
-            </button>
-            <img
-              src={samplePreviewUrl}
-              alt={t('taskDetail.samplePhotoAlt', 'Arrangement sample')}
-              className="max-h-[80vh] w-full rounded-2xl object-contain shadow-2xl"
-            />
-          </div>
-        </div>
+        <PhotoViewer
+          photos={viewerPhotos}
+          startIndex={viewerPhotos.indexOf(samplePreviewUrl)}
+          onClose={() => setSamplePreviewUrl(null)}
+        />
       )}
 
       {completionDialogOpen && (

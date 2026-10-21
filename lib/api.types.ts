@@ -7,6 +7,8 @@ export interface AssignTaskPayload {
 
 export interface CompleteTaskPayload {
   photo: File | Blob
+  /** Small JPEG for list views; optional. */
+  thumb?: unknown
 }
 
 export interface ApiClient {

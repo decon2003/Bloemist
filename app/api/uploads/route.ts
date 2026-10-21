@@ -12,7 +12,7 @@ export async function POST(request: Request) {
         const formData = await request.formData().catch(() => {
             throw new ApiError(400, 'Expected multipart form data')
         })
-        const url = await storePhoto(formData.get('photo'), 'samples')
+        const url = await storePhoto(formData.get('photo'), 'samples', formData.get('thumb'))
         return NextResponse.json({ url }, { status: 201 })
     } catch (error) {
         return handleRouteError(error)

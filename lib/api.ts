@@ -3,7 +3,7 @@
 // ============================================================
 import type { BouquetSuggestion, CreateOrderInput, CreateTaskInput, CustomerLookup, ListParams, CustomerPage, CustomerSummary, DashboardStats, Order, Task, TaskStatus, Florist, User, StaffCheckIn, WorkspaceSettings } from './types'
 import type { ApiClient, AssignTaskPayload, CompleteTaskPayload } from './api.types'
-import { compressImage } from './image-compress'
+import { compressImage, makeThumbnail } from './image-compress'
 
 const API_BASE_URL = '/api'
 
@@ -48,6 +48,15 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return (await response.json()) as T
 }
 
+/** HD photo plus, when the browser can make one, a list-view thumbnail. */
+async function photoForm(file: File | Blob) {
+  const [photo, thumb] = await Promise.all([compressImage(file), makeThumbnail(file)])
+  const formData = new FormData()
+  formData.append('photo', photo)
+  if (thumb) formData.append('thumb', thumb, 'thumb.jpg')
+  return formData
+}
+
 // API Client Implementation
 const apiClient: ApiClient = {
   // Tasks
@@ -60,13 +69,11 @@ const apiClient: ApiClient = {
   assignTask: (taskId, payload) => request<Task>(`/tasks/${taskId}/assign`, { method: 'POST', body: JSON.stringify(payload) }),
   unassignTask: (taskId, payload) => request<Task>(`/tasks/${taskId}/unassign`, { method: 'POST', body: JSON.stringify(payload) }),
   completeTask: async (taskId, payload) => {
-    const formData = new FormData()
-    formData.append('photo', await compressImage(payload.photo))
+    const formData = await photoForm(payload.photo)
     return request<Task>(`/tasks/${taskId}/complete`, { method: 'POST', body: formData })
   },
   uploadPhoto: async (file) => {
-    const formData = new FormData()
-    formData.append('photo', await compressImage(file))
+    const formData = await photoForm(file)
     const { url } = await request<{ url: string }>('/uploads', { method: 'POST', body: formData })
     return url
   },

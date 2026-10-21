@@ -14,6 +14,7 @@ import { useListParams } from '@/lib/use-list-params'
 import type { Order } from '@/lib/types'
 import { formatCurrencyDisplay } from '@/lib/utils'
 import { useViewSettings } from '@/components/providers/view-settings-provider'
+import { thumbUrl } from '@/lib/image-compress'
 
 const baseStatuses: Order['status'][] = ['NEW', 'IN_PROGRESS', 'READY', 'DELIVERED']
 const orderStatuses: Array<'ALL' | Order['status']> = ['ALL', ...baseStatuses]
@@ -178,7 +179,7 @@ export default function OrdersPage() {
                 <div className="flex flex-1 flex-col justify-center gap-4 md:flex-row md:items-center md:justify-start">
                   <div className="flex items-center gap-4 md:w-[320px] md:shrink-0">
                     <Image
-                      src={orderThumbnail}
+                      src={thumbUrl(orderThumbnail)}
                       alt={order.bouquetName}
                       width={64}
                       height={64}

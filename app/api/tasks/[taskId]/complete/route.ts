@@ -9,7 +9,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ tas
     const { taskId } = await params
     const formData = await request.formData()
     const photo = formData.get('photo')
-    const updated = await completeTask(taskId, { photo: photo as File | Blob })
+    const updated = await completeTask(taskId, { photo: photo as File | Blob, thumb: formData.get('thumb') })
     return NextResponse.json(updated)
   } catch (error) {
     return handleRouteError(error)

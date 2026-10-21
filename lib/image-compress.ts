@@ -43,3 +43,38 @@ export async function compressImage(file: File | Blob): Promise<Blob> {
   // Never make a small file bigger.
   return blob && blob.size < file.size ? blob : file
 }
+
+const THUMB_DIMENSION = 400
+const THUMB_QUALITY = 0.75
+
+/** A small JPEG for list views (~20-40 KB). Null when the browser cannot
+ *  decode the photo (e.g. HEIC outside Safari); lists then use the full photo. */
+export async function makeThumbnail(file: File | Blob): Promise<Blob | null> {
+  if (typeof window === 'undefined' || !file.type.startsWith('image/')) return null
+  let bitmap: ImageBitmap
+  try {
+    bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
+  } catch {
+    return null
+  }
+  const scale = Math.min(1, THUMB_DIMENSION / Math.max(bitmap.width, bitmap.height))
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.round(bitmap.width * scale)
+  canvas.height = Math.round(bitmap.height * scale)
+  const context = canvas.getContext('2d')
+  if (!context) {
+    bitmap.close()
+    return null
+  }
+  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+  bitmap.close()
+  return new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', THUMB_QUALITY))
+}
+
+/** The thumbnail URL for a stored photo, or the photo itself when it has none.
+ *  Uploads that came with a thumbnail are stored as "<id>.hd.<ext>" next to
+ *  "<id>.thumb.jpg" (see storePhoto); anything else has no thumbnail. */
+export function thumbUrl<T extends string | null | undefined>(url: T): T {
+  if (!url || !url.startsWith('/api/photos/')) return url
+  return url.replace(/\.hd\.[a-z0-9]+$/i, '.thumb.jpg') as T
+}

@@ -14,6 +14,7 @@ import { fetchOrder, updateOrder, deleteOrder } from "@/lib/api"
 import type { Order } from "@/lib/types"
 import { getDateKey } from "@/lib/date-utils"
 import { formatCurrencyDisplay, formatDateTime, fromDateTimeLocalValue, toDateTimeLocalValue } from "@/lib/utils"
+import { thumbUrl } from "@/lib/image-compress"
 
 interface OrderDetailPageProps {
   orderId: string
@@ -284,7 +285,7 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
         <section className="rounded-2xl border border-border bg-white p-6">
           <div className="flex flex-col gap-4 md:flex-row md:items-center">
             <Image
-              src={orderThumbnail}
+              src={thumbUrl(orderThumbnail)}
               alt={order.bouquetName}
               width={160}
               height={160}
@@ -586,7 +587,7 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
                             onClick={() => setViewer({ photos: task.samplePhotoUrls ?? [url], index: idx })}
                           >
                             <Image
-                              src={url}
+                              src={thumbUrl(url)}
                               alt={`Sample ${idx + 1}`}
                               fill
                               className="object-cover transition-transform duration-300 hover:scale-105"
@@ -604,7 +605,7 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
                           onClick={() => task.bouquetImage && setViewer({ photos: [task.bouquetImage], index: 0 })}
                         >
                           <Image
-                            src={task.bouquetImage}
+                            src={thumbUrl(task.bouquetImage)}
                             alt="Bouquet"
                             fill
                             className="object-cover transition-transform duration-300 hover:scale-105"

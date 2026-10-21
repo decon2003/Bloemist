@@ -10,6 +10,7 @@ import { PhotoViewer } from '@/components/photo-viewer'
 import { fetchBouquets, lookupCustomer, uploadPhoto } from '@/lib/api'
 import type { BouquetSuggestion, CustomerLookup } from '@/lib/types'
 import { formatCurrencyFromNumber, formatCurrencyInput, parseCurrencyToNumber } from '@/lib/utils'
+import { thumbUrl } from '@/lib/image-compress'
 
 
 type ProductForm = {
@@ -519,7 +520,7 @@ export default function NewOrderPage() {
                           {product.samplePhotoUrls.map((photoUrl, photoIndex) => (
                             <div key={`${photoUrl}-${photoIndex}`} className="group relative h-20 w-20 overflow-hidden rounded-lg border border-border bg-muted">
                               <img
-                                src={photoUrl}
+                                src={thumbUrl(photoUrl)}
                                 alt={t('orders.new.samplePhotoAlt', 'Sample arrangement inspiration')}
                                 className="h-full w-full object-cover"
                                 onClick={() => setProductPreviewUrl(photoUrl)}

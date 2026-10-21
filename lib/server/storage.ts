@@ -60,9 +60,16 @@ export const isR2Configured = () => getR2() !== null
 const objectUrl = (r2: R2Config, key: string) =>
   `https://${r2.accountId}.r2.cloudflarestorage.com/${r2.bucket}/${key.split('/').map(encodeURIComponent).join('/')}`
 
+const MAX_THUMB_BYTES = 300 * 1024
+
 /** Validate an uploaded image and store it. Returns the value to save in the
- *  database: an /api/photos/ path, or a data URL when R2 is not configured. */
-export async function storePhoto(file: unknown, folder: PhotoFolder): Promise<string> {
+ *  database: an /api/photos/ path, or a data URL when R2 is not configured.
+ *
+ *  With a valid JPEG `thumbnail` (made in the browser), the photo is stored as
+ *  "<id>.hd.<ext>" and the thumbnail as "<id>.thumb.jpg"; list views derive the
+ *  thumbnail URL from the ".hd." marker (thumbUrl in lib/image-compress.ts), so
+ *  no lookup is needed to know whether one exists. */
+export async function storePhoto(file: unknown, folder: PhotoFolder, thumbnail?: unknown): Promise<string> {
   // formData.get() returns a string for a plain text field; check the shape.
   if (!file || typeof file !== 'object' || typeof (file as Blob).arrayBuffer !== 'function') {
     throw new ApiError(400, 'Vui lòng chọn một file ảnh')
@@ -89,10 +96,24 @@ export async function storePhoto(file: unknown, folder: PhotoFolder): Promise<st
     return `data:${mime};base64,${buffer.toString('base64')}`
   }
 
-  const now = new Date()
-  const key = `${folder}/${vnDateKey(now).slice(0, 7).replace('-', '/')}/${randomUUID()}.${ext}`
-  await putObject(key, buffer, mime)
-  return `${PHOTO_PATH_PREFIX}${key}`
+  const base = `${folder}/${vnDateKey(new Date()).slice(0, 7).replace('-', '/')}/${randomUUID()}`
+  const thumb = await readThumbnail(thumbnail)
+  if (thumb) {
+    // Thumbnail first: an ".hd." photo must never exist without its thumbnail.
+    await putObject(`${base}.thumb.jpg`, thumb, 'image/jpeg')
+    await putObject(`${base}.hd.${ext}`, buffer, mime)
+    return `${PHOTO_PATH_PREFIX}${base}.hd.${ext}`
+  }
+  await putObject(`${base}.${ext}`, buffer, mime)
+  return `${PHOTO_PATH_PREFIX}${base}.${ext}`
+}
+
+/** A usable thumbnail upload, or null to store the photo without one. */
+async function readThumbnail(value: unknown): Promise<Buffer | null> {
+  if (!value || typeof value !== 'object' || typeof (value as Blob).arrayBuffer !== 'function') return null
+  const blob = value as Blob
+  if (blob.type !== 'image/jpeg' || blob.size === 0 || blob.size > MAX_THUMB_BYTES) return null
+  return Buffer.from(await blob.arrayBuffer())
 }
 
 export async function putObject(key: string, body: Buffer, contentType: string) {

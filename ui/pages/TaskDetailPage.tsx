@@ -11,6 +11,7 @@ import { useAuth } from '@/components/providers/auth-provider'
 import { Task, TaskStatus } from '@/lib/types'
 import { fetchTask, uploadPhoto } from '@/lib/api'
 import { formatDateTime, fromDateTimeLocalValue, toDateTimeLocalValue } from '@/lib/utils'
+import { thumbUrl } from '@/lib/image-compress'
 
 interface TaskDetailPageProps {
   taskId: string
@@ -392,7 +393,7 @@ export default function TaskDetailPage({ taskId }: TaskDetailPageProps) {
           <div className="flex flex-col gap-3 md:flex-row md:items-center">
             <div className="flex flex-col items-start gap-3">
               <Image
-                src={thumbnailUrl}
+                src={thumbUrl(thumbnailUrl)}
                 alt={task.bouquetName}
                 width={160}
                 height={160}
@@ -416,7 +417,7 @@ export default function TaskDetailPage({ taskId }: TaskDetailPageProps) {
                       className="overflow-hidden rounded-xl border border-border bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
                     >
                       <Image
-                        src={photoUrl}
+                        src={thumbUrl(photoUrl)}
                         alt={t('taskDetail.samplePhotoAlt', 'Arrangement sample')}
                         width={72}
                         height={72}
@@ -486,7 +487,7 @@ export default function TaskDetailPage({ taskId }: TaskDetailPageProps) {
                       {samplePhotoUrls.map((photoUrl, index) => (
                         <div key={`${photoUrl}-${index}`} className="group relative h-20 w-20 overflow-hidden rounded-lg border border-border bg-muted">
                           <img
-                            src={photoUrl}
+                            src={thumbUrl(photoUrl)}
                             alt={t('addTask.fields.samplePhotoAlt', 'Arrangement sample')}
                             className="h-full w-full object-cover"
                             onClick={() => setSamplePreviewUrl(photoUrl)}
@@ -613,7 +614,7 @@ export default function TaskDetailPage({ taskId }: TaskDetailPageProps) {
                 </p>
                 <div className="overflow-hidden rounded-2xl border border-border/60">
                   <img
-                    src={task.completionProofUrl}
+                    src={thumbUrl(task.completionProofUrl)}
                     alt="Completion proof"
                     className="h-48 w-full cursor-zoom-in object-cover"
                     onClick={() => setSamplePreviewUrl(task.completionProofUrl ?? null)}

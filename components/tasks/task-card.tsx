@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { Task } from '@/lib/types'
 import { useLocale } from '@/components/providers/locale-provider'
 import { formatDateTime } from '@/lib/utils'
+import { thumbUrl } from '@/lib/image-compress'
 
 interface TaskCardProps {
   task: Task
@@ -23,7 +24,7 @@ export default function TaskCard({ task, href }: TaskCardProps) {
     >
       <div className="flex flex-1 items-center gap-4">
         <Image
-          src={thumbnail}
+          src={thumbUrl(thumbnail)}
           alt={task.bouquetName}
           width={64}
           height={64}

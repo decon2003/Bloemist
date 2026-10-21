@@ -509,7 +509,7 @@ export const completeTask = async (taskId: string, payload: CompleteTaskPayload)
   }
 
   // Validates type/size and uploads to R2 (or inlines it when R2 is not set up).
-  const proofUrl = await storePhoto(payload.photo, 'proofs')
+  const proofUrl = await storePhoto(payload.photo, 'proofs', payload.thumb)
 
   await db.task.update({
     where: { id: taskId },

@@ -8,6 +8,7 @@ import { TaskType } from '@/lib/types'
 import { useLocale } from '@/components/providers/locale-provider'
 import { uploadPhoto } from '@/lib/api'
 import { PhotoViewer } from '@/components/photo-viewer'
+import { thumbUrl } from '@/lib/image-compress'
 
 interface AddTaskDialogProps {
   open: boolean
@@ -340,7 +341,7 @@ export default function AddTaskDialog({
                   {samplePhotoUrls.map((photoUrl, index) => (
                     <div key={`${photoUrl}-${index}`} className="group relative h-20 w-20 overflow-hidden rounded-lg border border-border bg-muted">
                       <img
-                        src={photoUrl}
+                        src={thumbUrl(photoUrl)}
                         alt={t('addTask.fields.samplePhotoAlt', 'Arrangement sample')}
                         className="h-full w-full object-cover"
                         onClick={() => setSamplePreviewUrl(photoUrl)}

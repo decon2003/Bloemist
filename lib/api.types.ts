@@ -1,4 +1,4 @@
-import { CreateOrderInput, CreateTaskInput, DashboardStats, Order, Task, TaskStatus, Florist, StaffCheckIn, WorkspaceSettings, User, CustomerPage, CustomerLookup, CustomerSummary, ListParams, BouquetSuggestion, AuditEntry } from './types'
+import { CreateOrderInput, CreateTaskInput, DashboardStats, Order, Task, TaskStatus, Florist, StaffCheckIn, WorkspaceSettings, User, CustomerPage, CustomerLookup, CustomerSummary, ListParams, BouquetSuggestion, AuditEntry, ShiftCorrectionInput } from './types'
 
 export interface AssignTaskPayload {
   userId: string
@@ -29,6 +29,9 @@ export interface ApiClient {
   unassignTask: (taskId: string, payload: AssignTaskPayload) => Promise<Task>
   completeTask: (taskId: string, payload: CompleteTaskPayload) => Promise<Task>
   fetchCheckIns: (month?: string) => Promise<StaffCheckIn[]>
+  correctCheckIn: (input: ShiftCorrectionInput) => Promise<StaffCheckIn>
+  fetchRecentCheckIns: (days: number) => Promise<StaffCheckIn[]>
+  updateWorkingHours: (hours: { start: string; end: string }) => Promise<WorkspaceSettings>
   createCheckIn: (input: Partial<StaffCheckIn>) => Promise<StaffCheckIn>
   checkOut: (checkInId: string) => Promise<StaffCheckIn>
   fetchDashboardStats: () => Promise<DashboardStats>

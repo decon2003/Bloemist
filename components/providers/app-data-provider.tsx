@@ -3,7 +3,7 @@
 import { createContext, useContext, useMemo, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/components/providers/auth-provider'
-import type { CreateOrderInput, CreateTaskInput, ListParams, Task, TaskStatus, Order, Florist, StaffCheckIn, WorkspaceSettings, User } from '@/lib/types'
+import type { CreateOrderInput, CreateTaskInput, ListParams, ShiftCorrectionInput, Task, TaskStatus, Order, Florist, StaffCheckIn, WorkspaceSettings, User } from '@/lib/types'
 import {
   fetchTasks,
   fetchOrders,
@@ -22,6 +22,7 @@ import {
   fetchCheckIns,
   createCheckIn as createCheckInRequest,
   checkOut as checkOutRequest,
+  correctCheckIn as correctCheckInRequest,
   fetchWorkspaceSettings,
   fetchUsers,
   createUser as createUserRequest,
@@ -54,6 +55,7 @@ interface AppDataContextValue {
   settings: WorkspaceSettings | null
   createCheckIn: (input: Partial<StaffCheckIn>) => Promise<StaffCheckIn>
   checkOut: (checkInId: string) => Promise<StaffCheckIn>
+  correctCheckIn: (input: ShiftCorrectionInput) => Promise<StaffCheckIn>
   users: User[]
   assignOrder: (orderId: string, payload: AssignTaskPayload) => Promise<Order>
   deleteOrder: (orderId: string) => Promise<void>
@@ -89,7 +91,7 @@ const AppDataContextProvider = ({ children }: { children: React.ReactNode }) => 
       florists: canLoad && (isOrdersRoute || isTasksRoute),
       checkins: canLoad && isCheckinsRoute,
       settings: canLoad && (isCheckinsRoute || isSettingsRoute),
-      users: canLoad && (isStaffRoute || isSettingsRoute),
+      users: canLoad && (isStaffRoute || isSettingsRoute || isCheckinsRoute),
     }
   }, [pathname, canLoad])
 
@@ -237,6 +239,12 @@ const AppDataContextProvider = ({ children }: { children: React.ReactNode }) => 
     },
   })
 
+  const correctCheckIn = useMutation({
+    mutationFn: correctCheckInRequest,
+    // May create a shift, so reload rather than patch the cached month.
+    onSuccess: () => queryClient.removeQueries(['checkins']),
+  })
+
   const tasks = tasksQuery.data ?? []
   const orders = ordersQuery.data ?? []
   const florists = floristsQuery.data ?? []
@@ -266,6 +274,7 @@ const AppDataContextProvider = ({ children }: { children: React.ReactNode }) => 
       settings,
       createCheckIn: (input: Partial<StaffCheckIn>) => createCheckIn.mutateAsync(input),
       checkOut: (checkInId: string) => checkOut.mutateAsync(checkInId),
+      correctCheckIn: (input: ShiftCorrectionInput) => correctCheckIn.mutateAsync(input),
       assignOrder: (orderId: string, payload: AssignTaskPayload) => assignOrder.mutateAsync({ orderId, payload }),
       deleteOrder: (orderId: string) => deleteOrder.mutateAsync(orderId),
       users,

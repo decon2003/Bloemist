@@ -19,6 +19,7 @@ const formatInputDate = (date: Date) => {
 interface StaffReportRow {
   profile: StaffProfile & { baseSalary?: string; commissionRate?: number }
   checkins: number
+  hours: number
   orders: number
   tasks: number
   tasksInProgress: number
@@ -276,6 +277,7 @@ export default function StaffReportsPage() {
                   <th className="py-3 pr-4 font-medium">{t('staffReports.columns.staff')}</th>
                   <th className="px-4 py-3 font-medium">{t('staffReports.columns.role')}</th>
                   <th className="px-4 py-3 font-medium">{t('staffReports.columns.checkins', 'Check-ins')}</th>
+                  <th className="px-4 py-3 font-medium">Giờ làm</th>
                   <th className="px-4 py-3 font-medium">{t('staffReports.columns.orders')}</th>
                   <th className="px-4 py-3 font-medium">{t('staffReports.columns.tasksInCharge', 'Tasks in charge')}</th>
                   <th className="px-4 py-3 font-medium">Estimated Salary</th>
@@ -300,6 +302,9 @@ export default function StaffReportsPage() {
                     <td className="px-4 py-4 align-top text-muted-foreground">{roleLabel(row.profile.specialty)}</td>
                     <td className="px-4 py-4 align-top font-medium">
                       {row.checkins}
+                    </td>
+                    <td className="px-4 py-4 align-top font-medium">
+                      {`${Math.floor(row.hours)}h${String(Math.round((row.hours % 1) * 60)).padStart(2, '0')}`}
                     </td>
                     <td className="px-4 py-4 align-top">{row.orders}</td>
                     <td className="px-4 py-4 align-top">

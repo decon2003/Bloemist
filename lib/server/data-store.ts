@@ -39,7 +39,7 @@ const mapTask = (t: any): Task => ({
   deliveryTime: t.order?.receiveTime?.toISOString() ?? '',
 })
 
-const mapCheckIn = (c: any): StaffCheckIn => ({
+export const mapCheckIn = (c: any): StaffCheckIn => ({
   ...c,
   timestamp: c.timestamp.toISOString(),
   checkInAt: c.checkInAt?.toISOString() ?? undefined,
@@ -577,47 +577,6 @@ export const listStaffCheckIns = async (month: { start: Date; end: Date }, staff
     orderBy: { timestamp: 'desc' },
   })
   return checkins.map(mapCheckIn)
-}
-
-export const createStaffCheckIn = async (input: Partial<StaffCheckIn>) => {
-  const checkin = await db.staffCheckIn.create({
-    data: {
-      staffId: input.staffId!,
-      staffName: input.staffName!,
-      discipline: input.discipline!,
-      timestamp: new Date(),
-      checkInAt: new Date(),
-      locationLabel: input.locationLabel || 'Unknown',
-      locationType: input.locationType || 'FIELD',
-      lat: input.coordinates?.lat || 0,
-      lng: input.coordinates?.lng || 0,
-      distanceFromOfficeKm: input.distanceFromOfficeKm || 0,
-      ordersTouched: 0,
-      completedTasks: 0,
-      notes: input.notes
-      // displayName: undefined // Removed to fix type error
-    }
-  })
-  return mapCheckIn(checkin)
-}
-
-export const checkOutStaff = async (checkInId: string) => {
-  const checkIn = await db.staffCheckIn.findUnique({ where: { id: checkInId } })
-  if (!checkIn) throw new ApiError(404, 'Check-in not found')
-  if (checkIn.checkOutAt) throw new ApiError(400, 'Already checked out')
-
-  const now = new Date()
-  const checkInTime = checkIn.checkInAt ? new Date(checkIn.checkInAt) : new Date(checkIn.timestamp)
-  const workingHours = (now.getTime() - checkInTime.getTime()) / (1000 * 60 * 60)
-
-  const updated = await db.staffCheckIn.update({
-    where: { id: checkInId },
-    data: {
-      checkOutAt: now,
-      workingHours
-    }
-  })
-  return mapCheckIn(updated)
 }
 
 // Orders in these states never represent realised revenue and must be excluded

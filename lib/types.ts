@@ -200,6 +200,23 @@ export interface StaffCheckIn {
   requiresReview?: boolean
   verificationStatus?: CheckInVerificationStatus
   verificationNote?: string
+  /** Vietnam date of the shift, YYYY-MM-DD. */
+  workDate: string
+  /** Closed at closing time by the nightly job because nobody checked out. */
+  autoClosed?: boolean
+  correctedAt?: string | null
+  correctedByName?: string | null
+  correctionReason?: string | null
+}
+
+export interface ShiftCorrectionInput {
+  workDate: string
+  /** HH:mm, Vietnam time */
+  checkIn: string
+  checkOut?: string | null
+  reason: string
+  /** Managers only: whose shift. */
+  staffId?: string
 }
 
 export interface StoreLocation {

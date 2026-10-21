@@ -156,8 +156,26 @@ model StaffCheckIn {
   requiresReview       Boolean?
   verificationStatus   String?
   verificationNote     String?
+  // Vietnam calendar day of the shift (YYYY-MM-DD); one shift per person per day.
+  workDate             String
+  // Closed by the nightly job at closing time because nobody checked out.
+  autoClosed           Boolean   @default(false)
+  // Set when the times were entered or fixed by hand (forgotten check-in/out).
+  correctedAt          DateTime?
+  correctedById        String?
+  correctedByName      String?
+  correctionReason     String?
 
   staff User @relation(fields: [staffId], references: [id])
+
+  @@unique([staffId, workDate])
+}
+
+// Shop-wide settings (single row, id = 1).
+model ShopSettings {
+  id        Int    @id @default(1)
+  openTime  String @default("08:00") // HH:mm, Vietnam time
+  closeTime String @default("19:00") // HH:mm; forgotten check-outs are closed at this time
 }
 
 model Message {

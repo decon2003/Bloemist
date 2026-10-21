@@ -15,6 +15,7 @@ export const BACKUP_TABLES = [
   'InventoryItem',
   'OrderCounter',
   'AuditLog',
+  'ShopSettings',
 ] as const
 
 export type BackupFile = {

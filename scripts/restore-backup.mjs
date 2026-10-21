@@ -20,7 +20,9 @@ try {
 }
 
 // Foreign-key order; must match BACKUP_TABLES in lib/server/backup.ts.
-const TABLES = ['User', 'StoreLocation', 'Customer', 'Order', 'Task', 'StaffCheckIn', 'Message', 'InventoryItem', 'OrderCounter', 'AuditLog']
+const TABLES = ['User', 'StoreLocation', 'Customer', 'Order', 'Task', 'StaffCheckIn', 'Message', 'InventoryItem', 'OrderCounter', 'AuditLog', 'ShopSettings']
+// Single-row settings tables that migrations seed with defaults: replaced, not required to be empty.
+const SEEDED = new Set(['ShopSettings'])
 
 const args = process.argv.slice(2)
 const apply = args.includes('--apply')
@@ -80,7 +82,7 @@ try {
     )
   }
 
-  for (const table of TABLES) {
+  for (const table of TABLES.filter((t) => !SEEDED.has(t))) {
     const [{ n }] = await prisma.$queryRawUnsafe(`SELECT count(*)::int AS n FROM "${table}"`)
     if (n > 0) throw new Error(`Target table "${table}" already has ${n} rows - restore only into an empty database`)
   }
@@ -89,12 +91,14 @@ try {
     console.log('\nDry run - nothing written. Re-run with --apply to restore.')
   } else {
     await prisma.$transaction(
-      TABLES.map((table) =>
+      TABLES.flatMap((table) => [
+        // Replace migration defaults only when the backup has the table's rows.
+        ...(SEEDED.has(table) && (backup.tables[table] ?? []).length ? [prisma.$executeRawUnsafe(`DELETE FROM "${table}"`)] : []),
         prisma.$executeRawUnsafe(
           `INSERT INTO "${table}" SELECT * FROM json_populate_recordset(NULL::"${table}", $1::json)`,
           JSON.stringify(backup.tables[table] ?? []),
         ),
-      ),
+      ]),
     )
     console.log('\nRestored.')
   }

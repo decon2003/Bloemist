@@ -5,7 +5,7 @@ export type AuditActor = { id: string; name: string } | null
 
 type AuditEntry = {
   action: string
-  entity: 'order' | 'task' | 'user' | 'customer' | 'auth'
+  entity: 'order' | 'task' | 'user' | 'customer' | 'auth' | 'checkin' | 'settings'
   entityId?: string | null
   summary?: string
   changes?: Record<string, [unknown, unknown]> | null

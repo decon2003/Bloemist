@@ -10,6 +10,8 @@ export type StaffReportRow = {
     commissionRate?: number
   }
   checkins: number
+  /** Hours of closed shifts in the month (auto-closed shifts included until fixed). */
+  hours: number
   orders: number
   tasks: number
   tasksInProgress: number
@@ -37,7 +39,7 @@ export async function getStaffReport(month: { start: Date; end: Date }): Promise
     db.user.findMany({ select: { id: true, name: true, role: true, baseSalary: true, commissionRate: true } }),
     db.staffCheckIn.findMany({
       where: { timestamp: inMonth },
-      select: { staffId: true, staffName: true, discipline: true, timestamp: true, locationLabel: true, ordersTouched: true, completedTasks: true },
+      select: { staffId: true, staffName: true, discipline: true, timestamp: true, locationLabel: true, ordersTouched: true, completedTasks: true, workingHours: true },
     }),
     db.order.findMany({
       where: { createdAt: inMonth, status: { not: 'CANCELLED' }, createdById: { not: null } },
@@ -54,6 +56,7 @@ export async function getStaffReport(month: { start: Date; end: Date }): Promise
   const blank = (profile: StaffReportRow['profile']): StaffReportRow => ({
     profile,
     checkins: 0,
+    hours: 0,
     orders: 0,
     tasks: 0,
     tasksInProgress: 0,
@@ -88,6 +91,7 @@ export async function getStaffReport(month: { start: Date; end: Date }): Promise
     }
     const row = rows.get(entry.staffId)!
     row.checkins += 1
+    row.hours += entry.workingHours ?? 0
     row.orders += entry.ordersTouched
     row.tasks += entry.completedTasks
     const seen = entry.timestamp.toISOString()
@@ -118,6 +122,7 @@ export async function getStaffReport(month: { start: Date; end: Date }): Promise
   return [...rows.values()]
     .map((row) => ({
       ...row,
+      hours: Math.round(row.hours * 100) / 100,
       commissionAmount: Math.round(row.commissionAmount),
       salary: Math.round((row.profile.baseSalary ?? 0) + row.commissionAmount),
     }))

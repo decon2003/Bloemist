@@ -1,7 +1,7 @@
 // ============================================================
 // API Layer - Calls Real Backend API Routes
 // ============================================================
-import type { AuditEntry, BouquetSuggestion, CreateOrderInput, CreateTaskInput, CustomerLookup, ListParams, CustomerPage, CustomerSummary, DashboardStats, Order, Task, TaskStatus, Florist, User, StaffCheckIn, WorkspaceSettings } from './types'
+import type { AuditEntry, BouquetSuggestion, ShiftCorrectionInput, CreateOrderInput, CreateTaskInput, CustomerLookup, ListParams, CustomerPage, CustomerSummary, DashboardStats, Order, Task, TaskStatus, Florist, User, StaffCheckIn, WorkspaceSettings } from './types'
 import type { ApiClient, AssignTaskPayload, CompleteTaskPayload } from './api.types'
 import { compressImage, makeThumbnail } from './image-compress'
 
@@ -111,6 +111,11 @@ const apiClient: ApiClient = {
 
   // Check-ins
   fetchCheckIns: (month?: string) => request<StaffCheckIn[]>(`/checkins${toQuery({ month })}`),
+  fetchRecentCheckIns: (days: number) => request<StaffCheckIn[]>(`/checkins${toQuery({ days })}`),
+  correctCheckIn: (input: ShiftCorrectionInput) =>
+    request<StaffCheckIn>('/checkins/correct', { method: 'POST', body: JSON.stringify(input) }),
+  updateWorkingHours: (hours) =>
+    request<WorkspaceSettings>('/settings', { method: 'PATCH', body: JSON.stringify({ workingHours: hours }) }),
   createCheckIn: (input) => request<StaffCheckIn>('/checkins', { method: 'POST', body: JSON.stringify(input) }),
   checkOut: (checkInId) => request<StaffCheckIn>(`/checkins/${checkInId}`, { method: 'PATCH' }),
 
@@ -139,6 +144,9 @@ export const completeTask = apiClient.completeTask
 export const fetchCheckIns = apiClient.fetchCheckIns
 export const createCheckIn = apiClient.createCheckIn
 export const checkOut = apiClient.checkOut
+export const correctCheckIn = apiClient.correctCheckIn
+export const fetchRecentCheckIns = apiClient.fetchRecentCheckIns
+export const updateWorkingHours = apiClient.updateWorkingHours
 export const fetchDashboardStats = apiClient.fetchDashboardStats
 export const fetchWorkspaceSettings = apiClient.fetchWorkspaceSettings
 export const login = apiClient.login

@@ -320,6 +320,25 @@ export default function SettingsPage() {
     }
   }
 
+  const [hoursMessage, setHoursMessage] = useState('')
+  const [savingHours, setSavingHours] = useState(false)
+
+  // Closing time is also when forgotten check-outs are closed automatically.
+  const saveWorkingHours = async () => {
+    setSavingHours(true)
+    setHoursMessage('')
+    try {
+      const { updateWorkingHours } = await import('@/lib/api')
+      const saved = await updateWorkingHours(workingHours)
+      setWorkingHours(saved.workingHours)
+      setHoursMessage('Đã lưu giờ làm việc')
+    } catch (error) {
+      setHoursMessage(error instanceof Error ? error.message : 'Không lưu được')
+    } finally {
+      setSavingHours(false)
+    }
+  }
+
   const handleWorkingHoursChange = (field: 'start' | 'end', value: string) => {
     if (!canEditSettings) return
     setWorkingHours((prev) => ({ ...prev, [field]: value }))
@@ -396,6 +415,22 @@ export default function SettingsPage() {
             />
           </div>
         </div>
+        <p className="text-xs text-muted-foreground">
+          Ca nào quên chấm công ra sẽ được hệ thống tự chốt ở giờ kết thúc, và nhân viên tự sửa lại giờ thực tế.
+        </p>
+        {canEditSettings && (
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={saveWorkingHours}
+              disabled={savingHours}
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+            >
+              {savingHours ? 'Đang lưu...' : 'Lưu giờ làm việc'}
+            </button>
+            {hoursMessage && <span className="text-sm text-muted-foreground">{hoursMessage}</span>}
+          </div>
+        )}
       </section>
 
       {/* Settings Sections */}

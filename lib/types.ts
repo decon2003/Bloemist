@@ -247,6 +247,19 @@ export interface ListParams {
   orderId?: string
 }
 
+export interface AuditEntry {
+  id: string
+  at: string
+  userId: string | null
+  userName: string | null
+  action: string
+  entity: string
+  entityId: string | null
+  summary: string | null
+  /** field -> [before, after] */
+  changes: Record<string, [unknown, unknown]> | null
+}
+
 export interface BouquetSuggestion {
   name: string
   image: string | null

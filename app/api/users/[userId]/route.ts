@@ -5,6 +5,7 @@ import { handleRouteError, readJsonBody } from '@/lib/server/route-helpers'
 import { hashPassword, validateNewPassword } from '@/lib/server/password'
 import { toVnd } from '@/lib/server/money'
 import { MANAGER_ROLES, isManager, requireUser } from '@/lib/server/session'
+import { audit, diff } from '@/lib/server/audit'
 import {
     PRIVILEGED_USER_SELECT,
     PUBLIC_USER_SELECT,
@@ -101,6 +102,18 @@ export async function PATCH(request: Request, context: RouteContext) {
             select: PRIVILEGED_USER_SELECT,
         })
 
+        const changes = diff(existing, user, ['name', 'email', 'phone', 'role', 'status', 'avatar', 'baseSalary', 'commissionRate'])
+        const passwordReset = data.passwordHash !== undefined
+        if (changes || passwordReset) {
+            await audit(me, {
+                action: passwordReset ? 'user.password_reset' : 'user.update',
+                entity: 'user',
+                entityId: userId,
+                summary: passwordReset ? `${user.name}: cấp lại mật khẩu tạm` : user.name,
+                changes,
+            })
+        }
+
         return NextResponse.json({
             ...user,
             createdAt: user.createdAt.toISOString()
@@ -148,6 +161,7 @@ export async function DELETE(request: Request, context: RouteContext) {
         }
 
         await db.user.delete({ where: { id: userId } })
+        await audit(me, { action: 'user.delete', entity: 'user', entityId: userId, summary: `${user.name} (${user.role})` })
         return new NextResponse(null, { status: 204 })
     } catch (error) {
         return handleRouteError(error)

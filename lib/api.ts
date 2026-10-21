@@ -1,7 +1,7 @@
 // ============================================================
 // API Layer - Calls Real Backend API Routes
 // ============================================================
-import type { BouquetSuggestion, CreateOrderInput, CreateTaskInput, CustomerLookup, ListParams, CustomerPage, CustomerSummary, DashboardStats, Order, Task, TaskStatus, Florist, User, StaffCheckIn, WorkspaceSettings } from './types'
+import type { AuditEntry, BouquetSuggestion, CreateOrderInput, CreateTaskInput, CustomerLookup, ListParams, CustomerPage, CustomerSummary, DashboardStats, Order, Task, TaskStatus, Florist, User, StaffCheckIn, WorkspaceSettings } from './types'
 import type { ApiClient, AssignTaskPayload, CompleteTaskPayload } from './api.types'
 import { compressImage, makeThumbnail } from './image-compress'
 
@@ -79,6 +79,7 @@ const apiClient: ApiClient = {
   },
 
   fetchBouquets: () => request<BouquetSuggestion[]>('/bouquets'),
+  fetchAudit: (params) => request<AuditEntry[]>(`/audit${toQuery(params)}`),
   fetchStaffReport: (month) => request<{ month: string; rows: unknown[] }>(`/reports/staff${toQuery({ month })}`),
 
   // Customers
@@ -145,6 +146,7 @@ export const logout = apiClient.logout
 export const uploadPhoto = apiClient.uploadPhoto
 export const fetchCustomers = apiClient.fetchCustomers
 export const fetchBouquets = apiClient.fetchBouquets
+export const fetchAudit = apiClient.fetchAudit
 export const fetchStaffReport = apiClient.fetchStaffReport
 export const lookupCustomer = apiClient.lookupCustomer
 export const updateCustomer = apiClient.updateCustomer

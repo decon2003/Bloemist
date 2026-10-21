@@ -6,6 +6,7 @@ import { useLocale } from '@/components/providers/locale-provider'
 import { useAuth } from '@/components/providers/auth-provider'
 import { useAppData } from '@/components/providers/app-data-provider'
 import { User } from '@/lib/types'
+import { AuditTrail } from '@/components/audit-trail'
 
 const sections = [
   {
@@ -521,6 +522,8 @@ export default function SettingsPage() {
           </div>
         </div>
       )}
+
+      {canManageUsers && <AuditTrail title="Hoạt động gần đây" />}
 
       {/* Add User Modal */}
       <UserFormModal

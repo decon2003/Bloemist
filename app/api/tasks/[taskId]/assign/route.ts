@@ -1,14 +1,17 @@
 import { NextResponse } from 'next/server'
-import { assignTask } from '@/lib/server/data-store'
+import { getTask, assignTask } from '@/lib/server/data-store'
 import { handleRouteError, readJsonBody } from '@/lib/server/route-helpers'
 import { requireUser } from '@/lib/server/session'
+import { audit, diff } from '@/lib/server/audit'
 
 export async function POST(request: Request, { params }: { params: Promise<{ taskId: string }> }) {
   try {
-    await requireUser(request)
+    const me = await requireUser(request)
     const { taskId } = await params
     const body = await readJsonBody(request)
+    const before = await getTask(taskId)
     const updated = await assignTask(taskId, body)
+    await audit(me, { action: 'task.assign', entity: 'task', entityId: taskId, summary: updated.taskTitle, changes: diff(before, updated, ['assigneeName', 'status']) })
     return NextResponse.json(updated)
   } catch (error) {
     return handleRouteError(error)

@@ -5,6 +5,7 @@ import { handleRouteError, readJsonBody } from '@/lib/server/route-helpers'
 import { hashPassword, validateNewPassword, verifyPassword } from '@/lib/server/password'
 import { requireUser, setSessionCookie } from '@/lib/server/session'
 import { toSessionResponse } from '@/lib/server/auth-response'
+import { audit } from '@/lib/server/audit'
 
 export async function POST(request: Request) {
     try {
@@ -33,6 +34,8 @@ export async function POST(request: Request) {
                 sessionVersion: { increment: 1 },
             },
         })
+
+        await audit(session, { action: 'auth.password_changed', entity: 'auth', entityId: session.id, summary: updated.email })
 
         const response = NextResponse.json(toSessionResponse(updated))
         setSessionCookie(response, updated)

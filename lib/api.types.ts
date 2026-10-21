@@ -1,4 +1,4 @@
-import { CreateOrderInput, CreateTaskInput, DashboardStats, Order, Task, TaskStatus, Florist, StaffCheckIn, WorkspaceSettings, User, CustomerPage, CustomerLookup, CustomerSummary, ListParams, BouquetSuggestion } from './types'
+import { CreateOrderInput, CreateTaskInput, DashboardStats, Order, Task, TaskStatus, Florist, StaffCheckIn, WorkspaceSettings, User, CustomerPage, CustomerLookup, CustomerSummary, ListParams, BouquetSuggestion, AuditEntry } from './types'
 
 export interface AssignTaskPayload {
   userId: string
@@ -37,6 +37,7 @@ export interface ApiClient {
   logout: () => Promise<void>
   uploadPhoto: (file: File | Blob) => Promise<string>
   fetchBouquets: () => Promise<BouquetSuggestion[]>
+  fetchAudit: (params: { entity?: string; entityId?: string }) => Promise<AuditEntry[]>
   fetchStaffReport: (month: string) => Promise<{ month: string; rows: unknown[] }>
   fetchCustomers: (params: { q?: string; sort?: 'spend' | 'recent' | 'orders'; page?: number }) => Promise<CustomerPage>
   lookupCustomer: (phone: string) => Promise<CustomerLookup | null>

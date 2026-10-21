@@ -182,3 +182,21 @@ model InventoryItem {
   status      String   @default("ok")
   lastUpdated DateTime @default(now()) @updatedAt
 }
+
+// Who did what, when: one row per change to orders, tasks, staff accounts and
+// customers, plus sign-ins. `changes` holds {field: [before, after]} for edits.
+// Never stores password hashes or other secrets.
+model AuditLog {
+  id       String   @id @default(uuid())
+  at       DateTime @default(now())
+  userId   String?
+  userName String?
+  action   String // e.g. "order.update", "task.complete", "auth.login_failed"
+  entity   String // "order" | "task" | "user" | "customer" | "auth"
+  entityId String?
+  summary  String?
+  changes  Json?
+
+  @@index([entity, entityId])
+  @@index([at])
+}

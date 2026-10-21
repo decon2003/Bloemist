@@ -15,6 +15,7 @@ import type { CreateOrderInput, Order } from "@/lib/types"
 import { getDateKey } from "@/lib/date-utils"
 import { formatCurrencyDisplay, formatDateTime, fromDateTimeLocalValue, toDateTimeLocalValue } from "@/lib/utils"
 import { thumbUrl } from "@/lib/image-compress"
+import { AuditTrail } from "@/components/audit-trail"
 
 interface OrderDetailPageProps {
   orderId: string
@@ -633,6 +634,10 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
           </div>
         )}
       </section>
+
+      {(user?.role === "boss" || user?.role === "admin") && (
+        <AuditTrail entity="order" entityId={orderId} lang={lang} />
+      )}
 
       {viewer && (
         <PhotoViewer photos={viewer.photos} startIndex={viewer.index} onClose={() => setViewer(null)} />

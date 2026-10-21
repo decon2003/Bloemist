@@ -5,6 +5,7 @@ import { handleRouteError, readJsonBody } from '@/lib/server/route-helpers'
 import { hashPassword, validateNewPassword } from '@/lib/server/password'
 import { toVnd } from '@/lib/server/money'
 import { MANAGER_ROLES, isManager, requireUser } from '@/lib/server/session'
+import { audit } from '@/lib/server/audit'
 import {
     PRIVILEGED_USER_SELECT,
     PUBLIC_USER_SELECT,
@@ -36,7 +37,7 @@ export async function GET(request: Request) {
 // POST: Create a new user
 export async function POST(request: Request) {
     try {
-        await requireUser(request, MANAGER_ROLES)
+        const me = await requireUser(request, MANAGER_ROLES)
         const body = await readJsonBody(request)
 
         const name = requireNonBlank(body.name, 'name', 120)
@@ -76,6 +77,8 @@ export async function POST(request: Request) {
             },
             select: PRIVILEGED_USER_SELECT,
         })
+
+        await audit(me, { action: 'user.create', entity: 'user', entityId: user.id, summary: `${user.name} (${user.role})` })
 
         return NextResponse.json({
             ...user,

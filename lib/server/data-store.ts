@@ -206,8 +206,22 @@ export const listFlorists = async () => {
   return users
 }
 
+/** Next readable order code for today (Vietnam time): "DDMMYY-NNN", e.g.
+ *  "211026-047" = the 47th order of 21 Oct 2026. The counter row is created or
+ *  incremented in one statement, so concurrent orders get distinct numbers. */
+export const nextOrderCode = async (now = new Date()) => {
+  const day = vnDateKey(now)
+  const [{ value }] = await db.$queryRaw<{ value: number }[]>`
+    INSERT INTO "OrderCounter" ("day", "value") VALUES (${day}, 1)
+    ON CONFLICT ("day") DO UPDATE SET "value" = "OrderCounter"."value" + 1
+    RETURNING "value"`
+  const [year, month, date] = day.split('-')
+  return `${date}${month}${year.slice(2)}-${String(value).padStart(3, '0')}`
+}
+
 export const createOrder = async (input: CreateOrderInput) => {
-  const code = input.code || `ORD-${Math.floor(1000 + Math.random() * 9000)}-${Date.now().toString().slice(-4)}`
+  // Codes are always assigned here; a client-supplied code could collide or mislead.
+  const code = await nextOrderCode()
 
   const customerId = await linkCustomer(input.customerPhone, input.customerName)
 

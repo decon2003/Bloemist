@@ -100,6 +100,13 @@ model Customer {
   orders Order[]
 }
 
+// Per-day order sequence for readable codes like "211026-047" (Vietnam date).
+// Incremented atomically with INSERT ... ON CONFLICT so concurrent orders never share a number.
+model OrderCounter {
+  day   String @id // YYYY-MM-DD, Vietnam time
+  value Int
+}
+
 model Task {
   id                 String    @id @default(uuid())
   orderId            String?

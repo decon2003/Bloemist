@@ -20,7 +20,7 @@ try {
 }
 
 // Foreign-key order; must match BACKUP_TABLES in lib/server/backup.ts.
-const TABLES = ['User', 'StoreLocation', 'Customer', 'Order', 'Task', 'StaffCheckIn', 'Message', 'InventoryItem']
+const TABLES = ['User', 'StoreLocation', 'Customer', 'Order', 'Task', 'StaffCheckIn', 'Message', 'InventoryItem', 'OrderCounter', 'AuditLog']
 
 const args = process.argv.slice(2)
 const apply = args.includes('--apply')

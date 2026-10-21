@@ -13,6 +13,8 @@ export const BACKUP_TABLES = [
   'StaffCheckIn',
   'Message',
   'InventoryItem',
+  'OrderCounter',
+  'AuditLog',
 ] as const
 
 export type BackupFile = {
@@ -29,6 +31,14 @@ export type BackupFile = {
  *  exact column types back without per-model code. The data is small (text
  *  only; photos live in R2), so one in-memory snapshot is fine. */
 export async function createBackup(): Promise<BackupFile> {
+  // A table added to the schema but not to BACKUP_TABLES would silently be
+  // left out of every backup; refuse instead so the gap is noticed.
+  const existing = await db.$queryRawUnsafe<{ table_name: string }[]>(
+    `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE' AND table_name <> '_prisma_migrations'`,
+  )
+  const missing = existing.map((t) => t.table_name).filter((name) => !(BACKUP_TABLES as readonly string[]).includes(name))
+  if (missing.length) throw new Error(`Tables not covered by the backup: ${missing.join(', ')} - add them to BACKUP_TABLES`)
+
   const tables: Record<string, unknown[]> = {}
   for (const table of BACKUP_TABLES) {
     const [row] = await db.$queryRawUnsafe<{ rows: unknown[] | null }[]>(

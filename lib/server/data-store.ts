@@ -8,6 +8,7 @@ import type { CreateOrderInput, CreateTaskInput, Florist, Order, Task, TaskStatu
 import { ApiError } from './api-error'
 import { storePhoto } from './storage'
 import { parseCurrencyToNumber } from './money'
+import { addVnDays, startOfVnMonth, vnDateKey } from './vn-time'
 import { linkCustomer, normalizeCustomerPhone } from './customers'
 import { TASK_STATUSES, assertOneOf } from './validation'
 
@@ -48,16 +49,6 @@ const mapUser = (u: any) => ({
   ...u,
   createdAt: u.createdAt.toISOString(),
 })
-
-// Local-time date key. Must match lib/date-utils.ts so that server buckets and
-// client buckets agree; toISOString() here would shift every VN evening order
-// into the previous day.
-const getDateKey = (date: Date) => {
-  const year = date.getFullYear()
-  const month = `${date.getMonth() + 1}`.padStart(2, '0')
-  const day = `${date.getDate()}`.padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
 
 const parseRequiredDate = (value: string | Date, field: string) => {
   const date = value instanceof Date ? value : new Date(value)
@@ -539,10 +530,9 @@ const REVENUE_EXCLUDED_STATUSES = ['CANCELLED']
 
 export const getDashboardStats = async () => {
   const now = new Date()
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-  const weekAgo = new Date(now)
-  weekAgo.setDate(now.getDate() - 6)
-  weekAgo.setHours(0, 0, 0, 0)
+  // Vietnam calendar boundaries - the server clock is UTC.
+  const startOfMonth = startOfVnMonth(now)
+  const weekAgo = addVnDays(now, -6)
 
   // Bound the window at "now" as well as at the start of the period. Without an
   // upper bound a future-dated order counts towards this month's revenue, and
@@ -581,18 +571,14 @@ export const getDashboardStats = async () => {
     }),
   ])
 
-  const weeklyRevenue = Array.from({ length: 7 }, (_, index) => {
-    const date = new Date(weekAgo)
-    date.setDate(weekAgo.getDate() + index)
-    return {
-      date: getDateKey(date),
-      revenue: 0,
-    }
-  })
+  const weeklyRevenue = Array.from({ length: 7 }, (_, index) => ({
+    date: vnDateKey(addVnDays(weekAgo, index)),
+    revenue: 0,
+  }))
   const weeklyIndex = new Map(weeklyRevenue.map((entry, index) => [entry.date, index]))
 
   for (const order of weeklyOrders) {
-    const index = weeklyIndex.get(getDateKey(order.createdAt))
+    const index = weeklyIndex.get(vnDateKey(order.createdAt))
     if (index !== undefined) {
       weeklyRevenue[index].revenue += parseCurrencyToNumber(order.total)
     }

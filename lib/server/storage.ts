@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto'
 import { request as httpsRequest } from 'https'
 import { AwsClient } from 'aws4fetch'
 import { ApiError } from './api-error'
+import { vnDateKey } from './vn-time'
 
 // Photos live in a private Cloudflare R2 bucket. The database stores only the
 // app path "/api/photos/<key>"; that route checks the session and redirects to
@@ -89,7 +90,7 @@ export async function storePhoto(file: unknown, folder: PhotoFolder): Promise<st
   }
 
   const now = new Date()
-  const key = `${folder}/${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${randomUUID()}.${ext}`
+  const key = `${folder}/${vnDateKey(now).slice(0, 7).replace('-', '/')}/${randomUUID()}.${ext}`
   await putObject(key, buffer, mime)
   return `${PHOTO_PATH_PREFIX}${key}`
 }

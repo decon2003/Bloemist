@@ -37,3 +37,14 @@ export function parseVnDateKey(key: string | null | undefined): Date | null {
   const time = Date.parse(`${key}T00:00:00+07:00`)
   return Number.isNaN(time) ? null : new Date(time)
 }
+
+/** Start (inclusive) and end (exclusive) of a Vietnam calendar month given as
+ *  "YYYY-MM"; the current month when missing. Null if malformed. */
+export function parseVnMonth(value: string | null | undefined, now = new Date()): { key: string; start: Date; end: Date } | null {
+  const key = value ?? vnDateKey(now).slice(0, 7)
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(key)) return null
+  const [year, month] = key.split('-').map(Number)
+  const start = new Date(Date.UTC(year, month - 1, 1) - VN_OFFSET_MS)
+  const end = new Date(Date.UTC(year, month, 1) - VN_OFFSET_MS)
+  return { key, start, end }
+}

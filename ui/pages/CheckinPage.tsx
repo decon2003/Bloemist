@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ShieldAlert, Clock, CheckCircle2 } from 'lucide-react'
 import { useAuth } from '@/components/providers/auth-provider'
 import { useLocale } from '@/components/providers/locale-provider'
@@ -27,7 +27,7 @@ const statusBadgeClass = (state: 'store' | 'pending' | 'approved') => {
 export default function CheckinPage() {
   const { user } = useAuth()
   const { lang, t } = useLocale()
-  const { checkins, settings, createCheckIn, checkOut } = useAppData()
+  const { checkins, settings, createCheckIn, checkOut, setCheckinMonth } = useAppData()
   const now = useMemo(() => new Date(), [])
 
   // State for Admin View
@@ -37,6 +37,11 @@ export default function CheckinPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const isAdmin = user?.role === 'admin' || user?.role === 'boss'
+
+  // Check-ins load one month at a time: the selected day's month for managers,
+  // this month for staff.
+  const monthToLoad = (isAdmin ? selectedDate : dayKey(now)).slice(0, 7)
+  useEffect(() => setCheckinMonth(monthToLoad), [monthToLoad, setCheckinMonth])
 
   const workspaceSettings = useMemo(() => settings || {
     storeLocations: [],

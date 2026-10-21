@@ -1,11 +1,17 @@
 // ============================================================
 // API Layer - Calls Real Backend API Routes
 // ============================================================
-import type { CreateOrderInput, CreateTaskInput, CustomerLookup, CustomerPage, CustomerSummary, DashboardStats, Order, Task, TaskStatus, Florist, User, StaffCheckIn, WorkspaceSettings } from './types'
+import type { BouquetSuggestion, CreateOrderInput, CreateTaskInput, CustomerLookup, ListParams, CustomerPage, CustomerSummary, DashboardStats, Order, Task, TaskStatus, Florist, User, StaffCheckIn, WorkspaceSettings } from './types'
 import type { ApiClient, AssignTaskPayload, CompleteTaskPayload } from './api.types'
 import { compressImage } from './image-compress'
 
 const API_BASE_URL = '/api'
+
+/** "?from=..&to=.." from the set fields only. */
+const toQuery = (params: object = {}) => {
+  const entries = Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
+  return entries.length ? `?${new URLSearchParams(entries.map(([k, v]) => [k, String(v)]))}` : ''
+}
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers = options.body instanceof FormData
@@ -45,7 +51,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 // API Client Implementation
 const apiClient: ApiClient = {
   // Tasks
-  fetchTasks: () => request<Task[]>('/tasks'),
+  fetchTasks: (params?: ListParams) => request<Task[]>(`/tasks${toQuery(params)}`),
   fetchTask: (taskId) => request<Task>(`/tasks/${taskId}`),
   createTask: (input) => request<Task>('/tasks', { method: 'POST', body: JSON.stringify(input) }),
   updateTask: (taskId, input) => request<Task>(`/tasks/${taskId}`, { method: 'PATCH', body: JSON.stringify(input) }),
@@ -65,6 +71,9 @@ const apiClient: ApiClient = {
     return url
   },
 
+  fetchBouquets: () => request<BouquetSuggestion[]>('/bouquets'),
+  fetchStaffReport: (month) => request<{ month: string; rows: unknown[] }>(`/reports/staff${toQuery({ month })}`),
+
   // Customers
   fetchCustomers: ({ q = '', sort = 'spend', page = 1 }) =>
     request<CustomerPage>(`/customers?${new URLSearchParams({ q, sort, page: String(page) })}`),
@@ -73,7 +82,7 @@ const apiClient: ApiClient = {
     request<CustomerSummary>(`/customers/${customerId}`, { method: 'PATCH', body: JSON.stringify(input) }),
 
   // Orders
-  fetchOrders: () => request<Order[]>('/orders'),
+  fetchOrders: (params?: ListParams) => request<Order[]>(`/orders${toQuery(params)}`),
   fetchOrder: (orderId) => request<Order>(`/orders/${orderId}`),
   createOrder: (input) => request<Order>('/orders', { method: 'POST', body: JSON.stringify(input) }),
   updateOrder: (orderId, input) => request<Order>(`/orders/${orderId}`, { method: 'PATCH', body: JSON.stringify(input) }),
@@ -93,7 +102,7 @@ const apiClient: ApiClient = {
     request<User>('/auth/change-password', { method: 'POST', body: JSON.stringify({ currentPassword, newPassword }) }),
 
   // Check-ins
-  fetchCheckIns: () => request<StaffCheckIn[]>('/checkins'),
+  fetchCheckIns: (month?: string) => request<StaffCheckIn[]>(`/checkins${toQuery({ month })}`),
   createCheckIn: (input) => request<StaffCheckIn>('/checkins', { method: 'POST', body: JSON.stringify(input) }),
   checkOut: (checkInId) => request<StaffCheckIn>(`/checkins/${checkInId}`, { method: 'PATCH' }),
 
@@ -128,6 +137,8 @@ export const login = apiClient.login
 export const logout = apiClient.logout
 export const uploadPhoto = apiClient.uploadPhoto
 export const fetchCustomers = apiClient.fetchCustomers
+export const fetchBouquets = apiClient.fetchBouquets
+export const fetchStaffReport = apiClient.fetchStaffReport
 export const lookupCustomer = apiClient.lookupCustomer
 export const updateCustomer = apiClient.updateCustomer
 export const fetchCurrentUser = apiClient.fetchCurrentUser

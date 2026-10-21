@@ -10,6 +10,7 @@ import { useLocale } from '@/components/providers/locale-provider'
 import { useAuth } from '@/components/providers/auth-provider'
 import { DateFilterSwitcher, DateRange } from '@/components/date-filter-switcher'
 import { getDateKey } from '@/lib/date-utils'
+import { useListParams } from '@/lib/use-list-params'
 import type { Order } from '@/lib/types'
 import { formatCurrencyDisplay } from '@/lib/utils'
 import { useViewSettings } from '@/components/providers/view-settings-provider'
@@ -21,59 +22,40 @@ type OrderFilter = (typeof orderStatuses)[number]
 
 export default function OrdersPage() {
   const router = useRouter()
-  const { orders, tasks, florists, assignOrder, deleteOrder, updateOrder } = useAppData()
+  const { orders, florists, assignOrder, deleteOrder, updateOrder, setOrderScope } = useAppData()
   const { lang, t, getDeliveryLabel, getOrderStatusLabel } = useLocale()
   const { user } = useAuth()
   const { dateFilterMode } = useViewSettings()
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState<OrderFilter>('ALL')
-  const [selectedDate, setSelectedDate] = useState('')
-  const [dateRange, setDateRange] = useState<DateRange>({ from: '', to: '' })
+  // Open on today's orders; "All dates" shows the working window around today.
+  const [selectedDate, setSelectedDate] = useState(() => getDateKey(new Date()) ?? '')
+  const [dateRange, setDateRange] = useState<DateRange>(() => {
+    const today = getDateKey(new Date()) ?? ''
+    return { from: today, to: today }
+  })
   const weekDayLabels = lang === 'vi' ? ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'] : undefined
 
+  // Each mode starts on today when switched to; the other mode's value is cleared.
   useEffect(() => {
+    const today = getDateKey(new Date()) ?? ''
     if (dateFilterMode === 'range') {
       setSelectedDate('')
+      setDateRange((current) => (current.from ? current : { from: today, to: today }))
     } else {
       setDateRange({ from: '', to: '' })
+      setSelectedDate((current) => current || today)
     }
   }, [dateFilterMode])
 
-  const ordersWithDerivedStatus = useMemo(() => {
-    if (user?.role === 'florist') {
-      const myOrderIds = new Set(tasks.filter(t => t.assigneeId === user.id).map(t => t.orderId))
-      return orders.filter((order) => myOrderIds.has(order.id))
-    }
-    return orders
-  }, [orders, tasks, user])
+  // Dates and search are applied by the server (florists only get orders with
+  // their tasks); only the status tabs filter locally.
+  const listParams = useListParams({ mode: dateFilterMode, selectedDate, range: dateRange, query })
+  useEffect(() => setOrderScope(listParams), [listParams, setOrderScope])
 
   const filteredOrders = useMemo(
-    () =>
-      ordersWithDerivedStatus.filter((order) => {
-        const matchesStatus = status === 'ALL' || order.status === status
-        const matchesQuery =
-          !query ||
-          order.code.toLowerCase().includes(query.toLowerCase()) ||
-          order.customerName.toLowerCase().includes(query.toLowerCase())
-        const receiveDate = getDateKey(order.receiveTime)
-        const matchesDate =
-          dateFilterMode === 'range'
-            ? (!dateRange.from ||
-              (receiveDate !== null &&
-                receiveDate >= dateRange.from &&
-                (!dateRange.to || receiveDate <= dateRange.to)))
-            : !selectedDate || receiveDate === selectedDate
-        return matchesStatus && matchesQuery && matchesDate
-      }),
-    [
-      ordersWithDerivedStatus,
-      query,
-      selectedDate,
-      dateFilterMode,
-      dateRange.from,
-      dateRange.to,
-      status,
-    ],
+    () => orders.filter((order) => status === 'ALL' || order.status === status),
+    [orders, status],
   )
 
   const formatMoney = (value?: string | number | null) => formatCurrencyDisplay(value, '₫0')

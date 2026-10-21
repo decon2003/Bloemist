@@ -2,16 +2,12 @@
 
 import { useMemo, useState, useCallback, useEffect } from 'react'
 import { Users, ShoppingBag, ClipboardList, Search, Filter, Calendar, Settings, X, Save } from 'lucide-react'
-import { StaffCheckIn, StaffProfile, User } from '@/lib/types'
+import { StaffProfile, User } from '@/lib/types'
 import { formatDateTime, parseCurrencyToNumber, formatCurrencyFromNumber, formatCurrencyInput } from '@/lib/utils'
 import { useLocale } from '@/components/providers/locale-provider'
 import { useAuth } from '@/components/providers/auth-provider'
 import { useAppData } from '@/components/providers/app-data-provider'
-
-const dateKey = (value: string) => {
-  const date = new Date(value)
-  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`
-}
+import { fetchStaffReport } from '@/lib/api'
 
 const formatInputDate = (date: Date) => {
   const year = date.getFullYear()
@@ -103,7 +99,7 @@ function SalaryConfigModal({ user, onClose, onSave }: { user: User, onClose: () 
 export default function StaffReportsPage() {
   const { lang, t } = useLocale()
   const { user } = useAuth()
-  const { tasks, checkins, users, orders, updateUser } = useAppData()
+  const { users, updateUser } = useAppData()
 
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedDate, setSelectedDate] = useState(() => new Date())
@@ -123,154 +119,35 @@ export default function StaffReportsPage() {
     [lang],
   )
 
-  const selectedMonthKey = useMemo(
-    () => `${selectedDate.getFullYear()}-${selectedDate.getMonth()}`,
+  // Pay and attendance are computed on the server for just this month
+  // (lib/server/staff-report.ts) instead of from every order/task in the browser.
+  const monthKey = useMemo(
+    () => `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}`,
     [selectedDate],
   )
+  const [staffReports, setStaffReports] = useState<StaffReportRow[]>([])
+  const [reportError, setReportError] = useState<string | null>(null)
+  const [reportVersion, setReportVersion] = useState(0)
 
-  const monthEntries = useMemo(
-    () =>
-      checkins.filter((entry: StaffCheckIn) => {
-        const timestamp = new Date(entry.timestamp)
-        return `${timestamp.getFullYear()}-${timestamp.getMonth()}` === selectedMonthKey
-      }),
-    [checkins, selectedMonthKey],
+  useEffect(() => {
+    let active = true
+    setReportError(null)
+    fetchStaffReport(monthKey)
+      .then((report) => active && setStaffReports(report.rows as StaffReportRow[]))
+      .catch((error) => active && setReportError(error instanceof Error ? error.message : 'Không tải được báo cáo'))
+    return () => {
+      active = false
+    }
+  }, [monthKey, reportVersion])
+
+  const saveSalaryConfig = useCallback(
+    async (userId: string, input: Partial<User>) => {
+      const updated = await updateUser(userId, input)
+      setReportVersion((version) => version + 1)
+      return updated
+    },
+    [updateUser],
   )
-
-  const taskAssignments = useMemo(() => {
-    const base = new Map<string, { inProgress: number; completed: number }>()
-
-    tasks.forEach((task) => {
-      if (!task.assigneeId) return
-      if (!base.has(task.assigneeId)) {
-        base.set(task.assigneeId, { inProgress: 0, completed: 0 })
-      }
-      const record = base.get(task.assigneeId)
-      if (!record) return
-      if (task.status === 'COMPLETED') record.completed += 1
-      if (task.status === 'IN_PROGRESS') record.inProgress += 1
-    })
-
-    return base
-  }, [tasks])
-
-  const staffReports = useMemo<StaffReportRow[]>(() => {
-    const base = new Map<string, StaffReportRow>()
-
-    // Initialize with all users
-    users.forEach((profile: User) => {
-      base.set(profile.id, {
-        profile: {
-          id: profile.id,
-          name: profile.name,
-          title: profile.role === 'florist' ? 'Florist' : profile.role === 'sales' ? 'Sales' : 'Admin',
-          specialty: profile.role as any,
-          baseSalary: profile.baseSalary,
-          commissionRate: profile.commissionRate,
-        },
-        checkins: 0,
-        orders: 0,
-        tasks: 0,
-        tasksInProgress: 0,
-        tasksCompleted: 0,
-        salary: 0,
-        commissionAmount: 0,
-        lastSeen: null,
-        lastLocation: null,
-      })
-    })
-
-    // Process check-ins
-    monthEntries.forEach((entry: StaffCheckIn) => {
-      if (!base.has(entry.staffId)) {
-        base.set(entry.staffId, {
-          profile: {
-            id: entry.staffId,
-            name: entry.staffName,
-            title: entry.discipline === 'sales' ? 'Sales' : 'Florist',
-            specialty: entry.discipline,
-          },
-          checkins: 0,
-          orders: 0,
-          tasks: 0,
-          tasksInProgress: 0,
-          tasksCompleted: 0,
-          salary: 0,
-          commissionAmount: 0,
-          lastSeen: null,
-          lastLocation: null,
-        })
-      }
-
-      const record = base.get(entry.staffId)
-      if (!record) return
-
-      record.checkins += 1
-      record.orders += entry.ordersTouched
-      record.tasks += entry.completedTasks
-
-      if (!record.lastSeen || new Date(entry.timestamp).getTime() > new Date(record.lastSeen).getTime()) {
-        record.lastSeen = entry.timestamp
-        record.lastLocation = entry.locationLabel
-      }
-    })
-
-    // Calculate Salary & Commission
-    const startOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1)
-    const endOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0, 23, 59, 59)
-
-    const relevantOrders = orders.filter(o => {
-      const d = new Date(o.createdAt)
-      return d >= startOfMonth && d <= endOfMonth
-    })
-
-    // Process Sales Commission
-    relevantOrders.forEach(order => {
-      if (!order.createdById) return
-      const record = base.get(order.createdById)
-      if (record) {
-        const userRev = parseCurrencyToNumber(order.sellingPrice || order.total)
-        const rate = record.profile.commissionRate || 0
-        record.commissionAmount += userRev * (rate / 100)
-      }
-    })
-
-    // Process Florist Commission
-    const relevantTasks = tasks.filter(t => {
-      if (t.status !== 'COMPLETED' || !t.completedAt) return false
-      const d = new Date(t.completedAt)
-      return d >= startOfMonth && d <= endOfMonth
-    })
-
-    relevantTasks.forEach(task => {
-      if (!task.assigneeId) return
-      const record = base.get(task.assigneeId)
-      if (record) {
-        const price = parseCurrencyToNumber(task.price || '0')
-        const rate = record.profile.commissionRate || 0
-        record.commissionAmount += price * (rate / 100)
-      }
-    })
-
-    return Array.from(base.values())
-      .map((record) => {
-        const activeAssignment = taskAssignments.get(record.profile.id) || {
-          inProgress: record.tasksInProgress,
-          completed: record.tasksCompleted,
-        }
-
-        const baseSal = parseCurrencyToNumber(record.profile.baseSalary || '0')
-        const totalSalary = baseSal + record.commissionAmount
-
-        return {
-          ...record,
-          tasksInProgress: activeAssignment.inProgress,
-          tasksCompleted: activeAssignment.completed,
-          salary: totalSalary
-        }
-      })
-      .sort((a, b) => a.profile.name.localeCompare(b.profile.name))
-  }, [monthEntries, taskAssignments, users, orders, tasks, selectedDate])
 
   const totals = useMemo(
     () =>
@@ -321,7 +198,7 @@ export default function StaffReportsPage() {
         <SalaryConfigModal
           user={editingConfigUser}
           onClose={() => setEditingConfigUser(null)}
-          onSave={updateUser}
+          onSave={saveSalaryConfig}
         />
       )}
 
@@ -357,6 +234,10 @@ export default function StaffReportsPage() {
       </div>
 
       {/* Main Table Section */}
+      {reportError && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{reportError}</div>
+      )}
+
       <section className="rounded-3xl border border-border bg-white p-6">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>

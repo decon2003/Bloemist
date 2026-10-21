@@ -10,20 +10,25 @@ import AddTaskDialog from '@/components/tasks/add-task-dialog'
 import TaskCard from '@/components/tasks/task-card'
 import { DateFilterSwitcher, DateRange } from '@/components/date-filter-switcher'
 import { getDateKey } from '@/lib/date-utils'
+import { useListParams } from '@/lib/use-list-params'
 import { TaskStatus, TaskType } from '@/lib/types'
 import { useViewSettings } from '@/components/providers/view-settings-provider'
 
 const statuses: ('ALL' | TaskStatus)[] = ['ALL', 'UNASSIGNED', 'ASSIGNED', 'IN_PROGRESS', 'READY', 'COMPLETED']
 
 export default function TasksPage() {
-  const { tasks, isLoading } = useAppData()
+  const { tasks, isLoading, setTaskScope } = useAppData()
   const { lang, t, getTaskStatusLabel } = useLocale()
   const { user } = useAuth()
   const { dateFilterMode } = useViewSettings()
   const [filter, setFilter] = useState<(typeof statuses)[number]>('ALL')
   const [query, setQuery] = useState('')
-  const [selectedDate, setSelectedDate] = useState('')
-  const [dateRange, setDateRange] = useState<DateRange>({ from: '', to: '' })
+  // Open on today's tasks; "All dates" shows the working window around today.
+  const [selectedDate, setSelectedDate] = useState(() => getDateKey(new Date()) ?? '')
+  const [dateRange, setDateRange] = useState<DateRange>(() => {
+    const today = getDateKey(new Date()) ?? ''
+    return { from: today, to: today }
+  })
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
@@ -40,34 +45,31 @@ export default function TasksPage() {
     { value: 'SHIP_DON', label: t('addTask.taskType.shipDon', 'Delivery') },
   ]
 
+  // Each mode starts on today when switched to; the other mode's value is cleared.
   useEffect(() => {
+    const today = getDateKey(new Date()) ?? ''
     if (dateFilterMode === 'range') {
       setSelectedDate('')
+      setDateRange((current) => (current.from ? current : { from: today, to: today }))
     } else {
       setDateRange({ from: '', to: '' })
+      setSelectedDate((current) => current || today)
     }
   }, [dateFilterMode])
+
+  // Due date and search are applied by the server; status, type and
+  // "assigned to me" filter the loaded day(s) locally.
+  const listParams = useListParams({ mode: dateFilterMode, selectedDate, range: dateRange, query })
+  useEffect(() => setTaskScope(listParams), [listParams, setTaskScope])
 
   const filteredTasks = useMemo(
     () =>
       tasks
         .filter((task) => {
           const matchesStatus = filter === 'ALL' || task.status === filter
-          const matchesQuery =
-            !query ||
-            task.taskTitle.toLowerCase().includes(query.toLowerCase()) ||
-            task.customerName.toLowerCase().includes(query.toLowerCase())
-          const dateKey = getDateKey(task.dueTime)
-          const matchesDate =
-            dateFilterMode === 'range'
-              ? (!dateRange.from ||
-                (dateKey !== null &&
-                  dateKey >= dateRange.from &&
-                  (!dateRange.to || dateKey <= dateRange.to)))
-              : !selectedDate || dateKey === selectedDate
           const matchesAssignee = !assignedOnly || (user?.id ? task.assigneeId === user.id : true)
           const matchesType = typeFilter === 'ALL' || task.type === typeFilter
-          return matchesStatus && matchesQuery && matchesDate && matchesAssignee && matchesType
+          return matchesStatus && matchesAssignee && matchesType
         })
         .sort((taskA, taskB) => {
           const diff = new Date(taskA.dueTime).getTime() - new Date(taskB.dueTime).getTime()
@@ -76,11 +78,6 @@ export default function TasksPage() {
     [
       tasks,
       filter,
-      query,
-      selectedDate,
-      dateFilterMode,
-      dateRange.from,
-      dateRange.to,
       sortOrder,
       assignedOnly,
       user?.id,

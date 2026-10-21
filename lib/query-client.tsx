@@ -48,6 +48,28 @@ class QueryClient {
     this.notify(hashed)
   }
 
+  /** Cached keys that start with `prefix`, e.g. ['tasks'] matches ['tasks', { from, to }]. */
+  private keysWithPrefix(prefix: QueryKey) {
+    const head = hashKey(prefix).slice(0, -1) // drop the closing "]"
+    return [...this.cache.keys()].filter((hashed) => hashed === `${head}]` || hashed.startsWith(`${head},`))
+  }
+
+  /** Apply an update to every cached list under `prefix` (each filter/scope). */
+  setQueriesData<T>(prefix: QueryKey, update: (current: T) => T) {
+    for (const hashed of this.keysWithPrefix(prefix)) {
+      this.cache.set(hashed, update(this.cache.get(hashed) as T))
+      this.notify(hashed)
+    }
+  }
+
+  /** Drop every cached list under `prefix`; mounted queries refetch their own key. */
+  removeQueries(prefix: QueryKey) {
+    for (const hashed of this.keysWithPrefix(prefix)) {
+      this.cache.delete(hashed)
+      this.notify(hashed)
+    }
+  }
+
   subscribe(key: QueryKey, listener: () => void) {
     const hashed = hashKey(key)
     const listeners = this.listeners.get(hashed) ?? new Set()
@@ -98,8 +120,12 @@ function useQuery<T>({ queryKey, queryFn, enabled = true }: QueryOptions<T>) {
   // Use refs to avoid stale closures
   const queryFnRef = useRef(queryFn)
   const isFetchingRef = useRef(false)
-  const hasFetchedRef = useRef(false)
+  // The key last loaded. Tracking the key (not a boolean) means a changed
+  // filter - e.g. another date - fetches again instead of keeping old data.
+  const fetchedKeyRef = useRef<string | null>(null)
+  const currentKeyRef = useRef(keyHash)
   queryFnRef.current = queryFn
+  currentKeyRef.current = keyHash
 
   // Stable runQuery that won't change
   const runQuery = useCallback(async () => {
@@ -107,43 +133,52 @@ function useQuery<T>({ queryKey, queryFn, enabled = true }: QueryOptions<T>) {
     if (isFetchingRef.current) return
     isFetchingRef.current = true
 
+    const requestedKey = keyHash
     setState((current) => ({ ...current, status: 'pending', error: null }))
     try {
       const data = await queryFnRef.current()
       client.setQueryData(queryKey, data)
-      setState({ data, status: 'success', error: null })
+      // The filter changed while this was in flight: keep it cached, don't show it.
+      if (currentKeyRef.current === requestedKey) setState({ data, status: 'success', error: null })
       return data
     } catch (error) {
       console.error('Query error for', queryKey, error)
-      setState((current) => ({ ...current, status: 'error', error: error as Error }))
+      if (currentKeyRef.current === requestedKey) {
+        setState((current) => ({ ...current, status: 'error', error: error as Error }))
+      }
     } finally {
       isFetchingRef.current = false
     }
   }, [client, enabled, keyHash])
 
-  // Initial fetch - runs once per key
+  // Fetch once per key: on mount and whenever the key (filter) changes.
   useEffect(() => {
     if (!enabled) return
-    if (hasFetchedRef.current) return
-    hasFetchedRef.current = true
+    if (fetchedKeyRef.current === keyHash) return
+    fetchedKeyRef.current = keyHash
 
     const cached = client.getQueryData<T>(queryKey)
     if (cached !== undefined) {
       setState({ data: cached, status: 'success', error: null })
     } else {
+      // A new key may still be in flight from the previous one; allow this fetch.
+      isFetchingRef.current = false
+      setState({ data: undefined, status: 'pending', error: null })
       runQuery()
     }
   }, [enabled, keyHash])
 
-  // Subscribe to cache updates
+  // Subscribe to cache updates. A removed entry (removeQueries) is refetched.
   useEffect(() => {
     return client.subscribe(queryKey, () => {
       const cached = client.getQueryData<T>(queryKey)
       if (cached !== undefined) {
         setState((current) => ({ ...current, data: cached, status: 'success' }))
+      } else if (enabled) {
+        runQuery()
       }
     })
-  }, [client, keyHash])
+  }, [client, keyHash, enabled])
 
   return {
     data: state.data,

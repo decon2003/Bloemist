@@ -234,6 +234,21 @@ export interface User {
   password?: string
 }
 
+/** What a list should load: a Vietnam-day window (YYYY-MM-DD, inclusive), a
+ *  search across all history, or (tasks only) one order's tasks. Empty = the
+ *  server's default working window. */
+export interface ListParams {
+  from?: string
+  to?: string
+  q?: string
+  orderId?: string
+}
+
+export interface BouquetSuggestion {
+  name: string
+  image: string | null
+}
+
 export type CustomerSource = 'facebook' | 'zalo' | 'instagram' | 'walk_in' | 'referral' | 'other'
 
 export interface CustomerSummary {

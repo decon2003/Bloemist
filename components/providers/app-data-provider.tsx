@@ -3,7 +3,7 @@
 import { createContext, useContext, useMemo, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/components/providers/auth-provider'
-import type { CreateOrderInput, CreateTaskInput, Task, TaskStatus, Order, Florist, StaffCheckIn, WorkspaceSettings, User } from '@/lib/types'
+import type { CreateOrderInput, CreateTaskInput, ListParams, Task, TaskStatus, Order, Florist, StaffCheckIn, WorkspaceSettings, User } from '@/lib/types'
 import {
   fetchTasks,
   fetchOrders,
@@ -58,6 +58,12 @@ interface AppDataContextValue {
   assignOrder: (orderId: string, payload: AssignTaskPayload) => Promise<Order>
   deleteOrder: (orderId: string) => Promise<void>
   updateUser: (userId: string, input: Partial<User>) => Promise<User>
+  /** Which orders/tasks the current page shows. Lists load nothing until the
+   *  page sets a scope, so no page downloads every order or task. */
+  setOrderScope: (scope: ListParams) => void
+  setTaskScope: (scope: ListParams) => void
+  /** "YYYY-MM" month of check-ins to load (Vietnam time). */
+  setCheckinMonth: (month: string) => void
 }
 
 const AppDataContext = createContext<AppDataContextValue | undefined>(undefined)
@@ -78,40 +84,51 @@ const AppDataContextProvider = ({ children }: { children: React.ReactNode }) => 
     const isSettingsRoute = route.includes('/settings')
 
     return {
-      orders: canLoad && (isOrdersRoute || isStaffRoute),
-      tasks: canLoad && (isOrdersRoute || isTasksRoute || isStaffRoute),
+      orders: canLoad && isOrdersRoute,
+      tasks: canLoad && (isOrdersRoute || isTasksRoute),
       florists: canLoad && (isOrdersRoute || isTasksRoute),
-      checkins: canLoad && (isCheckinsRoute || isStaffRoute),
+      checkins: canLoad && isCheckinsRoute,
       settings: canLoad && (isCheckinsRoute || isSettingsRoute),
       users: canLoad && (isStaffRoute || isSettingsRoute),
     }
   }, [pathname, canLoad])
 
-  const tasksQuery = useQuery({ queryKey: ['tasks'], queryFn: fetchTasks, enabled: dataNeeds.tasks })
-  const ordersQuery = useQuery({ queryKey: ['orders'], queryFn: fetchOrders, enabled: dataNeeds.orders })
+  const [orderScope, setOrderScope] = useState<ListParams | null>(null)
+  const [taskScope, setTaskScope] = useState<ListParams | null>(null)
+  const [checkinMonth, setCheckinMonth] = useState<string | null>(null)
+
+  const tasksQuery = useQuery({
+    queryKey: ['tasks', taskScope],
+    queryFn: () => fetchTasks(taskScope ?? undefined),
+    enabled: dataNeeds.tasks && taskScope !== null,
+  })
+  const ordersQuery = useQuery({
+    queryKey: ['orders', orderScope],
+    queryFn: () => fetchOrders(orderScope ?? undefined),
+    enabled: dataNeeds.orders && orderScope !== null,
+  })
   const floristsQuery = useQuery({ queryKey: ['florists'], queryFn: fetchFlorists, enabled: dataNeeds.florists })
-  const checkinsQuery = useQuery({ queryKey: ['checkins'], queryFn: fetchCheckIns, enabled: dataNeeds.checkins })
+  const checkinsQuery = useQuery({
+    queryKey: ['checkins', checkinMonth],
+    queryFn: () => fetchCheckIns(checkinMonth ?? undefined),
+    enabled: dataNeeds.checkins && checkinMonth !== null,
+  })
   const settingsQuery = useQuery({ queryKey: ['settings'], queryFn: fetchWorkspaceSettings, enabled: dataNeeds.settings })
   const usersQuery = useQuery({ queryKey: ['users'], queryFn: fetchUsers, enabled: dataNeeds.users })
 
+  // Lists are cached per scope (date window, search, order). An update replaces
+  // the item wherever it is cached; a create/delete drops the cached lists so
+  // each page refetches its own scope and new items land where they belong.
   const mergeTask = (updated: Task) => {
-    queryClient.setQueryData<Task[]>(['tasks'], (prev = []) => {
-      const existing = prev.some((task) => task.id === updated.id)
-      if (!existing) {
-        return [...prev, updated]
-      }
-      return prev.map((task) => (task.id === updated.id ? updated : task))
-    })
+    queryClient.setQueriesData<Task[] | undefined>(['tasks'], (prev) =>
+      prev?.map((task) => (task.id === updated.id ? updated : task)),
+    )
   }
 
   const mergeOrder = (updated: Order) => {
-    queryClient.setQueryData<Order[]>(['orders'], (prev = []) => {
-      const existing = prev.some((order) => order.id === updated.id)
-      if (!existing) {
-        return [...prev, updated]
-      }
-      return prev.map((order) => (order.id === updated.id ? updated : order))
-    })
+    queryClient.setQueriesData<Order[] | undefined>(['orders'], (prev) =>
+      prev?.map((order) => (order.id === updated.id ? updated : order)),
+    )
   }
 
   const mergeUser = (updated: User) => {
@@ -126,9 +143,7 @@ const AppDataContextProvider = ({ children }: { children: React.ReactNode }) => 
 
   const createOrder = useMutation({
     mutationFn: createOrderRequest,
-    onSuccess: (created) => {
-      queryClient.setQueryData<Order[]>(['orders'], (prev = []) => [...prev, created])
-    },
+    onSuccess: () => queryClient.removeQueries(['orders']),
   })
 
   const updateOrder = useMutation({
@@ -146,7 +161,8 @@ const AppDataContextProvider = ({ children }: { children: React.ReactNode }) => 
   const deleteOrder = useMutation({
     mutationFn: deleteOrderRequest,
     onSuccess: (_data, orderId) => {
-      queryClient.setQueryData<Order[]>(['orders'], (prev = []) => prev.filter((o) => o.id !== orderId))
+      queryClient.setQueriesData<Order[] | undefined>(['orders'], (prev) => prev?.filter((o) => o.id !== orderId))
+      queryClient.removeQueries(['tasks'])
     },
   })
 
@@ -169,9 +185,7 @@ const AppDataContextProvider = ({ children }: { children: React.ReactNode }) => 
 
   const createTask = useMutation({
     mutationFn: createTaskRequest,
-    onSuccess: (created) => {
-      queryClient.setQueryData<Task[]>(['tasks'], (prev = []) => [...prev, created])
-    },
+    onSuccess: () => queryClient.removeQueries(['tasks']),
   })
 
   const updateTask = useMutation({
@@ -211,17 +225,15 @@ const AppDataContextProvider = ({ children }: { children: React.ReactNode }) => 
 
   const createCheckIn = useMutation({
     mutationFn: createCheckInRequest,
-    onSuccess: (created) => {
-      queryClient.setQueryData<StaffCheckIn[]>(['checkins'], (prev = []) => [created, ...prev])
-    },
+    onSuccess: () => queryClient.removeQueries(['checkins']),
   })
 
   const checkOut = useMutation({
     mutationFn: checkOutRequest,
     onSuccess: (updated) => {
-      queryClient.setQueryData<StaffCheckIn[]>(['checkins'], (prev = []) => {
-        return prev.map((c) => c.id === updated.id ? updated : c)
-      })
+      queryClient.setQueriesData<StaffCheckIn[] | undefined>(['checkins'], (prev) =>
+        prev?.map((c) => (c.id === updated.id ? updated : c)),
+      )
     },
   })
 
@@ -258,6 +270,9 @@ const AppDataContextProvider = ({ children }: { children: React.ReactNode }) => 
       deleteOrder: (orderId: string) => deleteOrder.mutateAsync(orderId),
       users,
       updateUser: (userId: string, input: Partial<User>) => updateUser.mutateAsync({ userId, input }),
+      setOrderScope,
+      setTaskScope,
+      setCheckinMonth,
     }),
     [
       tasks,

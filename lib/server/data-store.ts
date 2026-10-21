@@ -9,6 +9,8 @@ import { ApiError } from './api-error'
 import { storePhoto } from './storage'
 import { parseCurrencyToNumber } from './money'
 import { addVnDays, startOfVnMonth, vnDateKey } from './vn-time'
+import { LIST_LIMIT, SEARCH_LIMIT, searchDigits, type ListScope } from './list-scope'
+import type { Prisma } from '@prisma/client'
 import { linkCustomer, normalizeCustomerPhone } from './customers'
 import { TASK_STATUSES, assertOneOf } from './validation'
 
@@ -93,9 +95,35 @@ const slimOrderPhotos = <T extends { id: string; bouquetImage?: string | null }>
     ? { ...order, bouquetImage: `/api/legacy-photos?order=${encodeURIComponent(order.id)}&field=bouquet` }
     : order
 
-export const listTasks = async () => {
+type ListViewer = { id: string; role: string }
+
+/** Tasks due in a Vietnam-day window, matching a search, or belonging to one
+ *  order. Never the whole table - see lib/server/list-scope.ts. */
+export const listTasks = async (
+  scope: ListScope | { kind: 'order'; orderId: string },
+  options: { assigneeId?: string } = {},
+) => {
+  const where: Prisma.TaskWhereInput = {}
+  if (scope.kind === 'order') {
+    where.orderId = scope.orderId
+  } else if (scope.kind === 'range') {
+    where.dueTime = { gte: scope.start, lt: scope.end }
+  } else {
+    const digits = searchDigits(scope.q)
+    where.OR = [
+      { taskTitle: { contains: scope.q, mode: 'insensitive' } },
+      { bouquetName: { contains: scope.q, mode: 'insensitive' } },
+      { orderCode: { contains: scope.q, mode: 'insensitive' } },
+      { order: { customerName: { contains: scope.q, mode: 'insensitive' } } },
+      ...(digits.length >= 4 ? [{ order: { customer: { phone: { contains: digits } } } }] : []),
+    ]
+  }
+  if (options.assigneeId) where.assigneeId = options.assigneeId
+
   const tasks = await db.task.findMany({
-    orderBy: { createdAt: 'desc' },
+    where,
+    orderBy: scope.kind === 'search' ? { dueTime: 'desc' } : { dueTime: 'asc' },
+    take: scope.kind === 'search' ? SEARCH_LIMIT : LIST_LIMIT,
     include: {
       order: {
         select: {
@@ -127,9 +155,28 @@ export const getTask = async (taskId: string) => {
   return slimTaskPhotos(mapTask(task), { samples: false })
 }
 
-export const listOrders = async () => {
+/** Orders received in a Vietnam-day window or matching a search. Florists only
+ *  see orders that have a task assigned to them. */
+export const listOrders = async (scope: ListScope, viewer: ListViewer) => {
+  const where: Prisma.OrderWhereInput = {}
+  if (scope.kind === 'range') {
+    where.receiveTime = { gte: scope.start, lt: scope.end }
+  } else {
+    const digits = searchDigits(scope.q)
+    where.OR = [
+      { code: { contains: scope.q, mode: 'insensitive' } },
+      { customerName: { contains: scope.q, mode: 'insensitive' } },
+      { receiverName: { contains: scope.q, mode: 'insensitive' } },
+      { bouquetName: { contains: scope.q, mode: 'insensitive' } },
+      ...(digits.length >= 4 ? [{ customer: { phone: { contains: digits } } }] : []),
+    ]
+  }
+  if (viewer.role === 'florist') where.tasks = { some: { assigneeId: viewer.id } }
+
   const orders = await db.order.findMany({
-    orderBy: { createdAt: 'desc' }
+    where,
+    orderBy: scope.kind === 'search' ? { createdAt: 'desc' } : { receiveTime: 'asc' },
+    take: scope.kind === 'search' ? SEARCH_LIMIT : LIST_LIMIT,
   })
   return orders.map(o => slimOrderPhotos({
     ...mapOrder(o),
@@ -475,9 +522,11 @@ export const completeTask = async (taskId: string, payload: CompleteTaskPayload)
   return getTask(taskId)
 }
 
-export const listStaffCheckIns = async () => {
+/** Check-ins in one Vietnam calendar month, optionally for one staff member. */
+export const listStaffCheckIns = async (month: { start: Date; end: Date }, staffId?: string) => {
   const checkins = await db.staffCheckIn.findMany({
-    orderBy: { timestamp: 'desc' }
+    where: { timestamp: { gte: month.start, lt: month.end }, ...(staffId ? { staffId } : {}) },
+    orderBy: { timestamp: 'desc' },
   })
   return checkins.map(mapCheckIn)
 }

@@ -12,6 +12,7 @@ import AddTaskDialog from "@/components/tasks/add-task-dialog"
 import { PhotoViewer } from "@/components/photo-viewer"
 import { fetchOrder, updateOrder, deleteOrder } from "@/lib/api"
 import type { Order } from "@/lib/types"
+import { getDateKey } from "@/lib/date-utils"
 import { formatCurrencyDisplay, formatDateTime, fromDateTimeLocalValue, toDateTimeLocalValue } from "@/lib/utils"
 
 interface OrderDetailPageProps {
@@ -20,7 +21,7 @@ interface OrderDetailPageProps {
 
 export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
   const router = useRouter()
-  const { tasks, florists, assignTask, updateTaskStatus } = useAppData()
+  const { tasks, florists, assignTask, updateTaskStatus, setTaskScope, setOrderScope } = useAppData()
   const { lang, t, getDeliveryLabel, getOrderStatusLabel, getTaskStatusLabel } = useLocale()
   const { user } = useAuth()
   const [order, setOrder] = useState<Order | null>(null)
@@ -60,6 +61,16 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
       active = false
     }
   }, [orderId, t])
+
+  // Load just this order's tasks.
+  useEffect(() => setTaskScope({ orderId }), [orderId, setTaskScope])
+
+  // The add-task dialog picks from loaded orders; load this order's receive day
+  // so the order itself is among them.
+  const orderReceiveDay = order ? getDateKey(order.receiveTime) : null
+  useEffect(() => {
+    if (orderReceiveDay) setOrderScope({ from: orderReceiveDay, to: orderReceiveDay })
+  }, [orderReceiveDay, setOrderScope])
 
   const relatedTasks = useMemo(
     () =>

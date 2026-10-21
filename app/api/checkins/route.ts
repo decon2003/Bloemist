@@ -2,13 +2,18 @@ import { NextResponse } from 'next/server'
 import { listStaffCheckIns, createStaffCheckIn } from '@/lib/server/data-store'
 import { handleRouteError, readJsonBody } from '@/lib/server/route-helpers'
 import { isManager, requireUser } from '@/lib/server/session'
+import { ApiError } from '@/lib/server/api-error'
+import { parseVnMonth } from '@/lib/server/vn-time'
 
 export async function GET(request: Request) {
     try {
         const me = await requireUser(request)
-        const checkins = await listStaffCheckIns()
+        // ?month=YYYY-MM (Vietnam time), default this month.
+        const month = parseVnMonth(new URL(request.url).searchParams.get('month'))
+        if (!month) throw new ApiError(400, 'month must be YYYY-MM')
         // Staff see only their own attendance; managers see everyone's.
-        return NextResponse.json(isManager(me) ? checkins : checkins.filter((c) => c.staffId === me.id))
+        const checkins = await listStaffCheckIns(month, isManager(me) ? undefined : me.id)
+        return NextResponse.json(checkins)
     } catch (error) {
         return handleRouteError(error)
     }

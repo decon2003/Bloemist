@@ -1,4 +1,4 @@
-import { CreateOrderInput, CreateTaskInput, DashboardStats, Order, Task, TaskStatus, Florist, StaffCheckIn, WorkspaceSettings, User, CustomerPage, CustomerLookup, CustomerSummary } from './types'
+import { CreateOrderInput, CreateTaskInput, DashboardStats, Order, Task, TaskStatus, Florist, StaffCheckIn, WorkspaceSettings, User, CustomerPage, CustomerLookup, CustomerSummary, ListParams, BouquetSuggestion } from './types'
 
 export interface AssignTaskPayload {
   userId: string
@@ -10,9 +10,9 @@ export interface CompleteTaskPayload {
 }
 
 export interface ApiClient {
-  fetchTasks: () => Promise<Task[]>
+  fetchTasks: (params?: ListParams) => Promise<Task[]>
   fetchTask: (taskId: string) => Promise<Task>
-  fetchOrders: () => Promise<Order[]>
+  fetchOrders: (params?: ListParams) => Promise<Order[]>
   fetchOrder: (orderId: string) => Promise<Order>
   createOrder: (input: CreateOrderInput) => Promise<Order>
   updateOrder: (orderId: string, input: Partial<CreateOrderInput>) => Promise<Order>
@@ -26,7 +26,7 @@ export interface ApiClient {
   assignTask: (taskId: string, payload: AssignTaskPayload) => Promise<Task>
   unassignTask: (taskId: string, payload: AssignTaskPayload) => Promise<Task>
   completeTask: (taskId: string, payload: CompleteTaskPayload) => Promise<Task>
-  fetchCheckIns: () => Promise<StaffCheckIn[]>
+  fetchCheckIns: (month?: string) => Promise<StaffCheckIn[]>
   createCheckIn: (input: Partial<StaffCheckIn>) => Promise<StaffCheckIn>
   checkOut: (checkInId: string) => Promise<StaffCheckIn>
   fetchDashboardStats: () => Promise<DashboardStats>
@@ -34,6 +34,8 @@ export interface ApiClient {
   login: (email: string, password: string) => Promise<User>
   logout: () => Promise<void>
   uploadPhoto: (file: File | Blob) => Promise<string>
+  fetchBouquets: () => Promise<BouquetSuggestion[]>
+  fetchStaffReport: (month: string) => Promise<{ month: string; rows: unknown[] }>
   fetchCustomers: (params: { q?: string; sort?: 'spend' | 'recent' | 'orders'; page?: number }) => Promise<CustomerPage>
   lookupCustomer: (phone: string) => Promise<CustomerLookup | null>
   updateCustomer: (customerId: string, input: Partial<Pick<CustomerSummary, 'name' | 'notes' | 'source' | 'marketingConsent'>>) => Promise<CustomerSummary>

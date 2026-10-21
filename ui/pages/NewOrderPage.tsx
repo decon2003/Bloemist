@@ -7,8 +7,8 @@ import { useLocale } from '@/components/providers/locale-provider'
 import { useAppData } from '@/components/providers/app-data-provider'
 import { useAuth } from '@/components/providers/auth-provider'
 import { PhotoViewer } from '@/components/photo-viewer'
-import { lookupCustomer, uploadPhoto } from '@/lib/api'
-import type { CustomerLookup } from '@/lib/types'
+import { fetchBouquets, lookupCustomer, uploadPhoto } from '@/lib/api'
+import type { BouquetSuggestion, CustomerLookup } from '@/lib/types'
 import { formatCurrencyFromNumber, formatCurrencyInput, parseCurrencyToNumber } from '@/lib/utils'
 
 
@@ -23,7 +23,7 @@ type ProductForm = {
 export default function NewOrderPage() {
   const router = useRouter()
   const { lang, t, getDeliveryLabel } = useLocale()
-  const { createOrder, createTask, orders, florists } = useAppData()
+  const { createOrder, createTask, florists } = useAppData()
   const { user } = useAuth()
 
   const [customerName, setCustomerName] = useState('')
@@ -117,15 +117,15 @@ export default function NewOrderPage() {
     }
   }, [deliveryCoveredByShop, deliveryFee, deposit, discount, listedPrice, vatPercent])
 
-  const bouquetOptions = useMemo(() => {
-    const registry = new Map<string, string | undefined>()
-    orders.forEach((order) => {
-      if (!registry.has(order.bouquetName)) {
-        registry.set(order.bouquetName, order.bouquetImage)
-      }
-    })
-    return Array.from(registry.entries()).map(([name, image]) => ({ name, image }))
-  }, [orders])
+  // Names (and latest photo) of bouquets on recent orders, for suggestions.
+  const [bouquetSuggestions, setBouquetSuggestions] = useState<BouquetSuggestion[]>([])
+  useEffect(() => {
+    fetchBouquets().then(setBouquetSuggestions).catch(() => setBouquetSuggestions([]))
+  }, [])
+  const bouquetOptions = useMemo(
+    () => bouquetSuggestions.map(({ name, image }) => ({ name, image: image ?? undefined })),
+    [bouquetSuggestions],
+  )
 
   const handleProductChange = (index: number, key: 'name' | 'quantity' | 'note', value: string | number) => {
     setProducts((prev) =>

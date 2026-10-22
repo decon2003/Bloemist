@@ -30,66 +30,88 @@ interface StaffReportRow {
   lastLocation: string | null
 }
 
+/** Default pay profile: pre-fills each month's payroll draft, where every
+ *  figure can still be changed for that month. */
 function SalaryConfigModal({ user, onClose, onSave }: { user: User, onClose: () => void, onSave: (id: string, data: Partial<User>) => Promise<any> }) {
+  const [payType, setPayType] = useState<'MONTHLY' | 'HOURLY'>(user.payType ?? 'MONTHLY')
   const [base, setBase] = useState(String(user.baseSalary ?? 0))
-  const [rate, setRate] = useState(user.commissionRate?.toString() || '0')
+  const [hourly, setHourly] = useState(String(user.hourlyRate ?? 0))
+  const [makerRate, setMakerRate] = useState(String(user.commissionRate ?? 0))
+  const [salesRate, setSalesRate] = useState(String(user.salesCommissionRate ?? 0))
+  const [referralRate, setReferralRate] = useState(String(user.referralCommissionRate ?? 0))
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
 
   const handleSave = async () => {
     setSaving(true)
+    setError('')
     try {
       await onSave(user.id, {
+        payType,
         baseSalary: Number(base.replace(/\D/g, '') || 0),
-        commissionRate: parseFloat(rate)
+        hourlyRate: Number(hourly.replace(/\D/g, '') || 0),
+        commissionRate: Number(makerRate),
+        salesCommissionRate: Number(salesRate),
+        referralCommissionRate: Number(referralRate),
       })
       onClose()
     } catch (e) {
-      console.error(e)
+      setError(e instanceof Error ? e.message : 'Không lưu được')
     } finally {
       setSaving(false)
     }
   }
 
+  const field = 'mt-1 w-full rounded-lg border border-border p-2 text-sm'
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+      <div className="w-full max-w-md space-y-4 rounded-2xl bg-white p-6 shadow-xl">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold">Salary Configuration</h3>
-          <button onClick={onClose}><X className="h-5 w-5" /></button>
+          <h3 className="text-lg font-bold">Hồ sơ lương · {user.name}</h3>
+          <button onClick={onClose} aria-label="Đóng"><X className="h-5 w-5" /></button>
         </div>
-        <div className="mt-4 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Staff Member</label>
-            <p className="text-lg font-semibold">{user.name}</p>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Base Salary (VND)</label>
-            <input
-              value={formatCurrencyInput(base)}
-              onChange={(e) => setBase(e.target.value.replace(/\D/g, ''))}
-              className="mt-1 w-full rounded-lg border border-gray-300 p-2"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Commission Rate (%)</label>
-            <input
-              type="number"
-              value={rate}
-              onChange={(e) => setRate(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-gray-300 p-2"
-              step="0.1"
-            />
-            <p className="text-xs text-gray-500 mt-1">Applied to sales orders or completed tasks.</p>
-          </div>
+        <p className="text-xs text-muted-foreground">
+          Mức mặc định để điền sẵn bảng lương mỗi tháng. Trong bảng lương vẫn sửa được riêng cho từng tháng.
+        </p>
+        <label className="block text-sm font-medium">
+          Hình thức lương
+          <select value={payType} onChange={(e) => setPayType(e.target.value as 'MONTHLY' | 'HOURLY')} className={field}>
+            <option value="MONTHLY">Lương cứng (thợ chính)</option>
+            <option value="HOURLY">Theo giờ (sale, thợ phụ)</option>
+          </select>
+        </label>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block text-sm font-medium">
+            Lương cứng / tháng
+            <input value={formatCurrencyInput(base)} disabled={payType !== 'MONTHLY'} onChange={(e) => setBase(e.target.value.replace(/\D/g, ''))} className={field} />
+          </label>
+          <label className="block text-sm font-medium">
+            Đơn giá / giờ
+            <input value={formatCurrencyInput(hourly)} onChange={(e) => setHourly(e.target.value.replace(/\D/g, ''))} className={field} />
+          </label>
         </div>
-        <div className="mt-6 flex justify-end gap-3">
-          <button onClick={onClose} className="rounded-lg px-4 py-2 text-sm font-medium hover:bg-gray-100">Cancel</button>
+        <p className="text-xs text-muted-foreground">Đơn giá giờ cũng dùng để tính OT (kể cả người lương cứng).</p>
+        <div className="grid grid-cols-3 gap-3">
+          {([
+            ['% HH làm SP', makerRate, setMakerRate],
+            ['% HH bán hàng', salesRate, setSalesRate],
+            ['% HH giới thiệu', referralRate, setReferralRate],
+          ] as const).map(([label, value, set]) => (
+            <label key={label} className="block text-sm font-medium">
+              {label}
+              <input type="number" min={0} max={100} step={0.5} value={value} onChange={(e) => set(e.target.value)} className={field} />
+            </label>
+          ))}
+        </div>
+        {error && <p className="text-sm text-red-700">{error}</p>}
+        <div className="flex justify-end gap-3">
+          <button onClick={onClose} className="rounded-lg px-4 py-2 text-sm font-medium hover:bg-muted">Huỷ</button>
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+            className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
           >
-            {saving ? 'Saving...' : <><Save className="h-4 w-4" /> Save Changes</>}
+            {saving ? 'Đang lưu...' : <><Save className="h-4 w-4" /> Lưu</>}
           </button>
         </div>
       </div>
@@ -280,7 +302,7 @@ export default function StaffReportsPage() {
                   <th className="px-4 py-3 font-medium">Giờ làm</th>
                   <th className="px-4 py-3 font-medium">{t('staffReports.columns.orders')}</th>
                   <th className="px-4 py-3 font-medium">{t('staffReports.columns.tasksInCharge', 'Tasks in charge')}</th>
-                  <th className="px-4 py-3 font-medium">Estimated Salary</th>
+                  <th className="px-4 py-3 font-medium">Hồ sơ lương</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -316,15 +338,24 @@ export default function StaffReportsPage() {
                     <td className="px-4 py-4 align-top">
                       <div className="flex items-center gap-2">
                         <div>
-                          <p className="font-bold text-green-600">{formatCurrencyFromNumber(row.salary)}</p>
-                          <p className="text-xs text-muted-foreground">
-                            Base: {formatCurrencyFromNumber(parseCurrencyToNumber(row.profile.baseSalary || '0'))} • Comm: {row.profile.commissionRate || 0}%
-                          </p>
+                          {(() => {
+                            const profile = users.find((u) => u.id === row.profile.id)
+                            if (!profile) return <p className="text-xs text-muted-foreground">—</p>
+                            return (
+                              <p className="text-xs text-muted-foreground">
+                                {profile.payType === 'HOURLY'
+                                  ? `Theo giờ ${formatCurrencyFromNumber(profile.hourlyRate ?? 0)}/h`
+                                  : `Lương cứng ${formatCurrencyFromNumber(profile.baseSalary ?? 0)}`}
+                                {` · HH ${profile.commissionRate ?? 0}% / ${profile.salesCommissionRate ?? 0}% / ${profile.referralCommissionRate ?? 0}%`}
+                              </p>
+                            )
+                          })()}
+                          <a href="payroll" className="text-xs font-medium text-primary hover:underline">Xem bảng lương →</a>
                         </div>
                         <button
                           onClick={() => handleOpenConfig(row.profile.id)}
                           className="rounded-full p-1 hover:bg-gray-200 text-gray-500"
-                          title="Configure Salary"
+                          title="Sửa hồ sơ lương"
                         >
                           <Settings className="h-4 w-4" />
                         </button>

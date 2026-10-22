@@ -20,6 +20,7 @@ import {
   Zap,
   MapPin,
   UserCheck,
+  Wallet,
 } from 'lucide-react'
 import { supportedLocales, localeNames } from '@/lib/i18n'
 import { useLocale } from '@/components/providers/locale-provider'
@@ -54,6 +55,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       { href: `/${lang}/orders`, label: t('nav.orders'), icon: ShoppingBag },
       { href: `/${lang}/checkins`, label: t('nav.checkins'), icon: MapPin },
       { href: `/${lang}/staff`, label: t('nav.staffReports'), icon: UserCheck },
+      { href: `/${lang}/payroll`, label: 'Bảng lương', icon: Wallet },
       { href: `/${lang}/settings`, label: t('nav.settings'), icon: Settings },
     ]
 

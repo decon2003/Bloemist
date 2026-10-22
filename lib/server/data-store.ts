@@ -219,36 +219,107 @@ export const nextOrderCode = async (now = new Date()) => {
   return `${date}${month}${year.slice(2)}-${String(value).padStart(3, '0')}`
 }
 
+type ProductInput = { name: string; quantity: number; note: string; samplePhotoUrls: string[]; image: string | null; lineTotal: number }
+
+/** Validate the order's product lines. Each line becomes one task, and its
+ *  price (unit price x quantity) is what the maker earns commission on. */
+const readProducts = (value: unknown): ProductInput[] => {
+  if (value === undefined || value === null) return []
+  if (!Array.isArray(value)) throw new ApiError(400, 'products must be a list')
+  return value.map((raw, index) => {
+    const item = (raw ?? {}) as Record<string, unknown>
+    const label = `Sản phẩm ${index + 1}`
+    if (typeof item.name !== 'string' || !item.name.trim()) throw new ApiError(400, `${label}: thiếu tên`)
+    const quantity = item.quantity === undefined ? 1 : Number(item.quantity)
+    if (!Number.isInteger(quantity) || quantity < 1) throw new ApiError(400, `${label}: số lượng không hợp lệ`)
+    const unitPrice = toVnd(item.unitPrice, `${label}: đơn giá`, { required: true })!
+    const photos = Array.isArray(item.samplePhotoUrls) ? item.samplePhotoUrls.filter((url): url is string => typeof url === 'string') : []
+    return {
+      name: item.name.trim().slice(0, 300),
+      quantity,
+      note: typeof item.note === 'string' ? item.note.trim() : '',
+      samplePhotoUrls: photos,
+      image: typeof item.image === 'string' && item.image ? item.image : photos[0] ?? null,
+      lineTotal: unitPrice * quantity,
+    }
+  })
+}
+
+/** The staff member credited with referring an order, or null to clear it. */
+const readReferrer = async (value: unknown) => {
+  if (value === null || value === '') return { referrerId: null, referrerName: null }
+  if (typeof value !== 'string') throw new ApiError(400, 'referrerId không hợp lệ')
+  const user = await db.user.findUnique({ where: { id: value }, select: { id: true, name: true } })
+  if (!user) throw new ApiError(400, 'Người giới thiệu không tồn tại')
+  return { referrerId: user.id, referrerName: user.name }
+}
+
+/** Create an order and, when product lines are given, one task per product in
+ *  the same transaction - the browser used to create tasks one request at a
+ *  time, so a dropped connection left orders with missing products. With
+ *  product lines the listed price is their sum. */
 export const createOrder = async (input: CreateOrderInput) => {
+  const products = readProducts(input.products)
+  const referrer = input.referrerId ? await readReferrer(input.referrerId) : { referrerId: null, referrerName: null }
+  const receiveTime = parseRequiredDate(input.receiveTime, 'receiveTime')
+  const money = readOrderMoney(
+    products.length ? { ...input, listedPrice: products.reduce((sum, p) => sum + p.lineTotal, 0) } : input,
+  )
+
   // Codes are always assigned here; a client-supplied code could collide or mislead.
   const code = await nextOrderCode()
-
   const customerId = await linkCustomer(input.customerPhone, input.customerName)
-  const money = readOrderMoney(input)
 
-  const order = await db.order.create({
-    data: {
-      code,
-      customerId,
-      customerName: input.customerName,
-      customerPhone: input.customerPhone,
-      receiverName: input.receiverName,
-      receiverPhone: input.receiverPhone,
-      bouquetName: input.bouquetName,
-      bouquetImage: input.bouquetImage,
-      receiveTime: parseRequiredDate(input.receiveTime, 'receiveTime'),
-      deliveryType: input.deliveryType,
-      deliveryAddress: input.deliveryAddress,
-      status: input.status || 'NEW',
-      ...money,
-      ...computeOrderTotals(money),
-      notes: input.notes,
-      createdById: input.createdById,
-      createdByName: input.createdByName,
-      assigneeId: input.assigneeId,
-      assigneeName: input.assigneeName,
-      new_customer: input.new_customer,
+  const order = await db.$transaction(async (tx) => {
+    const created = await tx.order.create({
+      data: {
+        code,
+        customerId,
+        customerName: input.customerName,
+        customerPhone: input.customerPhone,
+        receiverName: input.receiverName,
+        receiverPhone: input.receiverPhone,
+        bouquetName: input.bouquetName,
+        bouquetImage: input.bouquetImage,
+        receiveTime: parseRequiredDate(input.receiveTime, 'receiveTime'),
+        deliveryType: input.deliveryType,
+        deliveryAddress: input.deliveryAddress,
+        status: input.status || 'NEW',
+        ...money,
+        ...computeOrderTotals(money),
+        notes: input.notes,
+        createdById: input.createdById,
+        createdByName: input.createdByName,
+        assigneeId: input.assigneeId,
+        assigneeName: input.assigneeName,
+        new_customer: input.new_customer,
+        ...referrer,
+      },
+    })
+    // Tasks are due two hours before the customer receives the order. A florist
+    // chosen on the order is the maker of its products.
+    const dueTime = new Date(receiveTime.getTime() - 2 * 60 * 60 * 1000)
+    for (const product of products) {
+      await tx.task.create({
+        data: {
+          orderId: created.id,
+          orderCode: created.code,
+          bouquetName: product.name,
+          bouquetImage: product.image,
+          taskTitle: `${product.quantity} × ${product.name}`,
+          samplePhotoUrls: JSON.stringify(product.samplePhotoUrls),
+          status: input.assigneeId ? 'ASSIGNED' : 'UNASSIGNED',
+          assigneeId: input.assigneeId || null,
+          assigneeName: input.assigneeId ? input.assigneeName ?? null : null,
+          dueTime,
+          notes: [product.note, input.notes].filter(Boolean).join('\n'),
+          type: 'CAM_HOA',
+          quantity: product.quantity,
+          price: product.lineTotal,
+        },
+      })
     }
+    return created
   })
 
   return mapOrder(order)
@@ -290,6 +361,8 @@ export const updateOrder = async (orderId: string, input: Partial<CreateOrderInp
   if (input.receiveTime !== undefined) {
     data.receiveTime = parseRequiredDate(input.receiveTime, 'receiveTime')
   }
+
+  if (input.referrerId !== undefined) Object.assign(data, await readReferrer(input.referrerId))
 
   // Changing any price input recomputes the derived amounts from the merged values.
   if (ORDER_MONEY_FIELDS.some((field) => input[field] !== undefined)) {

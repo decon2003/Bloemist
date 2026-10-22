@@ -91,7 +91,7 @@ const AppDataContextProvider = ({ children }: { children: React.ReactNode }) => 
       florists: canLoad && (isOrdersRoute || isTasksRoute),
       checkins: canLoad && isCheckinsRoute,
       settings: canLoad && (isCheckinsRoute || isSettingsRoute),
-      users: canLoad && (isStaffRoute || isSettingsRoute || isCheckinsRoute),
+      users: canLoad && (isStaffRoute || isSettingsRoute || isCheckinsRoute || route.includes('/orders/new')),
     }
   }, [pathname, canLoad])
 

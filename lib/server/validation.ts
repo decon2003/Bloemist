@@ -31,9 +31,15 @@ export const PUBLIC_USER_SELECT = {
 
 export const PRIVILEGED_USER_SELECT = {
   ...PUBLIC_USER_SELECT,
+  payType: true,
   baseSalary: true,
+  hourlyRate: true,
   commissionRate: true,
+  salesCommissionRate: true,
+  referralCommissionRate: true,
 } as const
+
+export const PAY_TYPES = ['MONTHLY', 'HOURLY'] as const
 
 export function assertOneOf<T extends readonly string[]>(
   value: unknown,

@@ -20,7 +20,7 @@ try {
 }
 
 // Foreign-key order; must match BACKUP_TABLES in lib/server/backup.ts.
-const TABLES = ['User', 'StoreLocation', 'Customer', 'Order', 'Task', 'StaffCheckIn', 'Message', 'InventoryItem', 'OrderCounter', 'AuditLog', 'ShopSettings']
+const TABLES = ['User', 'StoreLocation', 'Customer', 'Order', 'Task', 'StaffCheckIn', 'Message', 'InventoryItem', 'OrderCounter', 'AuditLog', 'ShopSettings', 'Payroll', 'PayrollLine']
 // Single-row settings tables that migrations seed with defaults: replaced, not required to be empty.
 const SEEDED = new Set(['ShopSettings'])
 

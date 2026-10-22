@@ -1,7 +1,7 @@
 // ============================================================
 // API Layer - Calls Real Backend API Routes
 // ============================================================
-import type { AuditEntry, BouquetSuggestion, ShiftCorrectionInput, CreateOrderInput, CreateTaskInput, CustomerLookup, ListParams, CustomerPage, CustomerSummary, DashboardStats, Order, Task, TaskStatus, Florist, User, StaffCheckIn, WorkspaceSettings } from './types'
+import type { AuditEntry, BouquetSuggestion, Payroll, PayrollLineUpdate, ShiftCorrectionInput, CreateOrderInput, CreateTaskInput, CustomerLookup, ListParams, CustomerPage, CustomerSummary, DashboardStats, Order, Task, TaskStatus, Florist, User, StaffCheckIn, WorkspaceSettings } from './types'
 import type { ApiClient, AssignTaskPayload, CompleteTaskPayload } from './api.types'
 import { compressImage, makeThumbnail } from './image-compress'
 
@@ -80,6 +80,14 @@ const apiClient: ApiClient = {
 
   fetchBouquets: () => request<BouquetSuggestion[]>('/bouquets'),
   fetchAudit: (params) => request<AuditEntry[]>(`/audit${toQuery(params)}`),
+  fetchPayroll: (month) => request<Payroll | null>(`/payroll${toQuery({ month })}`),
+  generatePayroll: (month) => request<Payroll>('/payroll', { method: 'POST', body: JSON.stringify({ month }) }),
+  updatePayrollLine: (lineId, input: PayrollLineUpdate) =>
+    request<Payroll>(`/payroll/lines/${lineId}`, { method: 'PATCH', body: JSON.stringify(input) }),
+  updatePayrollSettings: (payrollId, input) =>
+    request<Payroll>(`/payroll/${payrollId}`, { method: 'PATCH', body: JSON.stringify(input) }),
+  lockPayroll: (payrollId) => request<Payroll>(`/payroll/${payrollId}/lock`, { method: 'POST' }),
+  unlockPayroll: (payrollId) => request<Payroll>(`/payroll/${payrollId}/lock`, { method: 'DELETE' }),
   fetchStaffReport: (month) => request<{ month: string; rows: unknown[] }>(`/reports/staff${toQuery({ month })}`),
 
   // Customers
@@ -155,6 +163,12 @@ export const uploadPhoto = apiClient.uploadPhoto
 export const fetchCustomers = apiClient.fetchCustomers
 export const fetchBouquets = apiClient.fetchBouquets
 export const fetchAudit = apiClient.fetchAudit
+export const fetchPayroll = apiClient.fetchPayroll
+export const generatePayroll = apiClient.generatePayroll
+export const updatePayrollLine = apiClient.updatePayrollLine
+export const updatePayrollSettings = apiClient.updatePayrollSettings
+export const lockPayroll = apiClient.lockPayroll
+export const unlockPayroll = apiClient.unlockPayroll
 export const fetchStaffReport = apiClient.fetchStaffReport
 export const lookupCustomer = apiClient.lookupCustomer
 export const updateCustomer = apiClient.updateCustomer

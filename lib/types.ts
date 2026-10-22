@@ -75,6 +75,8 @@ export interface Order {
   createdByName?: string
   assigneeId?: string
   assigneeName?: string
+  referrerId?: string | null
+  referrerName?: string | null
   new_customer?: boolean
   deliveryAddress?: string
   sourcePlatform?: string
@@ -133,7 +135,10 @@ export interface CreateOrderInput {
   requiresAttention?: boolean
   sourceLastUpdatedAt?: string | null
   tasks?: Array<{ name: string; price?: string; note?: string }>
-  products?: Array<{ name: string; quantity: number; note?: string; samplePhotoUrls?: string[] }>
+  /** One task per line; with lines, the listed price is their sum. */
+  products?: Array<{ name: string; quantity: number; note?: string; samplePhotoUrls?: string[]; unitPrice: number | string; image?: string }>
+  /** Staff member who referred the customer (earns a referral commission). */
+  referrerId?: string | null
 }
 
 export interface CreateTaskInput {
@@ -209,6 +214,89 @@ export interface StaffCheckIn {
   correctionReason?: string | null
 }
 
+export type OtDecision = 'PENDING' | 'OT' | 'REGULAR' | 'EXCLUDE' | 'NONE'
+
+export interface PayrollShift {
+  date: string
+  checkIn: string | null
+  checkOut: string | null
+  hours: number
+  regularHours: number
+  otHours: number
+  otDecision: OtDecision
+  autoClosed: boolean
+}
+
+export type CommissionKind = 'MAKER' | 'SALES' | 'REFERRAL'
+
+export interface PayrollCommission {
+  key: string
+  kind: CommissionKind
+  orderId: string | null
+  orderCode: string | null
+  label: string
+  base: number
+  rate: number
+  included: boolean
+}
+
+export interface PayrollAdjustment {
+  label: string
+  amount: number
+}
+
+export interface PayrollLine {
+  id: string
+  userId: string
+  userName: string
+  role: string
+  payType: 'MONTHLY' | 'HOURLY'
+  baseSalary: number
+  hourlyRate: number
+  makerRate: number
+  salesRate: number
+  referralRate: number
+  shifts: PayrollShift[]
+  commissions: PayrollCommission[]
+  adjustments: PayrollAdjustment[]
+  note: string | null
+  totals: {
+    regularHours: number
+    otHours: number
+    pendingOtDays: number
+    basePay: number
+    otPay: number
+    commissionByKind: Record<CommissionKind, number>
+    commission: number
+    adjustmentsTotal: number
+    total: number
+  }
+}
+
+export interface Payroll {
+  id: string
+  month: string
+  status: 'DRAFT' | 'LOCKED'
+  otMultiplier: number
+  lockedAt: string | null
+  lockedByName: string | null
+  lines: PayrollLine[]
+  summary: { total: number; pendingOtDays: number }
+}
+
+export interface PayrollLineUpdate {
+  payType?: 'MONTHLY' | 'HOURLY'
+  baseSalary?: number
+  hourlyRate?: number
+  makerRate?: number
+  salesRate?: number
+  referralRate?: number
+  shiftDecisions?: { date: string; otDecision: OtDecision }[]
+  commissionChanges?: { key: string; included?: boolean; rate?: number }[]
+  adjustments?: PayrollAdjustment[]
+  note?: string | null
+}
+
 export interface ShiftCorrectionInput {
   workDate: string
   /** HH:mm, Vietnam time */
@@ -246,9 +334,18 @@ export interface User {
   status: 'active' | 'disabled'
   avatar?: string
   createdAt: string
+  /** MONTHLY = lương cứng, HOURLY = theo giờ. */
+  payType?: 'MONTHLY' | 'HOURLY'
   /** Whole VND. */
   baseSalary?: number | null
+  /** Whole VND per hour; also the base for overtime. */
+  hourlyRate?: number
+  /** % of the products this person made. */
   commissionRate?: number
+  /** % of the orders this person sold. */
+  salesCommissionRate?: number
+  /** % of the orders this person referred. */
+  referralCommissionRate?: number
   mustChangePassword?: boolean
   /** Write-only: a temporary password set by a manager. Never returned. */
   password?: string

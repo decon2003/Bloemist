@@ -16,6 +16,8 @@ import { thumbUrl } from '@/lib/image-compress'
 type ProductForm = {
   name: string
   quantity: number
+  /** Typed unit price; the line total is what the maker earns commission on. */
+  unitPrice: string
   note?: string
   samplePhotoUrls: string[]
   draftSampleUrl?: string
@@ -24,7 +26,7 @@ type ProductForm = {
 export default function NewOrderPage() {
   const router = useRouter()
   const { lang, t, getDeliveryLabel } = useLocale()
-  const { createOrder, createTask, florists } = useAppData()
+  const { createOrder, florists, users } = useAppData()
   const { user } = useAuth()
 
   const [customerName, setCustomerName] = useState('')
@@ -32,7 +34,7 @@ export default function NewOrderPage() {
   const [customerPhone, setCustomerPhone] = useState('')
   const [receiverName, setReceiverName] = useState('')
   const [receiverPhone, setReceiverPhone] = useState('')
-  const [listedPrice, setListedPrice] = useState('')
+  const [referrerId, setReferrerId] = useState('')
   const [discount, setDiscount] = useState('')
   const [deliveryFee, setDeliveryFee] = useState('')
   const [deliveryCoveredByShop, setDeliveryCoveredByShop] = useState(false)
@@ -44,7 +46,7 @@ export default function NewOrderPage() {
   const [notes, setNotes] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [products, setProducts] = useState<ProductForm[]>([
-    { name: '', quantity: 1, note: '', samplePhotoUrls: [], draftSampleUrl: '' },
+    { name: '', quantity: 1, unitPrice: '', note: '', samplePhotoUrls: [], draftSampleUrl: '' },
   ])
   const [knownCustomer, setKnownCustomer] = useState<CustomerLookup | null>(null)
   const [customerNameAutofilled, setCustomerNameAutofilled] = useState(false)
@@ -88,6 +90,11 @@ export default function NewOrderPage() {
 
   const isNewCustomer = !knownCustomer
 
+  // Listed price is the sum of the product lines; the server recomputes it.
+  const listedPrice = String(
+    products.reduce((sum, product) => sum + parseCurrencyToNumber(product.unitPrice) * (product.quantity || 1), 0),
+  )
+
   const dueTimeForTasks = useMemo(() => {
     const receiveDate = new Date(receiveTime)
     return new Date(receiveDate.getTime() - 1000 * 60 * 120).toISOString()
@@ -128,12 +135,15 @@ export default function NewOrderPage() {
     [bouquetSuggestions],
   )
 
-  const handleProductChange = (index: number, key: 'name' | 'quantity' | 'note', value: string | number) => {
+  const handleProductChange = (index: number, key: 'name' | 'quantity' | 'note' | 'unitPrice', value: string | number) => {
     setProducts((prev) =>
       prev.map((product, idx) => {
         if (idx !== index) return product
         if (key === 'quantity') {
           return { ...product, quantity: Number(value) }
+        }
+        if (key === 'unitPrice') {
+          return { ...product, unitPrice: formatCurrencyInput(String(value)) }
         }
         if (key === 'name') {
           return { ...product, name: String(value) }
@@ -183,7 +193,7 @@ export default function NewOrderPage() {
   }
 
   const addProductRow = () => {
-    setProducts((prev) => [...prev, { name: '', quantity: 1, note: '', samplePhotoUrls: [], draftSampleUrl: '' }])
+    setProducts((prev) => [...prev, { name: '', quantity: 1, unitPrice: '', note: '', samplePhotoUrls: [], draftSampleUrl: '' }])
   }
 
   const removeProductRow = (index: number) => {
@@ -198,6 +208,11 @@ export default function NewOrderPage() {
     const preparedProducts = products.filter((product) => product.name.trim())
     if (preparedProducts.length === 0) {
       setProductError(t('orders.new.taskValidation', 'Please enter a name for each item.'))
+      setIsSaving(false)
+      return
+    }
+    if (preparedProducts.some((product) => !product.unitPrice.trim())) {
+      setProductError('Vui lòng nhập đơn giá cho từng sản phẩm.')
       setIsSaving(false)
       return
     }
@@ -232,33 +247,18 @@ export default function NewOrderPage() {
         new_customer: isNewCustomer,
         assigneeId: assigneeId || undefined,
         assigneeName: florists.find((f) => f.id === assigneeId)?.name || undefined,
+        referrerId: referrerId || null,
+        // The server creates one task per product in the same transaction.
         products: preparedProducts.map((product) => ({
           name: product.name,
           quantity: product.quantity,
+          unitPrice: product.unitPrice,
           note: product.note,
           samplePhotoUrls: product.samplePhotoUrls,
+          image: bouquetOptions.find((option) => option.name.toLowerCase() === product.name.toLowerCase())?.image,
         })),
       })
 
-      await Promise.all(
-        preparedProducts.map((product) => {
-          const match = bouquetOptions.find(
-            (option) => option.name.toLowerCase() === product.name.toLowerCase(),
-          )
-          return createTask({
-            orderId: created.id,
-            bouquetName: product.name,
-            bouquetImage: product.samplePhotoUrls[0] || match?.image,
-            samplePhotoUrls: product.samplePhotoUrls,
-            dueTime: dueTimeForTasks,
-            status: 'UNASSIGNED',
-            notes: [product.note, notes].filter(Boolean).join('\n'),
-            taskTitle: `${product.quantity} × Arrange ${product.name}`,
-            quantity: product.quantity,
-            type: 'CAM_HOA',
-          })
-        }),
-      )
       router.push(`/${lang}/orders/${created.id}`)
     } catch (error) {
       console.error('Failed to create order', error)
@@ -432,6 +432,26 @@ export default function NewOrderPage() {
                 ))}
               </select>
             </label>
+            <label className="space-y-2 text-sm font-medium text-foreground">
+              <span>Người giới thiệu (tuỳ chọn)</span>
+              <select
+                value={referrerId}
+                onChange={(event) => setReferrerId(event.target.value)}
+                className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                <option value="">Không có</option>
+                {users
+                  .filter((u) => u.status === 'active')
+                  .map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name}
+                    </option>
+                  ))}
+              </select>
+              <span className="block text-xs font-normal text-muted-foreground">
+                Nhân viên giới thiệu khách này sẽ được tính hoa hồng giới thiệu trên đơn.
+              </span>
+            </label>
           </section >
 
           <section className="space-y-3 rounded-2xl border border-border bg-white p-5 shadow-sm">
@@ -470,6 +490,17 @@ export default function NewOrderPage() {
                         min={1}
                         value={product.quantity}
                         onChange={(event) => handleProductChange(index, 'quantity', Number(event.target.value) || 1)}
+                        className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                      />
+                    </label>
+                    <label className="w-36 space-y-1 text-sm font-medium text-foreground">
+                      <span>Đơn giá</span>
+                      <input
+                        required
+                        inputMode="numeric"
+                        placeholder="0"
+                        value={product.unitPrice}
+                        onChange={(event) => handleProductChange(index, 'unitPrice', event.target.value)}
                         className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                       />
                     </label>
@@ -587,13 +618,11 @@ export default function NewOrderPage() {
             </div>
             <div className="grid gap-3 md:grid-cols-2">
               <label className="space-y-2 text-sm font-medium text-foreground">
-                <span>{t('orders.new.listedPrice', 'Listed price')}</span>
+                <span>{t('orders.new.listedPrice', 'Listed price')} (tổng các sản phẩm)</span>
                 <input
-                  required
-                  inputMode="numeric"
-                  value={listedPrice}
-                  onChange={(event) => setListedPrice(formatCurrencyInput(event.target.value))}
-                  className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  readOnly
+                  value={formatCurrencyFromNumber(Number(listedPrice))}
+                  className="w-full rounded-xl border border-border bg-muted/50 px-3 py-2 text-sm text-foreground"
                 />
               </label>
               <label className="space-y-2 text-sm font-medium text-foreground">

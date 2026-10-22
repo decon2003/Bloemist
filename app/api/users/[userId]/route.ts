@@ -7,6 +7,7 @@ import { toVnd } from '@/lib/server/money'
 import { MANAGER_ROLES, isManager, requireUser } from '@/lib/server/session'
 import { audit, diff } from '@/lib/server/audit'
 import {
+    PAY_TYPES,
     PRIVILEGED_USER_SELECT,
     PUBLIC_USER_SELECT,
     USER_ROLES,
@@ -71,6 +72,10 @@ export async function PATCH(request: Request, context: RouteContext) {
         if (body.avatar !== undefined) data.avatar = requireNonBlank(body.avatar, 'avatar', 64)
         if (body.baseSalary !== undefined) data.baseSalary = toVnd(body.baseSalary, 'baseSalary') ?? 0
         if (body.commissionRate !== undefined) data.commissionRate = parseCommissionRate(body.commissionRate)
+        if (body.salesCommissionRate !== undefined) data.salesCommissionRate = parseCommissionRate(body.salesCommissionRate, 'salesCommissionRate')
+        if (body.referralCommissionRate !== undefined) data.referralCommissionRate = parseCommissionRate(body.referralCommissionRate, 'referralCommissionRate')
+        if (body.payType !== undefined) data.payType = assertOneOf(body.payType, PAY_TYPES, 'payType')
+        if (body.hourlyRate !== undefined) data.hourlyRate = toVnd(body.hourlyRate, 'hourlyRate') ?? 0
         // Password reset by a manager: issue a new temporary password, force a
         // change on next login and sign the user out everywhere.
         if (body.password !== undefined && body.password !== '') {
@@ -102,7 +107,7 @@ export async function PATCH(request: Request, context: RouteContext) {
             select: PRIVILEGED_USER_SELECT,
         })
 
-        const changes = diff(existing, user, ['name', 'email', 'phone', 'role', 'status', 'avatar', 'baseSalary', 'commissionRate'])
+        const changes = diff(existing, user, ['name', 'email', 'phone', 'role', 'status', 'avatar', 'payType', 'baseSalary', 'hourlyRate', 'commissionRate', 'salesCommissionRate', 'referralCommissionRate'])
         const passwordReset = data.passwordHash !== undefined
         if (changes || passwordReset) {
             await audit(me, {

@@ -18,6 +18,9 @@ export const protectedRoutes: ProtectedRoute[] = [
   // Dashboard - bosses and admins only
   { path: '/dashboard', allowedRoles: ['boss', 'admin'] },
 
+  // Payroll - bosses and admins only
+  { path: '/payroll', allowedRoles: ['boss', 'admin'] },
+
   // Staff performance reporting - bosses and admins only
   { path: '/staff', allowedRoles: ['boss', 'admin'] },
 ]

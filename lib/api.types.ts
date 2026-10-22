@@ -1,4 +1,4 @@
-import { CreateOrderInput, CreateTaskInput, DashboardStats, Order, Task, TaskStatus, Florist, StaffCheckIn, WorkspaceSettings, User, CustomerPage, CustomerLookup, CustomerSummary, ListParams, BouquetSuggestion, AuditEntry, ShiftCorrectionInput } from './types'
+import { CreateOrderInput, CreateTaskInput, DashboardStats, Order, Task, TaskStatus, Florist, StaffCheckIn, WorkspaceSettings, User, CustomerPage, CustomerLookup, CustomerSummary, ListParams, BouquetSuggestion, AuditEntry, ShiftCorrectionInput, Payroll, PayrollLineUpdate } from './types'
 
 export interface AssignTaskPayload {
   userId: string
@@ -41,6 +41,12 @@ export interface ApiClient {
   uploadPhoto: (file: File | Blob) => Promise<string>
   fetchBouquets: () => Promise<BouquetSuggestion[]>
   fetchAudit: (params: { entity?: string; entityId?: string }) => Promise<AuditEntry[]>
+  fetchPayroll: (month: string) => Promise<Payroll | null>
+  generatePayroll: (month: string) => Promise<Payroll>
+  updatePayrollLine: (lineId: string, input: PayrollLineUpdate) => Promise<Payroll>
+  updatePayrollSettings: (payrollId: string, input: { otMultiplier: number }) => Promise<Payroll>
+  lockPayroll: (payrollId: string) => Promise<Payroll>
+  unlockPayroll: (payrollId: string) => Promise<Payroll>
   fetchStaffReport: (month: string) => Promise<{ month: string; rows: unknown[] }>
   fetchCustomers: (params: { q?: string; sort?: 'spend' | 'recent' | 'orders'; page?: number }) => Promise<CustomerPage>
   lookupCustomer: (phone: string) => Promise<CustomerLookup | null>

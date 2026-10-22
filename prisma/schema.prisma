@@ -18,15 +18,20 @@ model User {
   createdAt DateTime @default(now())
 
   // Relations
-  tasksAssigned    Task[]         @relation("AssignedTasks")
-  ordersCreated    Order[]        @relation("CreatedOrders")
-  ordersAssigned   Order[]        @relation("AssignedOrders")
-  staffCheckIns    StaffCheckIn[]
-  messagesSent     Message[]      @relation("SentMessages")
-  messagesReceived Message[]      @relation("ReceivedMessages")
-  // Money is whole VND.
-  baseSalary       Int?           @default(0)
-  commissionRate   Float?         @default(0)
+  tasksAssigned          Task[]         @relation("AssignedTasks")
+  ordersCreated          Order[]        @relation("CreatedOrders")
+  ordersAssigned         Order[]        @relation("AssignedOrders")
+  staffCheckIns          StaffCheckIn[]
+  messagesSent           Message[]      @relation("SentMessages")
+  messagesReceived       Message[]      @relation("ReceivedMessages")
+  // Pay profile: defaults that pre-fill the monthly payroll draft, where every
+  // figure can still be adjusted. Money is whole VND, rates are percent.
+  payType                String         @default("MONTHLY") // MONTHLY (lương cứng) | HOURLY (theo giờ)
+  baseSalary             Int?           @default(0)
+  hourlyRate             Int            @default(0) // also the base for overtime pay
+  commissionRate         Float?         @default(0) // % of the products this person made
+  salesCommissionRate    Float          @default(0) // % of orders this person sold
+  referralCommissionRate Float          @default(0) // % of orders this person referred
 
   // Auth. passwordHash is null until a manager sets a temporary password.
   passwordHash       String?
@@ -76,6 +81,9 @@ model Order {
   new_customer          Boolean? @default(false)
   createdAt             DateTime @default(now())
   customerId            String?
+  // Staff member who brought this customer in; earns a referral commission.
+  referrerId            String?
+  referrerName          String?
 
   createdBy User?     @relation("CreatedOrders", fields: [createdById], references: [id])
   customer  Customer? @relation(fields: [customerId], references: [id])
@@ -173,9 +181,11 @@ model StaffCheckIn {
 
 // Shop-wide settings (single row, id = 1).
 model ShopSettings {
-  id        Int    @id @default(1)
-  openTime  String @default("08:00") // HH:mm, Vietnam time
-  closeTime String @default("19:00") // HH:mm; forgotten check-outs are closed at this time
+  id           Int    @id @default(1)
+  openTime     String @default("08:00") // HH:mm, Vietnam time
+  closeTime    String @default("19:00") // HH:mm; forgotten check-outs are closed at this time
+  // Overtime (hours outside open-close) is paid at hourlyRate x otMultiplier once a manager approves it.
+  otMultiplier Float  @default(1.5)
 }
 
 model Message {
@@ -217,4 +227,44 @@ model AuditLog {
 
   @@index([entity, entityId])
   @@index([at])
+}
+
+// Monthly payroll: a draft pre-filled from attendance and orders that a
+// manager adjusts (OT days, commission items, adjustments) and then locks.
+model Payroll {
+  id           String        @id @default(uuid())
+  month        String        @unique // YYYY-MM, Vietnam time
+  status       String        @default("DRAFT") // DRAFT | LOCKED
+  otMultiplier Float         @default(1.5)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  lockedAt     DateTime?
+  lockedByName String?
+  lines        PayrollLine[]
+}
+
+// One person's pay for the month. Rates are copied from the pay profile when
+// the draft is built and may be changed for this month only. `shifts`,
+// `commissions` and `adjustments` hold the itemised, editable detail; `total`
+// is recomputed on every save.
+model PayrollLine {
+  id           String  @id @default(uuid())
+  payrollId    String
+  payroll      Payroll @relation(fields: [payrollId], references: [id], onDelete: Cascade)
+  userId       String
+  userName     String
+  role         String
+  payType      String // MONTHLY | HOURLY
+  baseSalary   Int     @default(0)
+  hourlyRate   Int     @default(0)
+  makerRate    Float   @default(0)
+  salesRate    Float   @default(0)
+  referralRate Float   @default(0)
+  shifts       Json    @default("[]")
+  commissions  Json    @default("[]")
+  adjustments  Json    @default("[]")
+  note         String?
+  total        Int     @default(0)
+
+  @@unique([payrollId, userId])
 }

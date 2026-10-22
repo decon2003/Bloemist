@@ -47,6 +47,3 @@ export function parseListScope(params: URLSearchParams): ListScope {
 
   return { kind: 'range', start, end }
 }
-
-/** Digits of a search term, for matching phone numbers typed with spaces or dashes. */
-export const searchDigits = (q: string) => q.replace(/\D/g, '')

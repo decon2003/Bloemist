@@ -10,6 +10,43 @@ export function normalizeCustomerPhone(value: string | null | undefined): string
   return /^84\d{9}$/.test(digits) ? `0${digits.slice(2)}` : digits
 }
 
+/** Ids of orders whose sender (customer) or receiver phone contains these
+ *  digits, however the number was typed (spaces, dots, +84). Phones on orders
+ *  are stored as typed, so they are normalised in SQL the way
+ *  normalizeCustomerPhone does. The "+84 -> 0" replacement is a parameter
+ *  because a backslash is not allowed inside a tagged template. */
+export async function orderIdsByPhone(digits: string, field: 'any' | 'receiver' = 'any'): Promise<string[]> {
+  const like = `%${digits}%`
+  const fold = '0\\1'
+  const rows = field === 'receiver'
+    ? await db.$queryRaw<{ id: string }[]>`
+        SELECT id FROM "Order"
+        WHERE regexp_replace(regexp_replace("receiverPhone", '[^0-9]', '', 'g'), '^84([0-9]{9})$', ${fold}) LIKE ${like}
+        ORDER BY "createdAt" DESC LIMIT 500`
+    : await db.$queryRaw<{ id: string }[]>`
+        SELECT id FROM "Order"
+        WHERE regexp_replace(regexp_replace("customerPhone", '[^0-9]', '', 'g'), '^84([0-9]{9})$', ${fold}) LIKE ${like}
+           OR regexp_replace(regexp_replace("receiverPhone", '[^0-9]', '', 'g'), '^84([0-9]{9})$', ${fold}) LIKE ${like}
+        ORDER BY "createdAt" DESC LIMIT 500`
+  return rows.map((r) => r.id)
+}
+
+/** Search orders by code, sender/receiver name or phone, or bouquet. */
+export async function orderSearchWhere(q: string) {
+  const digits = normalizeCustomerPhone(q)
+  const phoneIds = digits.length >= 4 ? await orderIdsByPhone(digits) : []
+  const text = { contains: q, mode: 'insensitive' as const }
+  return {
+    OR: [
+      { code: text },
+      { customerName: text },
+      { receiverName: text },
+      { bouquetName: text },
+      ...(phoneIds.length ? [{ id: { in: phoneIds } }] : []),
+    ],
+  }
+}
+
 /** Find or create the customer for an order's phone. The customer's stored
  *  name is not overwritten by later orders - it is curated on the Customers
  *  page - so a typo on one order does not rename the customer. */
@@ -69,11 +106,15 @@ export type CustomerSort = 'spend' | 'recent' | 'orders'
 export async function listCustomers({ q, sort, page, pageSize }: { q: string; sort: CustomerSort; page: number; pageSize: number }) {
   const term = q.trim()
   const phoneTerm = normalizeCustomerPhone(term)
+  // Also finds the customer through the people they sent flowers to.
+  const receiverIds = phoneTerm.length >= 4 ? await orderIdsByPhone(phoneTerm, 'receiver') : []
   const where = term
     ? {
         OR: [
           { name: { contains: term, mode: 'insensitive' as const } },
           ...(phoneTerm ? [{ phone: { contains: phoneTerm } }] : []),
+          { orders: { some: { receiverName: { contains: term, mode: 'insensitive' as const } } } },
+          ...(receiverIds.length ? [{ orders: { some: { id: { in: receiverIds } } } }] : []),
         ],
       }
     : {}

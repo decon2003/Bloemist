@@ -12,7 +12,7 @@ import { DateFilterSwitcher, DateRange } from '@/components/date-filter-switcher
 import { getDateKey } from '@/lib/date-utils'
 import { useListParams } from '@/lib/use-list-params'
 import type { Order } from '@/lib/types'
-import { formatCurrencyDisplay } from '@/lib/utils'
+import { formatCurrencyDisplay, formatDateTime } from '@/lib/utils'
 import { useViewSettings } from '@/components/providers/view-settings-provider'
 import { thumbUrl } from '@/lib/image-compress'
 
@@ -73,6 +73,11 @@ export default function OrdersPage() {
   )
 
   const formatMoney = (value?: string | number | null) => formatCurrencyDisplay(value, '₫0')
+  // Unfinished orders whose receive day has passed (the server adds them to
+  // any window that includes today).
+  const todayKey = getDateKey(new Date()) ?? ''
+  const isOverdue = (order: Order) =>
+    (order.status === 'NEW' || order.status === 'IN_PROGRESS') && (getDateKey(new Date(order.receiveTime)) ?? '') < todayKey
 
   const handleDeleteOrder = async (e: React.MouseEvent, orderId: string) => {
     e.stopPropagation()
@@ -236,6 +241,11 @@ export default function OrdersPage() {
                       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{order.code}</p>
                       <h2 className="text-lg font-semibold text-foreground">{order.bouquetName}</h2>
                       <p className="text-sm text-muted-foreground">{order.customerName}</p>
+                      {isOverdue(order) && (
+                        <p className="mt-1 inline-block rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
+                          Quá hạn · nhận {formatDateTime(order.receiveTime, lang)}
+                        </p>
+                      )}
                     </div>
                   </div>
                   <div className="grid flex-1 grid-cols-2 gap-4 text-sm md:grid-cols-5 md:text-right">

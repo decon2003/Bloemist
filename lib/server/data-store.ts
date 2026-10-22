@@ -9,9 +9,9 @@ import { ApiError } from './api-error'
 import { storePhoto } from './storage'
 import { computeOrderTotals, parseCurrencyToNumber, toVatPercent, toVnd, type OrderMoneyInput } from './money'
 import { addVnDays, startOfVnMonth, vnDateKey } from './vn-time'
-import { LIST_LIMIT, SEARCH_LIMIT, searchDigits, type ListScope } from './list-scope'
+import { LIST_LIMIT, SEARCH_LIMIT, type ListScope } from './list-scope'
 import type { Prisma } from '@prisma/client'
-import { linkCustomer, normalizeCustomerPhone } from './customers'
+import { linkCustomer, normalizeCustomerPhone, orderSearchWhere } from './customers'
 import { TASK_STATUSES, assertOneOf } from './validation'
 
 // Helper to map Prisma entity to App entity
@@ -109,13 +109,11 @@ export const listTasks = async (
   } else if (scope.kind === 'range') {
     where.dueTime = { gte: scope.start, lt: scope.end }
   } else {
-    const digits = searchDigits(scope.q)
     where.OR = [
       { taskTitle: { contains: scope.q, mode: 'insensitive' } },
       { bouquetName: { contains: scope.q, mode: 'insensitive' } },
       { orderCode: { contains: scope.q, mode: 'insensitive' } },
-      { order: { customerName: { contains: scope.q, mode: 'insensitive' } } },
-      ...(digits.length >= 4 ? [{ order: { customer: { phone: { contains: digits } } } }] : []),
+      { order: await orderSearchWhere(scope.q) },
     ]
   }
   if (options.assigneeId) where.assigneeId = options.assigneeId
@@ -155,6 +153,9 @@ export const getTask = async (taskId: string) => {
   return slimTaskPhotos(mapTask(task), { samples: false })
 }
 
+/** Orders not yet finished - counted as "Đơn chưa hoàn thành" on the dashboard. */
+const OPEN_ORDER_STATUSES = ['NEW', 'IN_PROGRESS'] as const
+
 /** Orders received in a Vietnam-day window or matching a search, optionally
  *  narrowed to one person in charge / salesperson ('none' = not set).
  *  Florists only see orders that have a task assigned to them. */
@@ -167,16 +168,15 @@ export const listOrders = async (
   if (filters.assigneeId) where.assigneeId = filters.assigneeId === 'none' ? null : filters.assigneeId
   if (filters.salespersonId) where.salespersonId = filters.salespersonId === 'none' ? null : filters.salespersonId
   if (scope.kind === 'range') {
-    where.receiveTime = { gte: scope.start, lt: scope.end }
+    const window = { receiveTime: { gte: scope.start, lt: scope.end } }
+    // A window that includes today also carries unfinished orders whose
+    // receive day has passed, so they never drop out of sight.
+    const now = new Date()
+    where.OR = scope.start <= now && now < scope.end
+      ? [window, { status: { in: [...OPEN_ORDER_STATUSES] }, receiveTime: { lt: scope.start } }]
+      : [window]
   } else {
-    const digits = searchDigits(scope.q)
-    where.OR = [
-      { code: { contains: scope.q, mode: 'insensitive' } },
-      { customerName: { contains: scope.q, mode: 'insensitive' } },
-      { receiverName: { contains: scope.q, mode: 'insensitive' } },
-      { bouquetName: { contains: scope.q, mode: 'insensitive' } },
-      ...(digits.length >= 4 ? [{ customer: { phone: { contains: digits } } }] : []),
-    ]
+    Object.assign(where, await orderSearchWhere(scope.q))
   }
   if (viewer.role === 'florist') where.tasks = { some: { assigneeId: viewer.id } }
 

@@ -159,7 +159,7 @@ export default function CustomersPage() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Tìm theo tên hoặc số điện thoại"
+            placeholder="Tên, SĐT khách hoặc người nhận"
             className={`${inputClass} pl-9`}
           />
         </label>

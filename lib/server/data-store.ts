@@ -245,13 +245,13 @@ const readProducts = (value: unknown): ProductInput[] => {
   })
 }
 
-/** The staff member credited with referring an order, or null to clear it. */
-const readReferrer = async (value: unknown) => {
-  if (value === null || value === '') return { referrerId: null, referrerName: null }
-  if (typeof value !== 'string') throw new ApiError(400, 'referrerId không hợp lệ')
+/** The staff member credited with the sale (any staff member - whoever
+ *  brought the order in). They earn the order's sales commission. */
+const readSalesperson = async (value: unknown) => {
+  if (typeof value !== 'string' || !value) throw new ApiError(400, 'Vui lòng chọn người sale')
   const user = await db.user.findUnique({ where: { id: value }, select: { id: true, name: true } })
-  if (!user) throw new ApiError(400, 'Người giới thiệu không tồn tại')
-  return { referrerId: user.id, referrerName: user.name }
+  if (!user) throw new ApiError(400, 'Người sale không tồn tại')
+  return { salespersonId: user.id, salespersonName: user.name }
 }
 
 /** Create an order and, when product lines are given, one task per product in
@@ -260,7 +260,10 @@ const readReferrer = async (value: unknown) => {
  *  product lines the listed price is their sum. */
 export const createOrder = async (input: CreateOrderInput) => {
   const products = readProducts(input.products)
-  const referrer = input.referrerId ? await readReferrer(input.referrerId) : { referrerId: null, referrerName: null }
+  // Defaults to whoever creates the order.
+  const salesperson = input.salespersonId
+    ? await readSalesperson(input.salespersonId)
+    : { salespersonId: input.createdById ?? null, salespersonName: input.createdByName ?? null }
   const receiveTime = parseRequiredDate(input.receiveTime, 'receiveTime')
   const money = readOrderMoney(
     products.length ? { ...input, listedPrice: products.reduce((sum, p) => sum + p.lineTotal, 0) } : input,
@@ -293,7 +296,7 @@ export const createOrder = async (input: CreateOrderInput) => {
         assigneeId: input.assigneeId,
         assigneeName: input.assigneeName,
         new_customer: input.new_customer,
-        ...referrer,
+        ...salesperson,
       },
     })
     // Tasks are due two hours before the customer receives the order. A florist
@@ -362,7 +365,7 @@ export const updateOrder = async (orderId: string, input: Partial<CreateOrderInp
     data.receiveTime = parseRequiredDate(input.receiveTime, 'receiveTime')
   }
 
-  if (input.referrerId !== undefined) Object.assign(data, await readReferrer(input.referrerId))
+  if (input.salespersonId !== undefined) Object.assign(data, await readSalesperson(input.salespersonId))
 
   // Changing any price input recomputes the derived amounts from the merged values.
   if (ORDER_MONEY_FIELDS.some((field) => input[field] !== undefined)) {

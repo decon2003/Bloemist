@@ -18,20 +18,19 @@ model User {
   createdAt DateTime @default(now())
 
   // Relations
-  tasksAssigned          Task[]         @relation("AssignedTasks")
-  ordersCreated          Order[]        @relation("CreatedOrders")
-  ordersAssigned         Order[]        @relation("AssignedOrders")
-  staffCheckIns          StaffCheckIn[]
-  messagesSent           Message[]      @relation("SentMessages")
-  messagesReceived       Message[]      @relation("ReceivedMessages")
+  tasksAssigned       Task[]         @relation("AssignedTasks")
+  ordersCreated       Order[]        @relation("CreatedOrders")
+  ordersAssigned      Order[]        @relation("AssignedOrders")
+  staffCheckIns       StaffCheckIn[]
+  messagesSent        Message[]      @relation("SentMessages")
+  messagesReceived    Message[]      @relation("ReceivedMessages")
   // Pay profile: defaults that pre-fill the monthly payroll draft, where every
   // figure can still be adjusted. Money is whole VND, rates are percent.
-  payType                String         @default("MONTHLY") // MONTHLY (lương cứng) | HOURLY (theo giờ)
-  baseSalary             Int?           @default(0)
-  hourlyRate             Int            @default(0) // also the base for overtime pay
-  commissionRate         Float?         @default(0) // % of the products this person made
-  salesCommissionRate    Float          @default(0) // % of orders this person sold
-  referralCommissionRate Float          @default(0) // % of orders this person referred
+  payType             String         @default("MONTHLY") // MONTHLY (lương cứng) | HOURLY (theo giờ)
+  baseSalary          Int?           @default(0)
+  hourlyRate          Int            @default(0) // also the base for overtime pay
+  commissionRate      Float?         @default(0) // % of the products this person made
+  salesCommissionRate Float          @default(0) // % of orders this person sold
 
   // Auth. passwordHash is null until a manager sets a temporary password.
   passwordHash       String?
@@ -81,9 +80,10 @@ model Order {
   new_customer          Boolean? @default(false)
   createdAt             DateTime @default(now())
   customerId            String?
-  // Staff member who brought this customer in; earns a referral commission.
-  referrerId            String?
-  referrerName          String?
+  // Staff member credited with the sale (whoever brought the order in - any
+  // staff member); earns the sales commission. Defaults to the creator.
+  salespersonId         String?
+  salespersonName       String?
 
   createdBy User?     @relation("CreatedOrders", fields: [createdById], references: [id])
   customer  Customer? @relation(fields: [customerId], references: [id])
@@ -248,23 +248,22 @@ model Payroll {
 // `commissions` and `adjustments` hold the itemised, editable detail; `total`
 // is recomputed on every save.
 model PayrollLine {
-  id           String  @id @default(uuid())
-  payrollId    String
-  payroll      Payroll @relation(fields: [payrollId], references: [id], onDelete: Cascade)
-  userId       String
-  userName     String
-  role         String
-  payType      String // MONTHLY | HOURLY
-  baseSalary   Int     @default(0)
-  hourlyRate   Int     @default(0)
-  makerRate    Float   @default(0)
-  salesRate    Float   @default(0)
-  referralRate Float   @default(0)
-  shifts       Json    @default("[]")
-  commissions  Json    @default("[]")
-  adjustments  Json    @default("[]")
-  note         String?
-  total        Int     @default(0)
+  id          String  @id @default(uuid())
+  payrollId   String
+  payroll     Payroll @relation(fields: [payrollId], references: [id], onDelete: Cascade)
+  userId      String
+  userName    String
+  role        String
+  payType     String // MONTHLY | HOURLY
+  baseSalary  Int     @default(0)
+  hourlyRate  Int     @default(0)
+  makerRate   Float   @default(0)
+  salesRate   Float   @default(0)
+  shifts      Json    @default("[]")
+  commissions Json    @default("[]")
+  adjustments Json    @default("[]")
+  note        String?
+  total       Int     @default(0)
 
   @@unique([payrollId, userId])
 }

@@ -33,9 +33,8 @@ const dayLabel = (date: string) => `${date.slice(8, 10)}/${date.slice(5, 7)}`
 const thisMonth = () => new Intl.DateTimeFormat('en-CA', { timeZone: VN }).format(new Date()).slice(0, 7)
 
 const KIND_LABEL: Record<CommissionKind, string> = {
-  MAKER: 'Làm sản phẩm',
-  SALES: 'Bán hàng',
-  REFERRAL: 'Giới thiệu',
+  MAKER: 'Làm đơn',
+  SALES: 'Sale',
 }
 const OT_LABEL: Record<Exclude<OtDecision, 'NONE'>, string> = {
   PENDING: 'Chờ duyệt',
@@ -64,7 +63,7 @@ function LineEditor({
   const [payType, setPayType] = useState(line.payType)
   const [baseSalary, setBaseSalary] = useState(String(line.baseSalary))
   const [hourlyRate, setHourlyRate] = useState(String(line.hourlyRate))
-  const [rates, setRates] = useState({ makerRate: line.makerRate, salesRate: line.salesRate, referralRate: line.referralRate })
+  const [rates, setRates] = useState({ makerRate: line.makerRate, salesRate: line.salesRate })
   const [decisions, setDecisions] = useState<Record<string, OtDecision>>(
     Object.fromEntries(line.shifts.map((s) => [s.date, s.otDecision])),
   )
@@ -75,7 +74,7 @@ function LineEditor({
   const [error, setError] = useState('')
 
   const ratesChanged =
-    rates.makerRate !== line.makerRate || rates.salesRate !== line.salesRate || rates.referralRate !== line.referralRate
+    rates.makerRate !== line.makerRate || rates.salesRate !== line.salesRate
 
   const save = async () => {
     setSaving(true)
@@ -136,9 +135,9 @@ function LineEditor({
               <span className="text-muted-foreground">Đơn giá giờ (₫), cũng dùng cho OT</span>
               <input value={hourlyRate} disabled={locked} inputMode="numeric" onChange={(e) => setHourlyRate(e.target.value)} className={inputClass} />
             </label>
-            {(['makerRate', 'salesRate', 'referralRate'] as const).map((field, i) => (
+            {(['makerRate', 'salesRate'] as const).map((field, i) => (
               <label key={field} className="space-y-1 text-sm">
-                <span className="text-muted-foreground">% HH {['làm sản phẩm', 'bán hàng', 'giới thiệu'][i]}</span>
+                <span className="text-muted-foreground">% HH {['làm đơn', 'sale'][i]}</span>
                 <input
                   type="number"
                   min={0}

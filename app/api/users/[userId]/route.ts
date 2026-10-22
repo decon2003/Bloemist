@@ -73,7 +73,6 @@ export async function PATCH(request: Request, context: RouteContext) {
         if (body.baseSalary !== undefined) data.baseSalary = toVnd(body.baseSalary, 'baseSalary') ?? 0
         if (body.commissionRate !== undefined) data.commissionRate = parseCommissionRate(body.commissionRate)
         if (body.salesCommissionRate !== undefined) data.salesCommissionRate = parseCommissionRate(body.salesCommissionRate, 'salesCommissionRate')
-        if (body.referralCommissionRate !== undefined) data.referralCommissionRate = parseCommissionRate(body.referralCommissionRate, 'referralCommissionRate')
         if (body.payType !== undefined) data.payType = assertOneOf(body.payType, PAY_TYPES, 'payType')
         if (body.hourlyRate !== undefined) data.hourlyRate = toVnd(body.hourlyRate, 'hourlyRate') ?? 0
         // Password reset by a manager: issue a new temporary password, force a
@@ -107,7 +106,7 @@ export async function PATCH(request: Request, context: RouteContext) {
             select: PRIVILEGED_USER_SELECT,
         })
 
-        const changes = diff(existing, user, ['name', 'email', 'phone', 'role', 'status', 'avatar', 'payType', 'baseSalary', 'hourlyRate', 'commissionRate', 'salesCommissionRate', 'referralCommissionRate'])
+        const changes = diff(existing, user, ['name', 'email', 'phone', 'role', 'status', 'avatar', 'payType', 'baseSalary', 'hourlyRate', 'commissionRate', 'salesCommissionRate'])
         const passwordReset = data.passwordHash !== undefined
         if (changes || passwordReset) {
             await audit(me, {

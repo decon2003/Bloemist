@@ -34,7 +34,8 @@ export default function NewOrderPage() {
   const [customerPhone, setCustomerPhone] = useState('')
   const [receiverName, setReceiverName] = useState('')
   const [receiverPhone, setReceiverPhone] = useState('')
-  const [referrerId, setReferrerId] = useState('')
+  // Whoever brought the order in earns the sales commission; defaults to the creator.
+  const [salespersonId, setSalespersonId] = useState('')
   const [deliveryFee, setDeliveryFee] = useState('')
   // Freeship: the customer pays no delivery fee (stored as deliveryCoveredByShop).
   const [freeship, setFreeship] = useState(false)
@@ -245,7 +246,7 @@ export default function NewOrderPage() {
         new_customer: isNewCustomer,
         assigneeId: assigneeId || undefined,
         assigneeName: florists.find((f) => f.id === assigneeId)?.name || undefined,
-        referrerId: referrerId || null,
+        salespersonId: salespersonId || user?.id,
         // The server creates one task per product in the same transaction.
         products: preparedProducts.map((product) => ({
           name: product.name,
@@ -431,13 +432,12 @@ export default function NewOrderPage() {
               </select>
             </label>
             <label className="space-y-2 text-sm font-medium text-foreground">
-              <span>Người giới thiệu (tuỳ chọn)</span>
+              <span>Người sale</span>
               <select
-                value={referrerId}
-                onChange={(event) => setReferrerId(event.target.value)}
+                value={salespersonId || user?.id || ''}
+                onChange={(event) => setSalespersonId(event.target.value)}
                 className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               >
-                <option value="">Không có</option>
                 {users
                   .filter((u) => u.status === 'active')
                   .map((u) => (
@@ -447,7 +447,7 @@ export default function NewOrderPage() {
                   ))}
               </select>
               <span className="block text-xs font-normal text-muted-foreground">
-                Nhân viên giới thiệu khách này sẽ được tính hoa hồng giới thiệu trên đơn.
+                Người mang đơn về (bất kỳ nhân viên nào) nhận hoa hồng sale của đơn.
               </span>
             </label>
           </section >

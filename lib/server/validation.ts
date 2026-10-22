@@ -36,7 +36,6 @@ export const PRIVILEGED_USER_SELECT = {
   hourlyRate: true,
   commissionRate: true,
   salesCommissionRate: true,
-  referralCommissionRate: true,
 } as const
 
 export const PAY_TYPES = ['MONTHLY', 'HOURLY'] as const

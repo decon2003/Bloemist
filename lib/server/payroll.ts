@@ -6,7 +6,7 @@ import { getShopSettings } from './attendance'
 import { parseVnMonth } from './vn-time'
 
 // Monthly payroll. The system pre-fills a draft from facts recorded during the
-// month (shifts, products made, orders sold or referred); a manager adjusts it
+// month (shifts, products made, orders sold); a manager adjusts it
 // and locks it. Defaults, all editable per person and per item:
 //
 // - regular hours = the part of each shift inside opening hours; the rest is
@@ -16,8 +16,9 @@ import { parseVnMonth } from './vn-time'
 // - maker commission = rate% of each completed product's price, net of its
 //   share of the order discount, before VAT; it goes in full to whoever the
 //   product's task was assigned to;
-// - sales / referral commission = rate% of (listed price - discount) of each
-//   order the person created / referred, created that month;
+// - sales commission = rate% of (listed price - discount) of each order
+//   created that month where the person is the salesperson (whoever brought
+//   the order in; defaults to the creator);
 // - cancelled orders never earn commission;
 // - free-form adjustments (bonus, deduction, advance...).
 
@@ -35,7 +36,7 @@ export type ShiftItem = {
   autoClosed: boolean
 }
 
-export type CommissionKind = 'MAKER' | 'SALES' | 'REFERRAL'
+export type CommissionKind = 'MAKER' | 'SALES'
 export type CommissionItem = {
   key: string
   kind: CommissionKind
@@ -75,11 +76,12 @@ export function computeLine(line: Pick<LineRow, 'payType' | 'baseSalary' | 'hour
 
   const basePay = line.payType === 'MONTHLY' ? line.baseSalary : Math.round(line.hourlyRate * regularHours)
   const otPay = Math.round(line.hourlyRate * otMultiplier * otHours)
-  const commissionByKind: Record<CommissionKind, number> = { MAKER: 0, SALES: 0, REFERRAL: 0 }
+  const commissionByKind: Record<CommissionKind, number> = { MAKER: 0, SALES: 0 }
   for (const item of commissions) {
-    if (item.included) commissionByKind[item.kind] += Math.round((item.base * item.rate) / 100)
+    // Unknown kinds (e.g. the retired REFERRAL in an old draft) are ignored.
+    if (item.included && item.kind in commissionByKind) commissionByKind[item.kind] += Math.round((item.base * item.rate) / 100)
   }
-  const commission = commissionByKind.MAKER + commissionByKind.SALES + commissionByKind.REFERRAL
+  const commission = commissionByKind.MAKER + commissionByKind.SALES
   const adjustmentsTotal = adjustments.reduce((sum, a) => sum + a.amount, 0)
 
   return {
@@ -115,7 +117,7 @@ async function collectFacts(month: { key: string; start: Date; end: Date }) {
     }),
     db.order.findMany({
       where: { createdAt: inMonth, status: { not: 'CANCELLED' } },
-      select: { id: true, code: true, listedPrice: true, discount: true, createdById: true, referrerId: true, customerName: true },
+      select: { id: true, code: true, listedPrice: true, discount: true, createdById: true, salespersonId: true, customerName: true },
     }),
   ])
 
@@ -179,19 +181,17 @@ async function collectFacts(month: { key: string; start: Date; end: Date }) {
 
   for (const order of orders) {
     const base = orderBase(order)
-    if (order.createdById) {
-      push(order.createdById, { key: `SALES:${order.id}`, kind: 'SALES', orderId: order.id, orderCode: order.code, label: order.customerName, base })
-    }
-    if (order.referrerId) {
-      push(order.referrerId, { key: `REFERRAL:${order.id}`, kind: 'REFERRAL', orderId: order.id, orderCode: order.code, label: order.customerName, base })
+    const salesperson = order.salespersonId ?? order.createdById
+    if (salesperson) {
+      push(salesperson, { key: `SALES:${order.id}`, kind: 'SALES', orderId: order.id, orderCode: order.code, label: order.customerName, base })
     }
   }
 
   return { settings, users, shiftsByUser, commissionsByUser }
 }
 
-const rateFor = (line: { makerRate: number; salesRate: number; referralRate: number }, kind: CommissionKind) =>
-  kind === 'MAKER' ? line.makerRate : kind === 'SALES' ? line.salesRate : line.referralRate
+const rateFor = (line: { makerRate: number; salesRate: number }, kind: CommissionKind) =>
+  kind === 'MAKER' ? line.makerRate : line.salesRate
 
 /** Create the month's draft, or refresh an existing draft with the latest
  *  shifts and orders while keeping every manual change: per-month rates,
@@ -222,7 +222,6 @@ export async function generatePayroll(monthKey: string, actor: AuditActor) {
       hourlyRate: user.hourlyRate,
       makerRate: user.commissionRate ?? 0,
       salesRate: user.salesCommissionRate,
-      referralRate: user.referralCommissionRate,
     }
 
     const oldShifts = new Map(((before?.shifts as ShiftItem[] | undefined) ?? []).map((s) => [s.date, s.otDecision]))
@@ -245,7 +244,6 @@ export async function generatePayroll(monthKey: string, actor: AuditActor) {
       hourlyRate: rates.hourlyRate,
       makerRate: rates.makerRate,
       salesRate: rates.salesRate,
-      referralRate: rates.referralRate,
       shifts: shifts as unknown as Prisma.InputJsonValue,
       commissions: commissions as unknown as Prisma.InputJsonValue,
     }
@@ -320,7 +318,6 @@ export async function updatePayrollLine(lineId: string, body: Record<string, unk
     hourlyRate: line.hourlyRate,
     makerRate: line.makerRate,
     salesRate: line.salesRate,
-    referralRate: line.referralRate,
     shifts: line.shifts as ShiftItem[],
     commissions: line.commissions as CommissionItem[],
     adjustments: line.adjustments as Adjustment[],
@@ -335,7 +332,7 @@ export async function updatePayrollLine(lineId: string, body: Record<string, unk
   if (body.hourlyRate !== undefined) next.hourlyRate = asMoney(body.hourlyRate, 'Đơn giá giờ')
 
   // A new line rate applies to every item of that kind (overriding per-item rates).
-  for (const [field, kind] of [['makerRate', 'MAKER'], ['salesRate', 'SALES'], ['referralRate', 'REFERRAL']] as const) {
+  for (const [field, kind] of [['makerRate', 'MAKER'], ['salesRate', 'SALES']] as const) {
     if (body[field] === undefined) continue
     const rate = asRate(body[field], field)
     next[field] = rate
@@ -458,11 +455,11 @@ const csvCell = (value: unknown) => {
 export async function exportPayrollCsv(monthKey: string) {
   const payroll = await getPayroll(monthKey)
   if (!payroll) throw new ApiError(404, 'Chưa có bảng lương tháng này')
-  const kindLabel: Record<CommissionKind, string> = { MAKER: 'HH làm sản phẩm', SALES: 'HH bán hàng', REFERRAL: 'HH giới thiệu' }
+  const kindLabel: Record<CommissionKind, string> = { MAKER: 'HH làm đơn', SALES: 'HH sale' }
   const rows: unknown[][] = [
     [`Bảng lương ${payroll.month}`, payroll.status === 'LOCKED' ? `Đã chốt bởi ${payroll.lockedByName ?? ''}` : 'Nháp', `Hệ số OT ${payroll.otMultiplier}`],
     [],
-    ['Nhân viên', 'Hình thức', 'Giờ thường', 'Giờ OT', 'Lương', 'Tiền OT', 'HH làm SP', 'HH bán hàng', 'HH giới thiệu', 'Điều chỉnh', 'Tổng', 'Ghi chú'],
+    ['Nhân viên', 'Hình thức', 'Giờ thường', 'Giờ OT', 'Lương', 'Tiền OT', 'HH làm đơn', 'HH sale', 'Điều chỉnh', 'Tổng', 'Ghi chú'],
   ]
   for (const line of payroll.lines) {
     const t = line.totals
@@ -475,7 +472,6 @@ export async function exportPayrollCsv(monthKey: string) {
       t.otPay,
       t.commissionByKind.MAKER,
       t.commissionByKind.SALES,
-      t.commissionByKind.REFERRAL,
       t.adjustmentsTotal,
       t.total,
       line.note ?? '',

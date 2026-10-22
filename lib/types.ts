@@ -75,8 +75,9 @@ export interface Order {
   createdByName?: string
   assigneeId?: string
   assigneeName?: string
-  referrerId?: string | null
-  referrerName?: string | null
+  /** Staff member credited with the sale (earns the sales commission). */
+  salespersonId?: string | null
+  salespersonName?: string | null
   new_customer?: boolean
   deliveryAddress?: string
   sourcePlatform?: string
@@ -137,8 +138,8 @@ export interface CreateOrderInput {
   tasks?: Array<{ name: string; price?: string; note?: string }>
   /** One task per line; with lines, the listed price is their sum. */
   products?: Array<{ name: string; quantity: number; note?: string; samplePhotoUrls?: string[]; unitPrice: number | string; image?: string }>
-  /** Staff member who referred the customer (earns a referral commission). */
-  referrerId?: string | null
+  /** Staff member credited with the sale; defaults to the creator. */
+  salespersonId?: string | null
 }
 
 export interface CreateTaskInput {
@@ -227,7 +228,7 @@ export interface PayrollShift {
   autoClosed: boolean
 }
 
-export type CommissionKind = 'MAKER' | 'SALES' | 'REFERRAL'
+export type CommissionKind = 'MAKER' | 'SALES'
 
 export interface PayrollCommission {
   key: string
@@ -255,7 +256,6 @@ export interface PayrollLine {
   hourlyRate: number
   makerRate: number
   salesRate: number
-  referralRate: number
   shifts: PayrollShift[]
   commissions: PayrollCommission[]
   adjustments: PayrollAdjustment[]
@@ -290,7 +290,6 @@ export interface PayrollLineUpdate {
   hourlyRate?: number
   makerRate?: number
   salesRate?: number
-  referralRate?: number
   shiftDecisions?: { date: string; otDecision: OtDecision }[]
   commissionChanges?: { key: string; included?: boolean; rate?: number }[]
   adjustments?: PayrollAdjustment[]
@@ -340,12 +339,10 @@ export interface User {
   baseSalary?: number | null
   /** Whole VND per hour; also the base for overtime. */
   hourlyRate?: number
-  /** % of the products this person made. */
+  /** % of the products this person made (hoa hồng làm đơn). */
   commissionRate?: number
-  /** % of the orders this person sold. */
+  /** % of the orders credited to this person as salesperson (hoa hồng sale). */
   salesCommissionRate?: number
-  /** % of the orders this person referred. */
-  referralCommissionRate?: number
   mustChangePassword?: boolean
   /** Write-only: a temporary password set by a manager. Never returned. */
   password?: string

@@ -38,7 +38,6 @@ function SalaryConfigModal({ user, onClose, onSave }: { user: User, onClose: () 
   const [hourly, setHourly] = useState(String(user.hourlyRate ?? 0))
   const [makerRate, setMakerRate] = useState(String(user.commissionRate ?? 0))
   const [salesRate, setSalesRate] = useState(String(user.salesCommissionRate ?? 0))
-  const [referralRate, setReferralRate] = useState(String(user.referralCommissionRate ?? 0))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -52,7 +51,6 @@ function SalaryConfigModal({ user, onClose, onSave }: { user: User, onClose: () 
         hourlyRate: Number(hourly.replace(/\D/g, '') || 0),
         commissionRate: Number(makerRate),
         salesCommissionRate: Number(salesRate),
-        referralCommissionRate: Number(referralRate),
       })
       onClose()
     } catch (e) {
@@ -91,11 +89,10 @@ function SalaryConfigModal({ user, onClose, onSave }: { user: User, onClose: () 
           </label>
         </div>
         <p className="text-xs text-muted-foreground">Đơn giá giờ cũng dùng để tính OT (kể cả người lương cứng).</p>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           {([
-            ['% HH làm SP', makerRate, setMakerRate],
-            ['% HH bán hàng', salesRate, setSalesRate],
-            ['% HH giới thiệu', referralRate, setReferralRate],
+            ['% HH làm đơn', makerRate, setMakerRate],
+            ['% HH sale', salesRate, setSalesRate],
           ] as const).map(([label, value, set]) => (
             <label key={label} className="block text-sm font-medium">
               {label}
@@ -346,7 +343,7 @@ export default function StaffReportsPage() {
                                 {profile.payType === 'HOURLY'
                                   ? `Theo giờ ${formatCurrencyFromNumber(profile.hourlyRate ?? 0)}/h`
                                   : `Lương cứng ${formatCurrencyFromNumber(profile.baseSalary ?? 0)}`}
-                                {` · HH ${profile.commissionRate ?? 0}% / ${profile.salesCommissionRate ?? 0}% / ${profile.referralCommissionRate ?? 0}%`}
+                                {` · HH làm đơn ${profile.commissionRate ?? 0}% · HH sale ${profile.salesCommissionRate ?? 0}%`}
                               </p>
                             )
                           })()}

@@ -155,10 +155,17 @@ export const getTask = async (taskId: string) => {
   return slimTaskPhotos(mapTask(task), { samples: false })
 }
 
-/** Orders received in a Vietnam-day window or matching a search. Florists only
- *  see orders that have a task assigned to them. */
-export const listOrders = async (scope: ListScope, viewer: ListViewer) => {
+/** Orders received in a Vietnam-day window or matching a search, optionally
+ *  narrowed to one person in charge / salesperson ('none' = not set).
+ *  Florists only see orders that have a task assigned to them. */
+export const listOrders = async (
+  scope: ListScope,
+  viewer: ListViewer,
+  filters: { assigneeId?: string | null; salespersonId?: string | null } = {},
+) => {
   const where: Prisma.OrderWhereInput = {}
+  if (filters.assigneeId) where.assigneeId = filters.assigneeId === 'none' ? null : filters.assigneeId
+  if (filters.salespersonId) where.salespersonId = filters.salespersonId === 'none' ? null : filters.salespersonId
   if (scope.kind === 'range') {
     where.receiveTime = { gte: scope.start, lt: scope.end }
   } else {

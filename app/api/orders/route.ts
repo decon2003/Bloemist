@@ -5,12 +5,17 @@ import { requireUser, ORDER_WRITE_ROLES } from '@/lib/server/session'
 import { parseListScope } from '@/lib/server/list-scope'
 import { audit } from '@/lib/server/audit'
 
-// ?from=YYYY-MM-DD&to=YYYY-MM-DD (receive date, Vietnam days) or ?q=search.
+// ?from=YYYY-MM-DD&to=YYYY-MM-DD (receive date, Vietnam days) or ?q=search,
+// plus optional &assigneeId= / &salespersonId= (a user id, or 'none').
 export async function GET(request: Request) {
   try {
     const me = await requireUser(request)
-    const scope = parseListScope(new URL(request.url).searchParams)
-    const orders = await listOrders(scope, me)
+    const params = new URL(request.url).searchParams
+    const scope = parseListScope(params)
+    const orders = await listOrders(scope, me, {
+      assigneeId: params.get('assigneeId'),
+      salespersonId: params.get('salespersonId'),
+    })
     return NextResponse.json(orders.map((order) => redactOrderFor(me, order)))
   } catch (error) {
     return handleRouteError(error)

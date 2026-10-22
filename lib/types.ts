@@ -356,6 +356,9 @@ export interface ListParams {
   to?: string
   q?: string
   orderId?: string
+  /** Orders only: person in charge / salesperson (user id, or 'none' = not set). */
+  assigneeId?: string
+  salespersonId?: string
 }
 
 export interface AuditEntry {

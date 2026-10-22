@@ -23,7 +23,7 @@ type OrderFilter = (typeof orderStatuses)[number]
 
 export default function OrdersPage() {
   const router = useRouter()
-  const { orders, florists, assignOrder, deleteOrder, updateOrder, setOrderScope } = useAppData()
+  const { orders, users, deleteOrder, updateOrder, setOrderScope } = useAppData()
   const { lang, t, getDeliveryLabel, getOrderStatusLabel } = useLocale()
   const { user } = useAuth()
   const { dateFilterMode } = useViewSettings()
@@ -52,7 +52,20 @@ export default function OrdersPage() {
   // Dates and search are applied by the server (florists only get orders with
   // their tasks); only the status tabs filter locally.
   const listParams = useListParams({ mode: dateFilterMode, selectedDate, range: dateRange, query })
-  useEffect(() => setOrderScope(listParams), [listParams, setOrderScope])
+  // Person in charge / salesperson filters ('' = everyone, 'none' = not set),
+  // applied by the server on top of the date or search.
+  const [assigneeFilter, setAssigneeFilter] = useState('')
+  const [salespersonFilter, setSalespersonFilter] = useState('')
+  const scope = useMemo(
+    () => ({
+      ...listParams,
+      ...(assigneeFilter ? { assigneeId: assigneeFilter } : {}),
+      ...(salespersonFilter ? { salespersonId: salespersonFilter } : {}),
+    }),
+    [listParams, assigneeFilter, salespersonFilter],
+  )
+  useEffect(() => setOrderScope(scope), [scope, setOrderScope])
+  const staff = useMemo(() => users.filter((u) => u.status === 'active'), [users])
 
   const filteredOrders = useMemo(
     () => orders.filter((order) => status === 'ALL' || order.status === status),
@@ -160,6 +173,38 @@ export default function OrdersPage() {
         locale={lang === 'vi' ? 'vi-VN' : undefined}
       />
 
+      {user?.role !== 'florist' && (
+        <div className="grid gap-3 rounded-2xl border border-border bg-white/80 p-4 sm:grid-cols-2">
+          <label className="space-y-1 text-sm font-medium text-foreground">
+            <span className="text-xs uppercase tracking-wide text-muted-foreground">Người phụ trách</span>
+            <select
+              value={assigneeFilter}
+              onChange={(e) => setAssigneeFilter(e.target.value)}
+              className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              <option value="">Tất cả</option>
+              <option value="none">Chưa phân công</option>
+              {staff.map((u) => (
+                <option key={u.id} value={u.id}>{u.name}</option>
+              ))}
+            </select>
+          </label>
+          <label className="space-y-1 text-sm font-medium text-foreground">
+            <span className="text-xs uppercase tracking-wide text-muted-foreground">Người sale</span>
+            <select
+              value={salespersonFilter}
+              onChange={(e) => setSalespersonFilter(e.target.value)}
+              className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              <option value="">Tất cả</option>
+              {staff.map((u) => (
+                <option key={u.id} value={u.id}>{u.name}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
+
       {filteredOrders.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border bg-white/70 p-10 text-center text-muted-foreground">
           {t('orders.empty')}
@@ -191,7 +236,17 @@ export default function OrdersPage() {
                       <p className="text-sm text-muted-foreground">{order.customerName}</p>
                     </div>
                   </div>
-                  <div className="grid flex-1 grid-cols-2 gap-4 text-sm md:grid-cols-3 md:text-right">
+                  <div className="grid flex-1 grid-cols-2 gap-4 text-sm md:grid-cols-5 md:text-right">
+                    <div className="text-left md:text-right">
+                      <p className="text-muted-foreground">Phụ trách</p>
+                      <p className={`font-semibold ${order.assigneeName ? 'text-foreground' : 'text-amber-700'}`}>
+                        {order.assigneeName || 'Chưa phân công'}
+                      </p>
+                    </div>
+                    <div className="text-left md:text-right">
+                      <p className="text-muted-foreground">Sale</p>
+                      <p className="font-semibold text-foreground">{order.salespersonName || order.createdByName || '—'}</p>
+                    </div>
                     <div className="text-left md:text-right">
                       <p className="text-muted-foreground">{t('orders.detail.total')}</p>
                       <p className="text-lg font-semibold text-foreground">{formatMoney(order.total)}</p>

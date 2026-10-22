@@ -1,4 +1,4 @@
-import { CreateOrderInput, CreateTaskInput, DashboardStats, Order, Task, TaskStatus, Florist, StaffCheckIn, WorkspaceSettings, User, CustomerPage, CustomerLookup, CustomerSummary, ListParams, BouquetSuggestion, AuditEntry, ShiftCorrectionInput, Payroll, PayrollLineUpdate } from './types'
+import { CreateOrderInput, CreateTaskInput, DashboardStats, Order, Task, TaskStatus, Florist, StaffCheckIn, WorkspaceSettings, User, CustomerPage, CustomerLookup, CustomerSummary, ListParams, OrderSummary, BouquetSuggestion, AuditEntry, ShiftCorrectionInput, Payroll, PayrollLineUpdate } from './types'
 
 export interface AssignTaskPayload {
   userId: string
@@ -15,6 +15,7 @@ export interface ApiClient {
   fetchTasks: (params?: ListParams) => Promise<Task[]>
   fetchTask: (taskId: string) => Promise<Task>
   fetchOrders: (params?: ListParams) => Promise<Order[]>
+  fetchOrderSummary: (params?: ListParams) => Promise<OrderSummary>
   fetchOrder: (orderId: string) => Promise<Order>
   createOrder: (input: CreateOrderInput) => Promise<Order>
   updateOrder: (orderId: string, input: Partial<CreateOrderInput>) => Promise<Order>

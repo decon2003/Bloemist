@@ -14,6 +14,9 @@ type QueryOptions<T> = {
   queryKey: QueryKey
   queryFn: () => Promise<T>
   enabled?: boolean
+  /** Keep showing the previous key's data while a new key loads (no flash
+   *  when a list grows with "Xem thêm"). */
+  keepPreviousData?: boolean
 }
 
 type MutationOptions<TData, TVariables> = {
@@ -104,7 +107,7 @@ const useQueryClient = () => {
   return client
 }
 
-function useQuery<T>({ queryKey, queryFn, enabled = true }: QueryOptions<T>) {
+function useQuery<T>({ queryKey, queryFn, enabled = true, keepPreviousData = false }: QueryOptions<T>) {
   const client = useQueryClient()
   const keyHash = useMemo(() => hashKey(queryKey), [queryKey])
 
@@ -163,7 +166,7 @@ function useQuery<T>({ queryKey, queryFn, enabled = true }: QueryOptions<T>) {
     } else {
       // A new key may still be in flight from the previous one; allow this fetch.
       isFetchingRef.current = false
-      setState({ data: undefined, status: 'pending', error: null })
+      setState((current) => ({ data: keepPreviousData ? current.data : undefined, status: 'pending', error: null }))
       runQuery()
     }
   }, [enabled, keyHash])

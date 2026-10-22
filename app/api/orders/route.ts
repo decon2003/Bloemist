@@ -4,18 +4,16 @@ import { handleRouteError, readJsonBody } from '@/lib/server/route-helpers'
 import { requireUser, ORDER_WRITE_ROLES } from '@/lib/server/session'
 import { parseListScope } from '@/lib/server/list-scope'
 import { audit } from '@/lib/server/audit'
+import { orderFiltersFrom } from './filters'
 
 // ?from=YYYY-MM-DD&to=YYYY-MM-DD (receive date, Vietnam days) or ?q=search,
-// plus optional &assigneeId= / &salespersonId= (a user id, or 'none').
+// plus optional &assigneeId= / &salespersonId= (a user id, or 'none'), &status=
+// and &limit= (rows, for "Xem thêm"). Sales and florists see 30 days of history.
 export async function GET(request: Request) {
   try {
     const me = await requireUser(request)
     const params = new URL(request.url).searchParams
-    const scope = parseListScope(params)
-    const orders = await listOrders(scope, me, {
-      assigneeId: params.get('assigneeId'),
-      salespersonId: params.get('salespersonId'),
-    })
+    const orders = await listOrders(parseListScope(params, me), me, orderFiltersFrom(params))
     return NextResponse.json(orders.map((order) => redactOrderFor(me, order)))
   } catch (error) {
     return handleRouteError(error)

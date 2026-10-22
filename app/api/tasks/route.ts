@@ -12,7 +12,7 @@ export async function GET(request: Request) {
     const me = await requireUser(request)
     const params = new URL(request.url).searchParams
     const orderId = params.get('orderId')
-    const scope = orderId ? { kind: 'order' as const, orderId } : parseListScope(params)
+    const scope = orderId ? { kind: 'order' as const, orderId } : parseListScope(params, me)
     const tasks = await listTasks(scope, { assigneeId: params.get('mine') === '1' ? me.id : undefined })
     return NextResponse.json(tasks)
   } catch (error) {

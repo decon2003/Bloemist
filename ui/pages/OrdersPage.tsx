@@ -4,15 +4,17 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { Search, Filter, Trash2 } from 'lucide-react'
+import { Search, Filter, Trash2, Download } from 'lucide-react'
 import { useAppData } from '@/components/providers/app-data-provider'
 import { useLocale } from '@/components/providers/locale-provider'
 import { useAuth } from '@/components/providers/auth-provider'
 import { DateFilterSwitcher, DateRange } from '@/components/date-filter-switcher'
 import { getDateKey } from '@/lib/date-utils'
 import { useListParams } from '@/lib/use-list-params'
+import { fetchOrderSummary, orderExportUrl } from '@/lib/api'
+import { useQuery } from '@/lib/query-client'
 import type { Order } from '@/lib/types'
-import { formatCurrencyDisplay, formatDateTime } from '@/lib/utils'
+import { formatCurrencyDisplay, formatCurrencyFromNumber, formatDateTime } from '@/lib/utils'
 import { useViewSettings } from '@/components/providers/view-settings-provider'
 import { thumbUrl } from '@/lib/image-compress'
 
@@ -20,6 +22,27 @@ const baseStatuses: Order['status'][] = ['NEW', 'IN_PROGRESS', 'READY', 'DELIVER
 const orderStatuses: Array<'ALL' | Order['status']> = ['ALL', ...baseStatuses]
 
 type OrderFilter = (typeof orderStatuses)[number]
+
+/** Orders loaded per "Xem thêm". */
+const PAGE_SIZE = 50
+/** Sales and florists see this many days of history (the server enforces it). */
+const STAFF_HISTORY_DAYS = 30
+
+const pad = (n: number) => String(n).padStart(2, '0')
+/** First and last day of a calendar month (month is 0-based, may overflow). */
+const monthRange = (year: number, month: number) => {
+  const first = new Date(year, month, 1)
+  const last = new Date(year, month + 1, 0)
+  return {
+    from: `${first.getFullYear()}-${pad(first.getMonth() + 1)}-01`,
+    to: `${last.getFullYear()}-${pad(last.getMonth() + 1)}-${pad(last.getDate())}`,
+  }
+}
+const daysAgoKey = (days: number) => {
+  const d = new Date()
+  d.setDate(d.getDate() - days)
+  return getDateKey(d)
+}
 
 export default function OrdersPage() {
   const router = useRouter()
@@ -56,15 +79,50 @@ export default function OrdersPage() {
   // applied by the server on top of the date or search.
   const [assigneeFilter, setAssigneeFilter] = useState('')
   const [salespersonFilter, setSalespersonFilter] = useState('')
-  const scope = useMemo(
+  const baseScope = useMemo(
     () => ({
       ...listParams,
       ...(assigneeFilter ? { assigneeId: assigneeFilter } : {}),
       ...(salespersonFilter ? { salespersonId: salespersonFilter } : {}),
+      ...(status !== 'ALL' ? { status } : {}),
     }),
-    [listParams, assigneeFilter, salespersonFilter],
+    [listParams, assigneeFilter, salespersonFilter, status],
   )
+  // Pages loaded with "Xem thêm"; back to one page whenever the filters change.
+  const baseKey = JSON.stringify(baseScope)
+  const [paging, setPaging] = useState({ key: baseKey, pages: 1 })
+  const pages = paging.key === baseKey ? paging.pages : 1
+  const limit = PAGE_SIZE * pages
+  const scope = useMemo(() => ({ ...baseScope, limit }), [baseScope, limit])
   useEffect(() => setOrderScope(scope), [scope, setOrderScope])
+
+  const isManager = user?.role === 'boss' || user?.role === 'admin'
+  const now = new Date()
+  const quickRanges = isManager
+    ? [
+        { key: 'thisMonth', label: 'Tháng này', ...monthRange(now.getFullYear(), now.getMonth()) },
+        { key: 'lastMonth', label: 'Tháng trước', ...monthRange(now.getFullYear(), now.getMonth() - 1) },
+      ]
+    : [
+        { key: 'last7', label: '7 ngày qua', from: daysAgoKey(6), to: daysAgoKey(0) },
+        { key: 'last30', label: '30 ngày qua', from: daysAgoKey(STAFF_HISTORY_DAYS), to: daysAgoKey(0) },
+      ]
+  const pickedMonth = (() => {
+    const m = /^(\d{4})-(\d{2})-01$/.exec(dateRange.from)
+    if (!m) return ''
+    const r = monthRange(Number(m[1]), Number(m[2]) - 1)
+    return r.to === dateRange.to ? `${m[1]}-${m[2]}` : ''
+  })()
+
+  // Totals for the whole period (not just the loaded pages), managers only.
+  const showSummary = isManager && !listParams.q
+  const summaryQuery = useQuery({
+    queryKey: ['order-summary', baseScope],
+    queryFn: () => fetchOrderSummary(baseScope),
+    enabled: showSummary,
+    keepPreviousData: true,
+  })
+  const summary = showSummary ? summaryQuery.data : undefined
   const staff = useMemo(() => users.filter((u) => u.status === 'active'), [users])
 
   const filteredOrders = useMemo(
@@ -119,7 +177,7 @@ export default function OrdersPage() {
             </div>
             <div className="flex items-center gap-2 rounded-2xl border border-border bg-white px-3 py-2 text-sm text-muted-foreground">
               <Filter className="h-4 w-4" />
-              {filteredOrders.length} active
+              {filteredOrders.length}{summary && status === 'ALL' && orders.length >= limit ? `/${summary.count + summary.cancelled}` : ''} đơn
             </div>
           </div>
         </div>
@@ -176,6 +234,24 @@ export default function OrdersPage() {
         todayLabel={t('tasks.dateLabels.today', 'Today')}
         weekDayLabels={weekDayLabels}
         locale={lang === 'vi' ? 'vi-VN' : undefined}
+        extraQuickOptions={quickRanges}
+        minDate={isManager ? undefined : daysAgoKey(STAFF_HISTORY_DAYS)}
+        quickTrailing={
+          isManager ? (
+            <label className="inline-flex items-center gap-2 rounded-full border border-border bg-white px-3 py-1 text-xs font-semibold text-foreground">
+              <span>Chọn tháng</span>
+              <input
+                type="month"
+                value={pickedMonth}
+                onChange={(e) => {
+                  const m = /^(\d{4})-(\d{2})$/.exec(e.target.value)
+                  if (m) setDateRange(monthRange(Number(m[1]), Number(m[2]) - 1))
+                }}
+                className="bg-transparent text-xs focus:outline-none"
+              />
+            </label>
+          ) : undefined
+        }
         extraFields={
           user?.role !== 'florist' ? (
             <>
@@ -211,6 +287,34 @@ export default function OrdersPage() {
         }
       />
 
+
+      {summary && (
+        <div className="flex flex-wrap items-center gap-x-8 gap-y-3 rounded-2xl border border-border bg-white/80 px-5 py-4 text-sm">
+          <div>
+            <p className="text-muted-foreground">Số đơn</p>
+            <p className="text-lg font-semibold text-foreground">{summary.count}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Doanh thu</p>
+            <p className="text-lg font-semibold text-foreground">{formatCurrencyFromNumber(summary.revenue)}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Đã huỷ</p>
+            <p className="text-lg font-semibold text-foreground">{summary.cancelled}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Quá hạn chưa xong</p>
+            <p className={`text-lg font-semibold ${summary.overdue ? 'text-red-700' : 'text-foreground'}`}>{summary.overdue}</p>
+          </div>
+          <p className="text-xs text-muted-foreground">Theo ngày nhận trong khoảng đã chọn, không tính đơn huỷ</p>
+          <a
+            href={orderExportUrl(baseScope)}
+            className="ml-auto inline-flex items-center gap-2 rounded-xl border border-border bg-white px-3 py-2 text-sm font-medium text-foreground hover:bg-muted"
+          >
+            <Download className="h-4 w-4" /> Xuất CSV
+          </a>
+        </div>
+      )}
 
       {filteredOrders.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border bg-white/70 p-10 text-center text-muted-foreground">
@@ -310,6 +414,15 @@ export default function OrdersPage() {
               </div>
             )
           })}
+          {orders.length >= limit && (
+            <button
+              type="button"
+              onClick={() => setPaging({ key: baseKey, pages: pages + 1 })}
+              className="mx-auto rounded-full border border-border bg-white px-6 py-2 text-sm font-semibold text-foreground hover:bg-muted"
+            >
+              Xem thêm
+            </button>
+          )}
         </div>
       )}
     </div>

@@ -108,6 +108,7 @@ const AppDataContextProvider = ({ children }: { children: React.ReactNode }) => 
     queryKey: ['orders', orderScope],
     queryFn: () => fetchOrders(orderScope ?? undefined),
     enabled: dataNeeds.orders && orderScope !== null,
+    keepPreviousData: true,
   })
   const floristsQuery = useQuery({ queryKey: ['florists'], queryFn: fetchFlorists, enabled: dataNeeds.florists })
   const checkinsQuery = useQuery({

@@ -359,6 +359,19 @@ export interface ListParams {
   /** Orders only: person in charge / salesperson (user id, or 'none' = not set). */
   assigneeId?: string
   salespersonId?: string
+  /** Orders only: one status. */
+  status?: string
+  /** Rows wanted - grows by a page with "Xem thêm". */
+  limit?: number
+}
+
+/** Totals for a period on the Orders page (managers). */
+export interface OrderSummary {
+  count: number
+  revenue: number
+  cancelled: number
+  overdue: number
+  byStatus: Record<string, number>
 }
 
 export interface AuditEntry {

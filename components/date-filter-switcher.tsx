@@ -25,6 +25,12 @@ interface DateFilterSwitcherProps {
   locale?: string
   /** More filter fields shown on the same row as the from/to dates. */
   extraFields?: React.ReactNode
+  /** More quick ranges after the built-in ones (e.g. "Tháng này"). */
+  extraQuickOptions?: Array<{ key: string; label: string; from: string; to: string }>
+  /** Shown at the end of the quick-range row (e.g. a month picker). */
+  quickTrailing?: React.ReactNode
+  /** Earliest pickable day (YYYY-MM-DD). */
+  minDate?: string
 }
 
 const getOffsetDateKey = (daysFromToday: number) => {
@@ -50,6 +56,9 @@ export function DateFilterSwitcher({
   locale,
   showModeToggle = true,
   extraFields,
+  extraQuickOptions = [],
+  quickTrailing,
+  minDate,
 }: DateFilterSwitcherProps) {
   const quickOptions = [
     { key: 'today', from: getOffsetDateKey(0), to: getOffsetDateKey(0), label: quickLabels.today },
@@ -57,6 +66,7 @@ export function DateFilterSwitcher({
     { key: 'dayAfter', from: getOffsetDateKey(2), to: getOffsetDateKey(2), label: quickLabels.dayAfter },
     { key: 'threeDays', from: getOffsetDateKey(3), to: getOffsetDateKey(3), label: quickLabels.threeDays },
     { key: 'allDays', from: '', to: '', label: quickLabels.allDays },
+    ...extraQuickOptions,
   ]
 
   const allowModeChange = showModeToggle
@@ -132,6 +142,7 @@ export function DateFilterSwitcher({
                 {option.label}
               </button>
             ))}
+            {quickTrailing}
           </div>
           <div className={`grid gap-3 md:grid-cols-2 ${extraFields ? 'lg:grid-cols-4' : ''}`}>
             <label className="space-y-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -139,6 +150,7 @@ export function DateFilterSwitcher({
               <input
                 type="date"
                 value={range.from}
+                min={minDate}
                 onChange={(event) => handleRangeChange({ from: event.target.value })}
                 className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
               />
@@ -148,7 +160,7 @@ export function DateFilterSwitcher({
               <input
                 type="date"
                 value={range.to}
-                min={range.from || undefined}
+                min={range.from || minDate || undefined}
                 onChange={(event) => handleRangeChange({ to: event.target.value })}
                 className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
               />

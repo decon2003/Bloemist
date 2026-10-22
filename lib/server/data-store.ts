@@ -8,7 +8,7 @@ import type { CreateOrderInput, CreateTaskInput, Florist, Order, Task, TaskStatu
 import { ApiError } from './api-error'
 import { storePhoto } from './storage'
 import { computeOrderTotals, parseCurrencyToNumber, toVatPercent, toVnd, type OrderMoneyInput } from './money'
-import { addVnDays, startOfVnMonth, vnDateKey } from './vn-time'
+import { addVnDays, startOfVnDay, startOfVnMonth, vnDateKey } from './vn-time'
 import { LIST_LIMIT, SEARCH_LIMIT, type ListScope } from './list-scope'
 import type { Prisma } from '@prisma/client'
 import { linkCustomer, normalizeCustomerPhone, orderSearchWhere } from './customers'
@@ -115,6 +115,7 @@ export const listTasks = async (
       { orderCode: { contains: scope.q, mode: 'insensitive' } },
       { order: await orderSearchWhere(scope.q) },
     ]
+    if (scope.since) where.dueTime = { gte: scope.since }
   }
   if (options.assigneeId) where.assigneeId = options.assigneeId
 
@@ -156,39 +157,106 @@ export const getTask = async (taskId: string) => {
 /** Orders not yet finished - counted as "Đơn chưa hoàn thành" on the dashboard. */
 const OPEN_ORDER_STATUSES = ['NEW', 'IN_PROGRESS'] as const
 
-/** Orders received in a Vietnam-day window or matching a search, optionally
- *  narrowed to one person in charge / salesperson ('none' = not set).
- *  Florists only see orders that have a task assigned to them. */
-export const listOrders = async (
+export type OrderListFilters = {
+  assigneeId?: string | null
+  salespersonId?: string | null
+  status?: string | null
+}
+
+/** Shared by the list, its summary and the CSV export. `withOverdue`: a window
+ *  that includes today also carries unfinished orders whose receive day has
+ *  passed, so they never drop out of sight (the list only - totals for a
+ *  period count that period alone). */
+const orderListWhere = async (
   scope: ListScope,
   viewer: ListViewer,
-  filters: { assigneeId?: string | null; salespersonId?: string | null } = {},
+  filters: OrderListFilters,
+  { withOverdue }: { withOverdue: boolean },
 ) => {
   const where: Prisma.OrderWhereInput = {}
   if (filters.assigneeId) where.assigneeId = filters.assigneeId === 'none' ? null : filters.assigneeId
   if (filters.salespersonId) where.salespersonId = filters.salespersonId === 'none' ? null : filters.salespersonId
+  if (filters.status) where.status = filters.status
   if (scope.kind === 'range') {
     const window = { receiveTime: { gte: scope.start, lt: scope.end } }
-    // A window that includes today also carries unfinished orders whose
-    // receive day has passed, so they never drop out of sight.
     const now = new Date()
-    where.OR = scope.start <= now && now < scope.end
+    where.OR = withOverdue && scope.start <= now && now < scope.end
       ? [window, { status: { in: [...OPEN_ORDER_STATUSES] }, receiveTime: { lt: scope.start } }]
       : [window]
   } else {
     Object.assign(where, await orderSearchWhere(scope.q))
+    // Staff history limit; their unfinished orders stay findable.
+    if (scope.since) {
+      where.AND = [{ OR: [{ receiveTime: { gte: scope.since } }, { status: { in: [...OPEN_ORDER_STATUSES] } }] }]
+    }
   }
   if (viewer.role === 'florist') where.tasks = { some: { assigneeId: viewer.id } }
+  return where
+}
 
+/** Orders received in a Vietnam-day window or matching a search, optionally
+ *  narrowed to one person in charge / salesperson ('none' = not set) or a
+ *  status. Florists only see orders that have a task assigned to them. */
+export const listOrders = async (scope: ListScope, viewer: ListViewer, filters: OrderListFilters = {}) => {
+  const where = await orderListWhere(scope, viewer, filters, { withOverdue: true })
   const orders = await db.order.findMany({
     where,
-    orderBy: scope.kind === 'search' ? { createdAt: 'desc' } : { receiveTime: 'asc' },
-    take: scope.kind === 'search' ? SEARCH_LIMIT : LIST_LIMIT,
+    orderBy: scope.kind === 'search' ? { createdAt: 'desc' } : [{ receiveTime: 'asc' }, { code: 'asc' }],
+    take: Math.min(scope.limit ?? LIST_LIMIT, scope.kind === 'search' ? SEARCH_LIMIT : LIST_LIMIT),
   })
   return orders.map(o => slimOrderPhotos({
     ...mapOrder(o),
     receiveTime: o.receiveTime.toISOString()
   }))
+}
+
+/** Totals for a period on the Orders page (managers): the whole period, not
+ *  just the rows loaded so far. Revenue excludes cancelled orders. */
+export const summarizeOrders = async (scope: ListScope, viewer: ListViewer, filters: OrderListFilters = {}) => {
+  const where = await orderListWhere(scope, viewer, filters, { withOverdue: false })
+  const [groups, overdue] = await Promise.all([
+    db.order.groupBy({ by: ['status'], where, _count: { _all: true }, _sum: { total: true } }),
+    db.order.count({
+      where: { AND: [where, { status: { in: [...OPEN_ORDER_STATUSES] }, receiveTime: { lt: startOfVnDay(new Date()) } }] },
+    }),
+  ])
+  const byStatus = Object.fromEntries(groups.map((g) => [g.status, g._count._all]))
+  const live = groups.filter((g) => !REVENUE_EXCLUDED_STATUSES.includes(g.status))
+  return {
+    count: live.reduce((sum, g) => sum + g._count._all, 0),
+    revenue: live.reduce((sum, g) => sum + (g._sum.total ?? 0), 0),
+    cancelled: byStatus.CANCELLED ?? 0,
+    overdue,
+    byStatus,
+  }
+}
+
+const EXPORT_LIMIT = 10_000
+const csvCell = (value: unknown) => {
+  const text = value === null || value === undefined ? '' : String(value)
+  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
+}
+
+/** Orders for a period as CSV (Excel opens it thanks to the BOM). */
+export const exportOrdersCsv = async (scope: ListScope, viewer: ListViewer, filters: OrderListFilters = {}) => {
+  const where = await orderListWhere(scope, viewer, filters, { withOverdue: false })
+  const orders = await db.order.findMany({
+    where,
+    orderBy: [{ receiveTime: 'asc' }, { code: 'asc' }],
+    take: EXPORT_LIMIT,
+  })
+  const vnTime = (d: Date) => {
+    const local = new Date(d.getTime() + 7 * 3_600_000).toISOString()
+    return `${local.slice(0, 10)} ${local.slice(11, 16)}`
+  }
+  const header = ['Mã đơn', 'Ngày giờ nhận', 'Trạng thái', 'Người tặng', 'SĐT người tặng', 'Người nhận', 'SĐT người nhận',
+    'Sản phẩm', 'Giao nhận', 'Địa chỉ', 'Tổng tiền', 'Phụ trách', 'Sale', 'Người tạo', 'Ngày tạo', 'Ghi chú']
+  const rows = orders.map((o) => [
+    o.code, vnTime(o.receiveTime), o.status, o.customerName, o.customerPhone, o.receiverName, o.receiverPhone,
+    o.bouquetName, o.deliveryType, o.deliveryAddress, o.total, o.assigneeName, o.salespersonName ?? o.createdByName,
+    o.createdByName, vnTime(o.createdAt), o.notes,
+  ])
+  return '﻿' + [header, ...rows].map((r) => r.map(csvCell).join(',')).join('\r\n')
 }
 
 export const getOrder = async (orderId: string) => {

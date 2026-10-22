@@ -9,7 +9,7 @@ import { useAuth } from '@/components/providers/auth-provider'
 import { PhotoViewer } from '@/components/photo-viewer'
 import { fetchBouquets, lookupCustomer, uploadPhoto } from '@/lib/api'
 import type { BouquetSuggestion, CustomerLookup } from '@/lib/types'
-import { formatCurrencyFromNumber, formatCurrencyInput, parseCurrencyToNumber } from '@/lib/utils'
+import { formatCurrencyFromNumber, formatCurrencyInput, parseCurrencyToNumber, toDateTimeLocalValue } from '@/lib/utils'
 import { thumbUrl } from '@/lib/image-compress'
 
 
@@ -43,7 +43,7 @@ export default function NewOrderPage() {
   const [deposit, setDeposit] = useState('')
   const [deliveryType, setDeliveryType] = useState<'DELIVERY' | 'PICKUP'>('DELIVERY')
   const [deliveryAddress, setDeliveryAddress] = useState('')
-  const [receiveTime, setReceiveTime] = useState(() => new Date().toISOString().slice(0, 16))
+  const [receiveTime, setReceiveTime] = useState(() => toDateTimeLocalValue(new Date()))
   const [notes, setNotes] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [products, setProducts] = useState<ProductForm[]>([

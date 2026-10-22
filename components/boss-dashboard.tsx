@@ -75,7 +75,7 @@ export default function BossDashboard() {
         {/* Revenue */}
         <div className="rounded-2xl border border-border bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
-            <span className="text-sm font-medium text-muted-foreground uppercase">{t('dashboard.kpis.revenue', 'Monthly Revenue')}</span>
+            <span className="text-sm font-medium text-muted-foreground uppercase">{t('dashboard.kpis.revenue', 'Doanh thu tháng')}</span>
             <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center text-green-600">
               <DollarSign className="h-4 w-4" />
             </div>
@@ -84,14 +84,14 @@ export default function BossDashboard() {
             {formatCurrencyFromNumber(kpis.revenue)}
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            {kpis.orders} {t('dashboard.orders', 'orders this month')}
+            {kpis.orders} đơn tạo trong tháng {today.getMonth() + 1} (không tính đơn huỷ)
           </p>
         </div>
 
         {/* Active Orders */}
         <div className="rounded-2xl border border-border bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
-            <span className="text-sm font-medium text-muted-foreground uppercase">{t('dashboard.kpis.active', 'Active Orders')}</span>
+            <span className="text-sm font-medium text-muted-foreground uppercase">{t('dashboard.kpis.active', 'Đơn chưa hoàn thành')}</span>
             <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
               <Clock className="h-4 w-4" />
             </div>
@@ -100,14 +100,14 @@ export default function BossDashboard() {
             {kpis.active}
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            {t('dashboard.processing', 'Need attention')}
+            Đơn Mới + Đang xử lý ở mọi ngày nhận, kể cả ngày đã qua chưa chuyển &quot;Đã giao&quot;
           </p>
         </div>
 
         {/* Total Products/Tasks */}
         <div className="rounded-2xl border border-border bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
-            <span className="text-sm font-medium text-muted-foreground uppercase">{t('dashboard.kpis.products', 'Total Products')}</span>
+            <span className="text-sm font-medium text-muted-foreground uppercase">{t('dashboard.kpis.products', 'Sản phẩm trong tháng')}</span>
             <div className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-600">
               <Package className="h-4 w-4" />
             </div>
@@ -116,7 +116,7 @@ export default function BossDashboard() {
             {kpis.tasks}
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            {t('dashboard.createdThisMonth', 'Created this month')}
+            Sản phẩm (công việc) tạo trong tháng {today.getMonth() + 1}
           </p>
         </div>
       </div>

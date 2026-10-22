@@ -9,6 +9,7 @@ import { useLocale } from '@/components/providers/locale-provider'
 import { uploadPhoto } from '@/lib/api'
 import { PhotoViewer } from '@/components/photo-viewer'
 import { thumbUrl } from '@/lib/image-compress'
+import { toDateTimeLocalValue } from '@/lib/utils'
 
 interface AddTaskDialogProps {
   open: boolean
@@ -30,7 +31,7 @@ export default function AddTaskDialog({
   const { lang, t } = useLocale()
   const [selectedOrderId, setSelectedOrderId] = useState('')
   const [selectedFloristId, setSelectedFloristId] = useState('')
-  const [dueTime, setDueTime] = useState(new Date().toISOString().slice(0, 16))
+  const [dueTime, setDueTime] = useState(toDateTimeLocalValue(new Date()))
   const [notes, setNotes] = useState('')
   const [taskTitle, setTaskTitle] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -146,7 +147,7 @@ export default function AddTaskDialog({
       setOrderQuery('')
     }
     setSelectedFloristId(defaultFlorist?.id ?? '')
-    setDueTime(new Date().toISOString().slice(0, 16))
+    setDueTime(toDateTimeLocalValue(new Date()))
     setNotes('')
     setTaskType('CAM_HOA')
     setQuantity(1)

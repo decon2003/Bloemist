@@ -365,15 +365,6 @@ export interface ListParams {
   limit?: number
 }
 
-/** Totals for a period on the Orders page (managers). */
-export interface OrderSummary {
-  count: number
-  revenue: number
-  cancelled: number
-  overdue: number
-  byStatus: Record<string, number>
-}
-
 export interface AuditEntry {
   id: string
   at: string

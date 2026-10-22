@@ -1,7 +1,7 @@
 // ============================================================
 // API Layer - Calls Real Backend API Routes
 // ============================================================
-import type { AuditEntry, BouquetSuggestion, Payroll, PayrollLineUpdate, ShiftCorrectionInput, CreateOrderInput, CreateTaskInput, CustomerLookup, ListParams, CustomerPage, CustomerSummary, DashboardStats, OrderSummary, Order, Task, TaskStatus, Florist, User, StaffCheckIn, WorkspaceSettings } from './types'
+import type { AuditEntry, BouquetSuggestion, Payroll, PayrollLineUpdate, ShiftCorrectionInput, CreateOrderInput, CreateTaskInput, CustomerLookup, ListParams, CustomerPage, CustomerSummary, DashboardStats, Order, Task, TaskStatus, Florist, User, StaffCheckIn, WorkspaceSettings } from './types'
 import type { ApiClient, AssignTaskPayload, CompleteTaskPayload } from './api.types'
 import { compressImage, makeThumbnail } from './image-compress'
 
@@ -99,7 +99,6 @@ const apiClient: ApiClient = {
 
   // Orders
   fetchOrders: (params?: ListParams) => request<Order[]>(`/orders${toQuery(params)}`),
-  fetchOrderSummary: (params?: ListParams) => request<OrderSummary>(`/orders/summary${toQuery(params)}`),
   fetchOrder: (orderId) => request<Order>(`/orders/${orderId}`),
   createOrder: (input) => request<Order>('/orders', { method: 'POST', body: JSON.stringify(input) }),
   updateOrder: (orderId, input) => request<Order>(`/orders/${orderId}`, { method: 'PATCH', body: JSON.stringify(input) }),
@@ -137,9 +136,6 @@ const apiClient: ApiClient = {
 export const fetchTasks = apiClient.fetchTasks
 export const fetchTask = apiClient.fetchTask
 export const fetchOrders = apiClient.fetchOrders
-export const fetchOrderSummary = apiClient.fetchOrderSummary
-/** URL of the CSV export for the same filters as the list. */
-export const orderExportUrl = (params?: ListParams) => `${API_BASE_URL}/orders/export${toQuery(params)}`
 export const fetchOrder = apiClient.fetchOrder
 export const createOrder = apiClient.createOrder
 export const updateOrder = apiClient.updateOrder

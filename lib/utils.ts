@@ -100,7 +100,7 @@ export function calculateDistanceKm(
 export function formatCurrencyInput(value: string) {
   const digitsOnly = value.replace(/\D/g, '')
   if (!digitsOnly) return ''
-  return Number(digitsOnly).toLocaleString('en-US')
+  return Number(digitsOnly).toLocaleString('vi-VN')
 }
 
 // Keep in sync with parseCurrencyToNumber in lib/server/data-store.ts.

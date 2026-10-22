@@ -35,9 +35,9 @@ export default function NewOrderPage() {
   const [receiverName, setReceiverName] = useState('')
   const [receiverPhone, setReceiverPhone] = useState('')
   const [referrerId, setReferrerId] = useState('')
-  const [discount, setDiscount] = useState('')
   const [deliveryFee, setDeliveryFee] = useState('')
-  const [deliveryCoveredByShop, setDeliveryCoveredByShop] = useState(false)
+  // Freeship: the customer pays no delivery fee (stored as deliveryCoveredByShop).
+  const [freeship, setFreeship] = useState(false)
   const [vatPercent, setVatPercent] = useState<number>(10)
   const [deposit, setDeposit] = useState('')
   const [deliveryType, setDeliveryType] = useState<'DELIVERY' | 'PICKUP'>('DELIVERY')
@@ -106,15 +106,14 @@ export default function NewOrderPage() {
     formattedRemainingBalance,
   } = useMemo(() => {
     const listedAmount = parseCurrencyToNumber(listedPrice)
-    const discountAmount = parseCurrencyToNumber(discount)
     const deliveryAmount = parseCurrencyToNumber(deliveryFee)
     const depositAmount = parseCurrencyToNumber(deposit)
     const vatRate = Number.isFinite(vatPercent) ? vatPercent : 0
 
-    const basePriceValue = Math.max(listedAmount - discountAmount, 0)
+    const basePriceValue = listedAmount
     const vatAmount = Math.round((basePriceValue * vatRate) / 100)
     const sellingPriceValue = basePriceValue + vatAmount
-    const deliveryChargeValue = deliveryCoveredByShop ? 0 : deliveryAmount
+    const deliveryChargeValue = deliveryType !== 'DELIVERY' || freeship ? 0 : deliveryAmount
     const orderTotalValue = sellingPriceValue + deliveryChargeValue
     const remainingBalanceValue = Math.max(orderTotalValue - depositAmount, 0)
 
@@ -123,7 +122,7 @@ export default function NewOrderPage() {
       formattedOrderTotal: formatCurrencyFromNumber(orderTotalValue),
       formattedRemainingBalance: formatCurrencyFromNumber(remainingBalanceValue),
     }
-  }, [deliveryCoveredByShop, deliveryFee, deposit, discount, listedPrice, vatPercent])
+  }, [deliveryType, freeship, deliveryFee, deposit, listedPrice, vatPercent])
 
   // Names (and latest photo) of bouquets on recent orders, for suggestions.
   const [bouquetSuggestions, setBouquetSuggestions] = useState<BouquetSuggestion[]>([])
@@ -235,9 +234,8 @@ export default function NewOrderPage() {
         receiveTime: new Date(receiveTime).toISOString(),
         status: assigneeId ? 'IN_PROGRESS' : 'NEW',
         listedPrice,
-        discount,
-        deliveryFee,
-        deliveryCoveredByShop,
+        deliveryFee: deliveryType === 'DELIVERY' && !freeship ? deliveryFee : undefined,
+        deliveryCoveredByShop: deliveryType === 'DELIVERY' && freeship,
         vatPercent,
         deposit,
         // Selling price, total and remaining balance are recomputed by the server.
@@ -626,45 +624,6 @@ export default function NewOrderPage() {
                 />
               </label>
               <label className="space-y-2 text-sm font-medium text-foreground">
-                <span>{t('orders.new.discount', 'Discount')}</span>
-                <input
-                  inputMode="numeric"
-                  value={discount}
-                  onChange={(event) => setDiscount(formatCurrencyInput(event.target.value))}
-                  className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </label>
-              <label className="space-y-2 text-sm font-medium text-foreground">
-                <span>{t('orders.new.deliveryFee', 'Delivery fee')}</span>
-                <input
-                  inputMode="numeric"
-                  value={deliveryFee}
-                  onChange={(event) => setDeliveryFee(formatCurrencyInput(event.target.value))}
-                  className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </label>
-              <div className="space-y-2 text-sm font-medium text-foreground">
-                <span>{t('orders.new.deliveryCoveredByShop', 'Delivery covered by shop?')}</span>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setDeliveryCoveredByShop(false)}
-                    className={`flex-1 rounded-xl border px-3 py-2 text-sm font-semibold transition ${!deliveryCoveredByShop ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-white text-foreground'
-                      }`}
-                  >
-                    {t('orders.new.deliveryCustomerPays', 'Customer pays')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDeliveryCoveredByShop(true)}
-                    className={`flex-1 rounded-xl border px-3 py-2 text-sm font-semibold transition ${deliveryCoveredByShop ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-white text-foreground'
-                      }`}
-                  >
-                    {t('orders.new.deliveryShopCovers', 'Shop covers')}
-                  </button>
-                </div>
-              </div>
-              <label className="space-y-2 text-sm font-medium text-foreground">
                 <span>{t('orders.new.vatPercent', 'VAT %')}</span>
                 <select
                   value={vatPercent}
@@ -678,6 +637,23 @@ export default function NewOrderPage() {
                   ))}
                 </select>
               </label>
+              {deliveryType === 'DELIVERY' && (
+                <div className="space-y-2 text-sm font-medium text-foreground">
+                  <span>{t('orders.new.deliveryFee', 'Delivery fee')}</span>
+                  <input
+                    inputMode="numeric"
+                    value={freeship ? '' : deliveryFee}
+                    disabled={freeship}
+                    placeholder={freeship ? 'Miễn phí giao hàng' : ''}
+                    onChange={(event) => setDeliveryFee(formatCurrencyInput(event.target.value))}
+                    className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-muted/50"
+                  />
+                  <label className="flex items-center gap-2 font-normal">
+                    <input type="checkbox" checked={freeship} onChange={(event) => setFreeship(event.target.checked)} />
+                    Freeship (khách không trả phí giao)
+                  </label>
+                </div>
+              )}
               <label className="space-y-2 text-sm font-medium text-foreground">
                 <span>{t('orders.new.deposit', 'Deposit')}</span>
                 <input
@@ -689,31 +665,12 @@ export default function NewOrderPage() {
               </label>
             </div>
 
-            <div className="grid gap-3 md:grid-cols-3">
-              <label className="space-y-2 text-sm font-medium text-foreground">
-                <span>{t('orders.new.sellingPrice', 'Selling price')}</span>
-                <input
-                  readOnly
-                  value={formattedSellingPrice}
-                  className="w-full cursor-not-allowed rounded-xl border border-border bg-muted px-3 py-2 text-sm text-foreground"
-                />
-              </label>
-              <label className="space-y-2 text-sm font-medium text-foreground">
-                <span>{t('orders.new.orderTotalValue', 'Order total value')}</span>
-                <input
-                  readOnly
-                  value={formattedOrderTotal}
-                  className="w-full cursor-not-allowed rounded-xl border border-border bg-muted px-3 py-2 text-sm text-foreground"
-                />
-              </label>
-              <label className="space-y-2 text-sm font-medium text-foreground">
-                <span>{t('orders.new.remainingBalance', 'Remaining to pay')}</span>
-                <input
-                  readOnly
-                  value={formattedRemainingBalance}
-                  className="w-full cursor-not-allowed rounded-xl border border-border bg-muted px-3 py-2 text-sm text-foreground"
-                />
-              </label>
+            <div className="flex flex-col items-end gap-1 rounded-xl bg-muted/60 px-4 py-3">
+              <span className="text-sm text-muted-foreground">Tổng tiền</span>
+              <span className="text-2xl font-bold text-foreground">{formattedOrderTotal}</span>
+              {parseCurrencyToNumber(deposit) > 0 && (
+                <span className="text-sm text-muted-foreground">Còn phải thu: {formattedRemainingBalance}</span>
+              )}
             </div>
           </section>
 

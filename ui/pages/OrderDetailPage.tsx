@@ -327,10 +327,13 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
               <dt className="text-muted-foreground">{t('orders.detail.listedPrice', 'Listed price')}</dt>
               <dd className="text-lg font-semibold text-foreground">{formatMoney(order.listedPrice, '—')}</dd>
             </div>
-            <div>
-              <dt className="text-muted-foreground">{t('orders.detail.discount', 'Discount')}</dt>
-              <dd className="text-lg font-semibold text-foreground">{formatMoney(order.discount)}</dd>
-            </div>
+            {/* New orders have no discount field; only older orders may carry one. */}
+            {(order.discount ?? 0) > 0 && (
+              <div>
+                <dt className="text-muted-foreground">{t('orders.detail.discount', 'Discount')}</dt>
+                <dd className="text-lg font-semibold text-foreground">{formatMoney(order.discount)}</dd>
+              </div>
+            )}
             <div>
               <dt className="text-muted-foreground">{t('orders.detail.vatPercent', 'VAT')}</dt>
               <dd className="text-lg font-semibold text-foreground">{order.vatPercent ?? 0}%</dd>
@@ -338,12 +341,7 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
             <div>
               <dt className="text-muted-foreground">{t('orders.detail.deliveryFee', 'Delivery fee')}</dt>
               <dd className="text-lg font-semibold text-foreground">
-                {formatMoney(order.deliveryFee)}
-                <span className="ml-2 text-xs font-medium text-muted-foreground">
-                  {order.deliveryCoveredByShop
-                    ? t('orders.detail.deliveryCovered', 'Covered by shop')
-                    : t('orders.detail.deliveryCharged', 'Charged to customer')}
-                </span>
+                {order.deliveryCoveredByShop ? 'Freeship' : order.deliveryType === 'DELIVERY' ? formatMoney(order.deliveryFee) : '—'}
               </dd>
             </div>
             <div>

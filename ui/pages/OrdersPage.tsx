@@ -171,39 +171,41 @@ export default function OrdersPage() {
         todayLabel={t('tasks.dateLabels.today', 'Today')}
         weekDayLabels={weekDayLabels}
         locale={lang === 'vi' ? 'vi-VN' : undefined}
+        extraFields={
+          user?.role !== 'florist' ? (
+            <>
+              <label className="space-y-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <span>Người phụ trách</span>
+                <select
+                  value={assigneeFilter}
+                  onChange={(e) => setAssigneeFilter(e.target.value)}
+                  className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm font-normal normal-case tracking-normal text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="">Tất cả</option>
+                  <option value="none">Chưa phân công</option>
+                  {staff.map((u) => (
+                    <option key={u.id} value={u.id}>{u.name}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="space-y-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <span>Người sale</span>
+                <select
+                  value={salespersonFilter}
+                  onChange={(e) => setSalespersonFilter(e.target.value)}
+                  className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm font-normal normal-case tracking-normal text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="">Tất cả</option>
+                  {staff.map((u) => (
+                    <option key={u.id} value={u.id}>{u.name}</option>
+                  ))}
+                </select>
+              </label>
+            </>
+          ) : undefined
+        }
       />
 
-      {user?.role !== 'florist' && (
-        <div className="grid gap-3 rounded-2xl border border-border bg-white/80 p-4 sm:grid-cols-2">
-          <label className="space-y-1 text-sm font-medium text-foreground">
-            <span className="text-xs uppercase tracking-wide text-muted-foreground">Người phụ trách</span>
-            <select
-              value={assigneeFilter}
-              onChange={(e) => setAssigneeFilter(e.target.value)}
-              className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            >
-              <option value="">Tất cả</option>
-              <option value="none">Chưa phân công</option>
-              {staff.map((u) => (
-                <option key={u.id} value={u.id}>{u.name}</option>
-              ))}
-            </select>
-          </label>
-          <label className="space-y-1 text-sm font-medium text-foreground">
-            <span className="text-xs uppercase tracking-wide text-muted-foreground">Người sale</span>
-            <select
-              value={salespersonFilter}
-              onChange={(e) => setSalespersonFilter(e.target.value)}
-              className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            >
-              <option value="">Tất cả</option>
-              {staff.map((u) => (
-                <option key={u.id} value={u.id}>{u.name}</option>
-              ))}
-            </select>
-          </label>
-        </div>
-      )}
 
       {filteredOrders.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border bg-white/70 p-10 text-center text-muted-foreground">

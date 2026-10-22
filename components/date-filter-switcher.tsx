@@ -23,6 +23,8 @@ interface DateFilterSwitcherProps {
   todayLabel?: string
   weekDayLabels?: string[]
   locale?: string
+  /** More filter fields shown on the same row as the from/to dates. */
+  extraFields?: React.ReactNode
 }
 
 const getOffsetDateKey = (daysFromToday: number) => {
@@ -47,6 +49,7 @@ export function DateFilterSwitcher({
   weekDayLabels,
   locale,
   showModeToggle = true,
+  extraFields,
 }: DateFilterSwitcherProps) {
   const quickOptions = [
     { key: 'today', from: getOffsetDateKey(0), to: getOffsetDateKey(0), label: quickLabels.today },
@@ -130,7 +133,7 @@ export function DateFilterSwitcher({
               </button>
             ))}
           </div>
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className={`grid gap-3 md:grid-cols-2 ${extraFields ? 'lg:grid-cols-4' : ''}`}>
             <label className="space-y-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               <span>{rangeLabels.from}</span>
               <input
@@ -150,6 +153,7 @@ export function DateFilterSwitcher({
                 className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
               />
             </label>
+            {extraFields}
           </div>
         </div>
       ) : (

@@ -7,8 +7,9 @@ import { toVnd } from '@/lib/server/money'
 import { MANAGER_ROLES, isManager, requireUser } from '@/lib/server/session'
 import { audit } from '@/lib/server/audit'
 import {
+    PAY_TYPES,
     PRIVILEGED_USER_SELECT,
-    PUBLIC_USER_SELECT,
+    STAFF_DIRECTORY_SELECT,
     USER_ROLES,
     assertOneOf,
     normalizeEmail,
@@ -16,14 +17,14 @@ import {
     requireNonBlank,
 } from '@/lib/server/validation'
 
-// GET: List all users. Salary columns only go to bosses/admins; password and
-// lockout columns never leave the server.
+// GET: List all users. Salary and contact columns only go to bosses/admins;
+// password and lockout columns never leave the server.
 export async function GET(request: Request) {
     try {
         const me = await requireUser(request)
         const users = await db.user.findMany({
             orderBy: { createdAt: 'desc' },
-            select: isManager(me) ? PRIVILEGED_USER_SELECT : PUBLIC_USER_SELECT,
+            select: isManager(me) ? PRIVILEGED_USER_SELECT : STAFF_DIRECTORY_SELECT,
         })
         return NextResponse.json(users.map(u => ({
             ...u,
@@ -47,10 +48,16 @@ export async function POST(request: Request) {
         // caller could mint themselves an arbitrary (or misspelled) role.
         const role = assertOneOf(body.role, USER_ROLES, 'role')
 
+        // Pay profile can be set right away (otherwise MONTHLY with 0 everywhere).
+        const payType = body.payType === undefined ? 'MONTHLY' : assertOneOf(body.payType, PAY_TYPES, 'payType')
         const baseSalary = toVnd(body.baseSalary, 'baseSalary') ?? 0
+        const hourlyRate = toVnd(body.hourlyRate, 'hourlyRate') ?? 0
         const commissionRate = body.commissionRate === undefined || body.commissionRate === null
             ? 0
             : parseCommissionRate(body.commissionRate)
+        const salesCommissionRate = body.salesCommissionRate === undefined || body.salesCommissionRate === null
+            ? 0
+            : parseCommissionRate(body.salesCommissionRate, 'salesCommissionRate')
         // The manager hands this temporary password over in person; the staff
         // member must replace it on first login.
         const password = validateNewPassword(body.password)
@@ -59,7 +66,7 @@ export async function POST(request: Request) {
         // index agree; previously Admin@x and admin@x created shadow accounts.
         const existing = await db.user.findUnique({ where: { email } })
         if (existing) {
-            throw new ApiError(409, 'Email already exists')
+            throw new ApiError(409, 'Email này đã có tài khoản')
         }
 
         const user = await db.user.create({
@@ -70,8 +77,11 @@ export async function POST(request: Request) {
                 role,
                 status: 'active',
                 avatar: typeof body.avatar === 'string' && body.avatar.trim() ? body.avatar.trim() : '👤',
+                payType,
                 baseSalary,
+                hourlyRate,
                 commissionRate,
+                salesCommissionRate,
                 passwordHash: await hashPassword(password),
                 mustChangePassword: true,
             },

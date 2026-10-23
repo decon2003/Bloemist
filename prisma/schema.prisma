@@ -31,6 +31,8 @@ model User {
   hourlyRate          Int            @default(0) // also the base for overtime pay
   commissionRate      Float?         @default(0) // % of the products this person made
   salesCommissionRate Float          @default(0) // % of orders this person sold
+  holidayHourlyRate   Int? // hourly rate on public holidays; null = hourlyRate
+  daysOffPerMonth     Int            @default(4) // MONTHLY: paid days off; base = salary x days worked / (days in month - this)
 
   // Auth. passwordHash is null until a manager sets a temporary password.
   passwordHash       String?
@@ -64,7 +66,6 @@ model Order {
   deliveryAddress       String?
   status                String
   listedPrice           Int
-  discount              Int?
   deliveryFee           Int?
   deliveryCoveredByShop Boolean?
   vatPercent            Float?
@@ -84,6 +85,8 @@ model Order {
   // staff member); earns the sales commission. Defaults to the creator.
   salespersonId         String?
   salespersonName       String?
+  // One-off id sent by "Tạo đơn"; a retried request returns the existing order.
+  requestId             String?  @unique
 
   createdBy User?     @relation("CreatedOrders", fields: [createdById], references: [id])
   customer  Customer? @relation(fields: [customerId], references: [id])
@@ -183,9 +186,11 @@ model StaffCheckIn {
 model ShopSettings {
   id           Int    @id @default(1)
   openTime     String @default("08:00") // HH:mm, Vietnam time
-  closeTime    String @default("19:00") // HH:mm; forgotten check-outs are closed at this time
+  closeTime    String @default("19:00") // HH:mm; time worked outside open-close is overtime
   // Overtime (hours outside open-close) is paid at hourlyRate x otMultiplier once a manager approves it.
   otMultiplier Float  @default(1.5)
+  // Public holidays: JSON [{"date":"YYYY-MM-DD","name":"..."}]; hourly staff are paid holidayHourlyRate.
+  holidays     String @default("[]")
 }
 
 model Message {
@@ -248,22 +253,26 @@ model Payroll {
 // `commissions` and `adjustments` hold the itemised, editable detail; `total`
 // is recomputed on every save.
 model PayrollLine {
-  id          String  @id @default(uuid())
-  payrollId   String
-  payroll     Payroll @relation(fields: [payrollId], references: [id], onDelete: Cascade)
-  userId      String
-  userName    String
-  role        String
-  payType     String // MONTHLY | HOURLY
-  baseSalary  Int     @default(0)
-  hourlyRate  Int     @default(0)
-  makerRate   Float   @default(0)
-  salesRate   Float   @default(0)
-  shifts      Json    @default("[]")
-  commissions Json    @default("[]")
-  adjustments Json    @default("[]")
-  note        String?
-  total       Int     @default(0)
+  id                String  @id @default(uuid())
+  payrollId         String
+  payroll           Payroll @relation(fields: [payrollId], references: [id], onDelete: Cascade)
+  userId            String
+  userName          String
+  role              String
+  payType           String // MONTHLY | HOURLY
+  baseSalary        Int     @default(0)
+  hourlyRate        Int     @default(0)
+  makerRate         Float   @default(0)
+  salesRate         Float   @default(0)
+  holidayHourlyRate Int?
+  daysOffPerMonth   Int     @default(4)
+  // Set when a manager changed this month's rates; otherwise a refresh re-copies the pay profile.
+  ratesOverridden   Boolean @default(false)
+  shifts            Json    @default("[]")
+  commissions       Json    @default("[]")
+  adjustments       Json    @default("[]")
+  note              String?
+  total             Int     @default(0)
 
   @@unique([payrollId, userId])
 }

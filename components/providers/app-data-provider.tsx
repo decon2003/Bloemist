@@ -16,13 +16,13 @@ import {
   updateTaskStatus as updateTaskStatusRequest,
   updateTaskNotes as updateTaskNotesRequest,
   assignTask as assignTaskRequest,
-  assignOrder as assignOrderRequest,
   unassignTask as unassignTaskRequest,
   completeTask as completeTaskRequest,
   fetchCheckIns,
   createCheckIn as createCheckInRequest,
   checkOut as checkOutRequest,
   correctCheckIn as correctCheckInRequest,
+  deleteCheckIn as deleteCheckInRequest,
   fetchWorkspaceSettings,
   fetchUsers,
   createUser as createUserRequest,
@@ -56,14 +56,16 @@ interface AppDataContextValue {
   createCheckIn: (input: Partial<StaffCheckIn>) => Promise<StaffCheckIn>
   checkOut: (checkInId: string) => Promise<StaffCheckIn>
   correctCheckIn: (input: ShiftCorrectionInput) => Promise<StaffCheckIn>
+  deleteCheckIn: (checkInId: string, reason: string) => Promise<void>
   users: User[]
-  assignOrder: (orderId: string, payload: AssignTaskPayload) => Promise<Order>
   deleteOrder: (orderId: string) => Promise<{ lockedPayrollMonths: string[] }>
   updateUser: (userId: string, input: Partial<User>) => Promise<User>
   /** Which orders/tasks the current page shows. Lists load nothing until the
    *  page sets a scope, so no page downloads every order or task. */
   setOrderScope: (scope: ListParams) => void
   setTaskScope: (scope: ListParams) => void
+  /** Reload the task lists (e.g. after an order's receive time moved its products). */
+  refreshTasks: () => void
   /** "YYYY-MM" month of check-ins to load (Vietnam time). */
   setCheckinMonth: (month: string) => void
 }
@@ -155,12 +157,6 @@ const AppDataContextProvider = ({ children }: { children: React.ReactNode }) => 
     onSuccess: (updated) => mergeOrder(updated),
   })
 
-  const assignOrder = useMutation({
-    mutationFn: ({ orderId, payload }: { orderId: string; payload: AssignTaskPayload }) =>
-      assignOrderRequest(orderId, payload),
-    onSuccess: (updated) => mergeOrder(updated),
-  })
-
   const deleteOrder = useMutation({
     mutationFn: deleteOrderRequest,
     onSuccess: (_data, orderId) => {
@@ -246,6 +242,11 @@ const AppDataContextProvider = ({ children }: { children: React.ReactNode }) => 
     onSuccess: () => queryClient.removeQueries(['checkins']),
   })
 
+  const deleteCheckIn = useMutation({
+    mutationFn: ({ checkInId, reason }: { checkInId: string; reason: string }) => deleteCheckInRequest(checkInId, reason),
+    onSuccess: () => queryClient.removeQueries(['checkins']),
+  })
+
   const tasks = tasksQuery.data ?? []
   const orders = ordersQuery.data ?? []
   const florists = floristsQuery.data ?? []
@@ -276,12 +277,13 @@ const AppDataContextProvider = ({ children }: { children: React.ReactNode }) => 
       createCheckIn: (input: Partial<StaffCheckIn>) => createCheckIn.mutateAsync(input),
       checkOut: (checkInId: string) => checkOut.mutateAsync(checkInId),
       correctCheckIn: (input: ShiftCorrectionInput) => correctCheckIn.mutateAsync(input),
-      assignOrder: (orderId: string, payload: AssignTaskPayload) => assignOrder.mutateAsync({ orderId, payload }),
+      deleteCheckIn: (checkInId: string, reason: string) => deleteCheckIn.mutateAsync({ checkInId, reason }),
       deleteOrder: (orderId: string) => deleteOrder.mutateAsync(orderId),
       users,
       updateUser: (userId: string, input: Partial<User>) => updateUser.mutateAsync({ userId, input }),
       setOrderScope,
       setTaskScope,
+      refreshTasks: () => queryClient.removeQueries(['tasks']),
       setCheckinMonth,
     }),
     [

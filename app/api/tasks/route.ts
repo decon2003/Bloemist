@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createTask, listTasks } from '@/lib/server/data-store'
 import { handleRouteError, readJsonBody } from '@/lib/server/route-helpers'
-import { requireUser } from '@/lib/server/session'
+import { ORDER_WRITE_ROLES, requireUser } from '@/lib/server/session'
 import { parseListScope } from '@/lib/server/list-scope'
 import { audit } from '@/lib/server/audit'
 
@@ -13,7 +13,7 @@ export async function GET(request: Request) {
     const params = new URL(request.url).searchParams
     const orderId = params.get('orderId')
     const scope = orderId ? { kind: 'order' as const, orderId } : parseListScope(params, me)
-    const tasks = await listTasks(scope, { assigneeId: params.get('mine') === '1' ? me.id : undefined })
+    const tasks = await listTasks(scope, { assigneeId: params.get('mine') === '1' ? me.id : undefined, viewerRole: me.role })
     return NextResponse.json(tasks)
   } catch (error) {
     return handleRouteError(error)
@@ -22,7 +22,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const me = await requireUser(request)
+    const me = await requireUser(request, ORDER_WRITE_ROLES)
     const body = await readJsonBody(request)
     const created = await createTask(body)
     await audit(me, { action: 'task.create', entity: 'task', entityId: created.id, summary: created.taskTitle })

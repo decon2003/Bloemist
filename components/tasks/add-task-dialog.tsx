@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useAppData } from '@/components/providers/app-data-provider'
-import { TaskType } from '@/lib/types'
+import type { Order, TaskType } from '@/lib/types'
 import { useLocale } from '@/components/providers/locale-provider'
 import { uploadPhoto } from '@/lib/api'
 import { PhotoViewer } from '@/components/photo-viewer'
@@ -17,7 +17,12 @@ interface AddTaskDialogProps {
   onSuccess?: (message: string) => void
   initialOrderId?: string
   lockOrderSelection?: boolean
+  /** The order itself, when opened from its page (not looked up in a list). */
+  order?: Order
 }
+
+/** Products are due two hours before the customer receives the order. */
+const dueBefore = (receiveTime: string) => toDateTimeLocalValue(new Date(new Date(receiveTime).getTime() - 2 * 60 * 60 * 1000))
 
 export default function AddTaskDialog({
   open,
@@ -25,6 +30,7 @@ export default function AddTaskDialog({
   onSuccess,
   initialOrderId,
   lockOrderSelection = false,
+  order: givenOrder,
 }: AddTaskDialogProps) {
   const { orders, florists, createTask } = useAppData()
   const router = useRouter()
@@ -36,17 +42,17 @@ export default function AddTaskDialog({
   const [taskTitle, setTaskTitle] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [orderQuery, setOrderQuery] = useState('')
-  const [floristQuery, setFloristQuery] = useState('')
   const [taskType, setTaskType] = useState<TaskType>('CAM_HOA')
   const [quantity, setQuantity] = useState(1)
   const [orderless, setOrderless] = useState(false)
   const [samplePhotoUrls, setSamplePhotoUrls] = useState<string[]>([])
   const [samplePhotoInput, setSamplePhotoInput] = useState('')
   const [samplePreviewUrl, setSamplePreviewUrl] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const sampleFileInputRef = useRef<HTMLInputElement | null>(null)
 
-  const defaultOrder = useMemo(() => orders[0], [orders])
-  const defaultFlorist = useMemo(() => florists[0], [florists])
+  // From the Tasks page nothing is pre-selected: the order is picked on purpose.
+  const defaultOrder = useMemo(() => (givenOrder && lockOrderSelection ? givenOrder : undefined), [givenOrder, lockOrderSelection])
 
   const filteredOrders = useMemo(() => {
     const base = orders.filter(
@@ -64,18 +70,6 @@ export default function AddTaskDialog({
     return base
   }, [orders, orderQuery, selectedOrderId])
 
-  const filteredFlorists = useMemo(() => {
-    const base = florists.filter(
-      (florist) => !floristQuery || florist.name.toLowerCase().includes(floristQuery.toLowerCase()),
-    )
-
-    if (selectedFloristId && !base.some((florist) => florist.id === selectedFloristId)) {
-      const current = florists.find((florist) => florist.id === selectedFloristId)
-      if (current) base.unshift(current)
-    }
-
-    return base
-  }, [florists, floristQuery, selectedFloristId])
 
   const taskTypeOptions: Array<{ value: TaskType; label: string }> = [
     { value: 'CAM_HOA', label: t('addTask.taskType.camHoa', 'Flower arranging') },
@@ -102,13 +96,13 @@ export default function AddTaskDialog({
   const applyOrderDefaults = useCallback(
     (orderId?: string) => {
       if (!orderId) return
-      const order = orders.find((o) => o.id === orderId)
+      const order = givenOrder?.id === orderId ? givenOrder : orders.find((o) => o.id === orderId)
       if (!order) return
       setSelectedOrderId(order.id)
-      setTaskTitle(`Build ${order.bouquetName} for ${order.customerName}`)
-      setOrderQuery(`${order.code} — ${order.customerName}`)
+      setOrderQuery(`${order.code} — ${order.customerName || 'Chưa có tên khách'}`)
+      setDueTime(dueBefore(order.receiveTime))
     },
-    [orders],
+    [orders, givenOrder],
   )
 
   useEffect(() => {
@@ -121,12 +115,6 @@ export default function AddTaskDialog({
       applyOrderDefaults(defaultOrder.id)
     }
   }, [open, initialOrderId, applyOrderDefaults, defaultOrder, selectedOrderId])
-
-  useEffect(() => {
-    if (!selectedFloristId && defaultFlorist) {
-      setSelectedFloristId(defaultFlorist.id)
-    }
-  }, [defaultFlorist, selectedFloristId])
 
   useEffect(() => {
     if (!lockOrderSelection) return
@@ -146,8 +134,10 @@ export default function AddTaskDialog({
       setTaskTitle('')
       setOrderQuery('')
     }
-    setSelectedFloristId(defaultFlorist?.id ?? '')
-    setDueTime(toDateTimeLocalValue(new Date()))
+    setSelectedFloristId('')
+    setTaskTitle('')
+    setError(null)
+    if (!initialOrderId && !defaultOrder) setDueTime(toDateTimeLocalValue(new Date()))
     setNotes('')
     setTaskType('CAM_HOA')
     setQuantity(1)
@@ -155,7 +145,7 @@ export default function AddTaskDialog({
     setSamplePhotoUrls([])
     setSamplePhotoInput('')
     setSamplePreviewUrl(null)
-  }, [applyOrderDefaults, initialOrderId, defaultOrder, defaultFlorist])
+  }, [applyOrderDefaults, initialOrderId, defaultOrder])
 
   const handleOrderChange = (orderId: string) => {
     if (lockOrderSelection) return
@@ -164,33 +154,34 @@ export default function AddTaskDialog({
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
-    if (!dueTime) return
-    const florist = florists.find((entry) => entry.id === selectedFloristId)
-
+    setError(null)
+    if (!taskTitle.trim()) return setError('Vui lòng nhập tên việc')
+    if (!dueTime) return setError('Vui lòng chọn hạn làm')
     const resolvedOrderId = orderless ? undefined : selectedOrderId || undefined
-    const bouquetName = taskTitle || 'Task'
 
     try {
       setIsSubmitting(true)
+      // The server reads the maker's name from the account and sets the status.
       const createdTask = await createTask({
         orderId: resolvedOrderId,
-        bouquetName,
-        assigneeId: florist?.id,
-        assigneeName: florist?.name,
+        bouquetName: taskTitle.trim(),
+        assigneeId: selectedFloristId || undefined,
         bouquetImage: samplePhotoUrls[0] || undefined,
         samplePhotoUrls: samplePhotoUrls.length ? samplePhotoUrls : undefined,
         dueTime: new Date(dueTime).toISOString(),
-        status: florist ? 'ASSIGNED' : 'UNASSIGNED',
         notes,
-        taskTitle,
+        taskTitle: taskTitle.trim(),
         type: taskType,
         quantity,
       })
 
       resetForm()
       onClose()
-      onSuccess?.(t('tasks.toast.success'))
-      router.push(`/${lang}/tasks/${createdTask.id}`)
+      onSuccess?.('Đã thêm việc')
+      // From an order's page the new item shows up there; elsewhere open it.
+      if (!lockOrderSelection) router.push(`/${lang}/tasks/${createdTask.id}`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Không thêm được việc')
     } finally {
       setIsSubmitting(false)
     }
@@ -206,7 +197,7 @@ export default function AddTaskDialog({
             <h3 className="text-lg font-semibold">{t('addTask.title')}</h3>
             <p className="text-sm text-muted-foreground">{t('addTask.subtitle')}</p>
           </div>
-          <button onClick={onClose} className="rounded-lg p-2 hover:bg-muted" aria-label="Close">
+          <button onClick={onClose} className="rounded-lg p-2 hover:bg-muted" aria-label="Đóng">
             <Plus className="h-5 w-5 rotate-45" />
           </button>
         </div>
@@ -271,7 +262,7 @@ export default function AddTaskDialog({
             <input
               value={taskTitle}
               onChange={(event) => setTaskTitle(event.target.value)}
-              placeholder={t('addTask.fields.taskNamePlaceholder')}
+              placeholder="Ví dụ: In thiệp, gói thêm 1 bó nhỏ"
               className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
@@ -350,7 +341,7 @@ export default function AddTaskDialog({
                       <button
                         type="button"
                         onClick={() => removeSamplePhoto(index)}
-                        className="absolute right-1 top-1 hidden h-6 w-6 rounded-full bg-black/70 text-white hover:bg-black/90 group-hover:block"
+                        className="absolute right-1 top-1 h-6 w-6 rounded-full bg-black/70 text-white hover:bg-black/90"
                         aria-label={t('addTask.fields.removeSamplePhoto', 'Remove photo')}
                       >
                         ×
@@ -392,24 +383,17 @@ export default function AddTaskDialog({
 
           <div className="space-y-2">
             <label className="text-sm font-medium">{t('addTask.fields.assign')}</label>
-            <input
-              list="florist-options"
-              value={floristQuery}
-              onChange={(event) => {
-                setFloristQuery(event.target.value)
-                const match = filteredFlorists.find(
-                  (florist) => florist.name.toLowerCase() === event.target.value.toLowerCase(),
-                )
-                setSelectedFloristId(match?.id || '')
-              }}
-              placeholder={t('addTask.fields.floristSearch', 'Search florist name')}
+            <select
+              value={selectedFloristId}
+              onChange={(event) => setSelectedFloristId(event.target.value)}
               className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-            <datalist id="florist-options">
-              {filteredFlorists.map((florist) => (
-                <option key={florist.id} value={florist.name}></option>
+            >
+              <option value="">Chưa phân công (thợ tự nhận)</option>
+              {florists.map((florist) => (
+                <option key={florist.id} value={florist.id}>{florist.name}</option>
               ))}
-            </datalist>
+            </select>
+            <p className="text-xs text-muted-foreground">Việc thêm ở đây không cộng vào giá đơn và không tính hoa hồng làm đơn.</p>
           </div>
 
           <div className="space-y-2">
@@ -432,6 +416,8 @@ export default function AddTaskDialog({
               placeholder={t('addTask.fields.notesPlaceholder')}
             />
           </div>
+
+          {error && <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
           <div className="flex gap-3 pt-2">
             <button

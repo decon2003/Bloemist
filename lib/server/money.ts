@@ -59,7 +59,6 @@ export function toVnd(value: unknown, field: string, { required = false } = {}):
 
 export type OrderMoneyInput = {
   listedPrice: number
-  discount: number | null
   deliveryFee: number | null
   deliveryCoveredByShop: boolean
   vatPercent: number | null
@@ -68,10 +67,11 @@ export type OrderMoneyInput = {
 
 /** Derived amounts, computed on the server so a client cannot send a total
  *  that does not match its prices. Same formula as the new-order form:
- *  selling = (listed - discount) + VAT; total = selling + delivery fee (unless
- *  the shop covers it); remaining = total - deposit. */
+ *  selling = listed + VAT (only when a VAT % is entered); total = selling +
+ *  delivery fee (unless freeship); remaining = total - deposit. The shop does
+ *  not give discounts. */
 export function computeOrderTotals(input: OrderMoneyInput) {
-  const base = Math.max(input.listedPrice - (input.discount ?? 0), 0)
+  const base = input.listedPrice
   const vat = Math.round((base * (input.vatPercent ?? 0)) / 100)
   const sellingPrice = base + vat
   const total = sellingPrice + (input.deliveryCoveredByShop ? 0 : input.deliveryFee ?? 0)

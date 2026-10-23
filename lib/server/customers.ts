@@ -32,9 +32,9 @@ export async function orderIdsByPhone(digits: string, field: 'any' | 'receiver' 
 }
 
 /** Search orders by code, sender/receiver name or phone, or bouquet. */
-export async function orderSearchWhere(q: string) {
+export async function orderSearchWhere(q: string, { matchPhones = true } = {}) {
   const digits = normalizeCustomerPhone(q)
-  const phoneIds = digits.length >= 4 ? await orderIdsByPhone(digits) : []
+  const phoneIds = matchPhones && digits.length >= 4 ? await orderIdsByPhone(digits) : []
   const text = { contains: q, mode: 'insensitive' as const }
   return {
     OR: [

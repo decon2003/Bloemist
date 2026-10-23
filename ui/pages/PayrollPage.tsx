@@ -14,10 +14,10 @@ import type {
   CommissionKind,
   OtDecision,
   Payroll,
-  PayrollAdjustment,
   PayrollCommission,
   PayrollLine,
   PayrollLineUpdate,
+  PayrollShift,
 } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -29,24 +29,39 @@ const hours = (h: number) => {
 }
 const time = (iso: string | null) =>
   iso ? new Intl.DateTimeFormat('en-GB', { timeZone: VN, hour: '2-digit', minute: '2-digit' }).format(new Date(iso)) : '—'
+const dateTime = (iso: string) =>
+  new Intl.DateTimeFormat('vi-VN', { timeZone: VN, hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }).format(new Date(iso))
 const dayLabel = (date: string) => `${date.slice(8, 10)}/${date.slice(5, 7)}`
 const thisMonth = () => new Intl.DateTimeFormat('en-CA', { timeZone: VN }).format(new Date()).slice(0, 7)
+const digits = (text: string) => Number(text.replace(/\D/g, '') || 0)
+/** The month is over (pay is locked after it, and paid on the 5th). */
+const monthOver = (month: string) => thisMonth() > month
 
 const KIND_LABEL: Record<CommissionKind, string> = {
   MAKER: 'Làm đơn',
   SALES: 'Sale',
 }
-const OT_LABEL: Record<Exclude<OtDecision, 'NONE'>, string> = {
+const DECISION_LABEL: Record<OtDecision, string> = {
+  NONE: 'Bình thường',
   PENDING: 'Chờ duyệt',
   OT: 'Tính OT',
   REGULAR: 'Tính giờ thường',
-  EXCLUDE: 'Không tính',
+  EXCLUDE: 'Không tính giờ ngoài khung',
+  RUSH: 'Ca gấp (cả ca tính OT)',
 }
+
+/** The choices that make sense for a shift. */
+const decisionsFor = (shift: PayrollShift, payType: 'MONTHLY' | 'HOURLY'): OtDecision[] =>
+  shift.otHours > 0.01
+    ? (['PENDING', 'OT', ...(payType === 'HOURLY' ? (['REGULAR'] as const) : []), 'EXCLUDE', 'RUSH'] as OtDecision[])
+    : ['NONE', 'RUSH']
 
 const inputClass = 'w-full rounded-lg border border-border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-muted/50'
 
-/** One person's line: this month's rates, OT review, commission items and
- *  adjustments. All edits are sent in one save. */
+type AdjustmentDraft = { label: string; sign: 1 | -1; amount: string }
+
+/** One person's line: this month's rates, the decision for each shift,
+ *  commission items and adjustments. All edits are sent in one save. */
 function LineEditor({
   line,
   locked,
@@ -63,30 +78,47 @@ function LineEditor({
   const [payType, setPayType] = useState(line.payType)
   const [baseSalary, setBaseSalary] = useState(String(line.baseSalary))
   const [hourlyRate, setHourlyRate] = useState(String(line.hourlyRate))
+  const [holidayRate, setHolidayRate] = useState(line.holidayHourlyRate == null ? '' : String(line.holidayHourlyRate))
+  const [daysOff, setDaysOff] = useState(String(line.daysOffPerMonth ?? 4))
   const [rates, setRates] = useState({ makerRate: line.makerRate, salesRate: line.salesRate })
   const [decisions, setDecisions] = useState<Record<string, OtDecision>>(
     Object.fromEntries(line.shifts.map((s) => [s.date, s.otDecision])),
   )
   const [items, setItems] = useState<PayrollCommission[]>(line.commissions)
-  const [adjustments, setAdjustments] = useState<PayrollAdjustment[]>(line.adjustments)
+  const [adjustments, setAdjustments] = useState<AdjustmentDraft[]>(
+    line.adjustments.map((a) => ({ label: a.label, sign: a.amount < 0 ? -1 : 1, amount: String(Math.abs(a.amount)) })),
+  )
   const [note, setNote] = useState(line.note ?? '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
-  const ratesChanged =
-    rates.makerRate !== line.makerRate || rates.salesRate !== line.salesRate
+  const ratesChanged = rates.makerRate !== line.makerRate || rates.salesRate !== line.salesRate
+  const pendingDays = line.shifts.filter((s) => decisions[s.date] === 'PENDING').length
 
   const save = async () => {
-    setSaving(true)
     setError('')
+    if (adjustments.some((a) => !a.label.trim() && digits(a.amount) > 0)) {
+      setError('Mỗi khoản điều chỉnh cần có nội dung')
+      return
+    }
+    setSaving(true)
     const input: PayrollLineUpdate = {
-      payType,
-      baseSalary: Number(baseSalary.replace(/\D/g, '') || 0),
-      hourlyRate: Number(hourlyRate.replace(/\D/g, '') || 0),
-      shiftDecisions: line.shifts.filter((s) => s.otHours > 0.01).map((s) => ({ date: s.date, otDecision: decisions[s.date] })),
-      adjustments: adjustments.filter((a) => a.label.trim()),
+      shiftDecisions: line.shifts
+        .filter((s) => decisions[s.date] !== s.otDecision)
+        .map((s) => ({ date: s.date, otDecision: decisions[s.date] })),
+      adjustments: adjustments
+        .filter((a) => a.label.trim())
+        .map((a) => ({ label: a.label.trim(), amount: a.sign * digits(a.amount) })),
       note,
     }
+    // Only the rates actually changed are sent: they then stay fixed for this
+    // month instead of following the person's pay profile.
+    if (payType !== line.payType) input.payType = payType
+    if (digits(baseSalary) !== line.baseSalary) input.baseSalary = digits(baseSalary)
+    if (digits(hourlyRate) !== line.hourlyRate) input.hourlyRate = digits(hourlyRate)
+    const holiday = holidayRate.trim() ? digits(holidayRate) : null
+    if (holiday !== (line.holidayHourlyRate ?? null)) input.holidayHourlyRate = holiday
+    if (Number(daysOff) !== (line.daysOffPerMonth ?? 4)) input.daysOffPerMonth = Number(daysOff)
     // A changed line rate resets every item of that kind; otherwise send per-item edits.
     if (ratesChanged) Object.assign(input, rates)
     else input.commissionChanges = items.map((i) => ({ key: i.key, included: i.included, rate: i.rate }))
@@ -98,8 +130,6 @@ function LineEditor({
       setSaving(false)
     }
   }
-
-  const otShifts = line.shifts.filter((s) => s.otHours > 0.01)
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4">
@@ -127,10 +157,23 @@ function LineEditor({
                 <option value="HOURLY">Theo giờ</option>
               </select>
             </label>
-            <label className="space-y-1 text-sm">
-              <span className="text-muted-foreground">Lương cứng (₫)</span>
-              <input value={baseSalary} disabled={locked || payType !== 'MONTHLY'} inputMode="numeric" onChange={(e) => setBaseSalary(e.target.value)} className={inputClass} />
-            </label>
+            {payType === 'MONTHLY' ? (
+              <>
+                <label className="space-y-1 text-sm">
+                  <span className="text-muted-foreground">Lương cứng cả tháng (₫)</span>
+                  <input value={baseSalary} disabled={locked} inputMode="numeric" onChange={(e) => setBaseSalary(e.target.value)} className={inputClass} />
+                </label>
+                <label className="space-y-1 text-sm">
+                  <span className="text-muted-foreground">Ngày nghỉ được hưởng / tháng</span>
+                  <input type="number" min={0} max={15} value={daysOff} disabled={locked} onChange={(e) => setDaysOff(e.target.value)} className={inputClass} />
+                </label>
+              </>
+            ) : (
+              <label className="space-y-1 text-sm">
+                <span className="text-muted-foreground">Đơn giá giờ ngày lễ (₫, trống = như ngày thường)</span>
+                <input value={holidayRate} disabled={locked} inputMode="numeric" onChange={(e) => setHolidayRate(e.target.value)} className={inputClass} />
+              </label>
+            )}
             <label className="space-y-1 text-sm">
               <span className="text-muted-foreground">Đơn giá giờ (₫), cũng dùng cho OT</span>
               <input value={hourlyRate} disabled={locked} inputMode="numeric" onChange={(e) => setHourlyRate(e.target.value)} className={inputClass} />
@@ -151,51 +194,79 @@ function LineEditor({
               </label>
             ))}
           </div>
+          {line.payType === 'MONTHLY' && (
+            <p className="text-xs text-muted-foreground">
+              Ngày công {line.totals.daysWorked}/{line.totals.standardDays}: lương cứng chia theo số ngày đi làm.
+            </p>
+          )}
           {ratesChanged && (
             <p className="text-xs text-amber-700">Đổi % ở đây sẽ áp dụng cho mọi khoản hoa hồng cùng loại bên dưới khi lưu.</p>
+          )}
+          {line.ratesOverridden && (
+            <p className="text-xs text-muted-foreground">Mức lương tháng này đã được sửa tay, không tự lấy theo hồ sơ lương nữa.</p>
           )}
         </section>
 
         <section className="space-y-2">
-          <h4 className="font-semibold text-foreground">
-            Ngày có giờ ngoài khung làm việc ({otShifts.length}){' '}
-            <span className="text-sm font-normal text-muted-foreground">· hệ số OT ×{otMultiplier}</span>
-          </h4>
-          {otShifts.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Không có giờ ngoài khung trong tháng.</p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h4 className="font-semibold text-foreground">
+              Ca làm ({line.shifts.length}){' '}
+              <span className="text-sm font-normal text-muted-foreground">· hệ số OT ×{otMultiplier}</span>
+            </h4>
+            {!locked && pendingDays > 0 && (
+              <button
+                type="button"
+                onClick={() =>
+                  setDecisions((d) => Object.fromEntries(Object.entries(d).map(([date, v]) => [date, v === 'PENDING' ? 'OT' : v])))
+                }
+                className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold hover:bg-muted"
+              >
+                Duyệt OT {pendingDays} ngày chờ
+              </button>
+            )}
+          </div>
+          {line.shifts.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Không có ca nào trong tháng.</p>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="max-h-96 overflow-auto">
               <table className="min-w-full text-sm">
-                <thead className="text-left text-xs uppercase text-muted-foreground">
+                <thead className="sticky top-0 bg-white text-left text-xs uppercase text-muted-foreground">
                   <tr>
                     <th className="py-2 pr-3">Ngày</th>
                     <th className="px-3 py-2">Vào – Ra</th>
                     <th className="px-3 py-2">Trong khung</th>
                     <th className="px-3 py-2">Ngoài khung</th>
-                    <th className="px-3 py-2">Quyết định</th>
+                    <th className="px-3 py-2">Tính</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {otShifts.map((s) => (
-                    <tr key={s.date} className={cn(decisions[s.date] === 'PENDING' && 'bg-amber-50')}>
-                      <td className="py-2 pr-3">
+                  {line.shifts.map((s) => (
+                    <tr key={s.date} className={cn(decisions[s.date] === 'PENDING' && 'bg-amber-50', s.autoClosed && 'bg-red-50/60')}>
+                      <td className="py-2 pr-3 whitespace-nowrap">
                         {dayLabel(s.date)}
-                        {s.autoClosed && <span className="ml-1 text-xs text-amber-700">(tự chốt)</span>}
+                        {s.holiday && <span className="ml-1 rounded bg-violet-100 px-1 text-xs text-violet-800">Lễ</span>}
+                        {s.corrected && <span className="ml-1 rounded bg-sky-100 px-1 text-xs text-sky-800">Sửa tay</span>}
                       </td>
-                      <td className="px-3 py-2 text-muted-foreground">{time(s.checkIn)} – {time(s.checkOut)}</td>
+                      <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
+                        {time(s.checkIn)} – {s.autoClosed ? '?' : time(s.checkOut)}
+                      </td>
                       <td className="px-3 py-2">{hours(s.regularHours)}</td>
-                      <td className="px-3 py-2 font-medium">{hours(s.otHours)}</td>
+                      <td className="px-3 py-2 font-medium">{s.otHours > 0.01 ? hours(s.otHours) : '—'}</td>
                       <td className="px-3 py-2">
-                        <select
-                          value={decisions[s.date]}
-                          disabled={locked}
-                          onChange={(e) => setDecisions((d) => ({ ...d, [s.date]: e.target.value as OtDecision }))}
-                          className={inputClass}
-                        >
-                          {(Object.keys(OT_LABEL) as (keyof typeof OT_LABEL)[]).map((k) => (
-                            <option key={k} value={k}>{OT_LABEL[k]}</option>
-                          ))}
-                        </select>
+                        {s.autoClosed ? (
+                          <span className="text-xs font-medium text-red-700">Quên chấm ra – 0 giờ</span>
+                        ) : (
+                          <select
+                            value={decisions[s.date]}
+                            disabled={locked}
+                            onChange={(e) => setDecisions((d) => ({ ...d, [s.date]: e.target.value as OtDecision }))}
+                            className={inputClass}
+                          >
+                            {decisionsFor(s, payType).map((k) => (
+                              <option key={k} value={k}>{DECISION_LABEL[k]}</option>
+                            ))}
+                          </select>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -204,7 +275,10 @@ function LineEditor({
             </div>
           )}
           <p className="text-xs text-muted-foreground">
-            Tổng {line.shifts.length} ca, {hours(line.totals.regularHours)} giờ thường. Ngày chờ duyệt tạm tính như OT.
+            {hours(line.totals.regularHours)} giờ thường, {hours(line.totals.otHours)} OT
+            {line.totals.rushHours > 0 ? `, ${hours(line.totals.rushHours)} ca gấp` : ''}
+            {line.totals.holidayHours > 0 ? `, ${hours(line.totals.holidayHours)} ngày lễ` : ''}. Lệch dưới 15 phút ngoài khung được bỏ qua;
+            ngày chờ duyệt tạm tính như OT.
           </p>
         </section>
 
@@ -269,7 +343,7 @@ function LineEditor({
             {!locked && (
               <button
                 type="button"
-                onClick={() => setAdjustments((a) => [...a, { label: '', amount: 0 }])}
+                onClick={() => setAdjustments((a) => [...a, { label: '', sign: 1, amount: '' }])}
                 className="inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-xs hover:bg-muted"
               >
                 <Plus className="h-3.5 w-3.5" /> Thêm khoản
@@ -280,23 +354,28 @@ function LineEditor({
           {adjustments.map((adj, index) => (
             <div key={index} className="flex gap-2">
               <input
-                placeholder="Nội dung, ví dụ: Thưởng 20/10"
+                placeholder="Nội dung, ví dụ: Thưởng 20/10, Tạm ứng"
                 value={adj.label}
                 disabled={locked}
                 onChange={(e) => setAdjustments((list) => list.map((x, i) => (i === index ? { ...x, label: e.target.value } : x)))}
                 className={inputClass}
               />
+              <select
+                value={adj.sign}
+                disabled={locked}
+                onChange={(e) => setAdjustments((list) => list.map((x, i) => (i === index ? { ...x, sign: Number(e.target.value) as 1 | -1 } : x)))}
+                className="w-24 rounded-lg border border-border px-2 py-1.5 text-sm"
+              >
+                <option value={1}>Cộng</option>
+                <option value={-1}>Trừ</option>
+              </select>
               <input
-                placeholder="Số tiền (âm = trừ)"
-                value={String(adj.amount)}
+                placeholder="Số tiền"
+                value={adj.amount ? Number(digits(adj.amount)).toLocaleString('vi-VN') : ''}
                 disabled={locked}
                 inputMode="numeric"
-                onChange={(e) =>
-                  setAdjustments((list) =>
-                    list.map((x, i) => (i === index ? { ...x, amount: Number(e.target.value.replace(/[^\d-]/g, '') || 0) } : x)),
-                  )
-                }
-                className="w-40 rounded-lg border border-border px-2 py-1.5 text-sm"
+                onChange={(e) => setAdjustments((list) => list.map((x, i) => (i === index ? { ...x, amount: e.target.value.replace(/\D/g, '') } : x)))}
+                className="w-36 rounded-lg border border-border px-2 py-1.5 text-sm"
               />
               {!locked && (
                 <button
@@ -314,6 +393,7 @@ function LineEditor({
 
         <label className="block space-y-1 text-sm">
           <span className="font-semibold text-foreground">Ghi chú</span>
+          <span className="block text-xs text-muted-foreground">Nhân viên sẽ thấy ghi chú này trong mục Thu nhập sau khi chốt lương.</span>
           <textarea value={note} disabled={locked} onChange={(e) => setNote(e.target.value)} rows={2} className={inputClass} />
         </label>
 
@@ -338,6 +418,12 @@ function LineEditor({
     </div>
   )
 }
+
+/** Someone has hours (or days) but no rate in their pay profile yet. */
+const missingRate = (line: PayrollLine) =>
+  line.payType === 'MONTHLY'
+    ? line.baseSalary === 0 && line.totals.daysWorked > 0
+    : line.hourlyRate === 0 && line.totals.regularHours > 0
 
 export default function PayrollPage() {
   const [month, setMonth] = useState(thisMonth())
@@ -376,6 +462,7 @@ export default function PayrollPage() {
   }
 
   const locked = payroll?.status === 'LOCKED'
+  const canLock = monthOver(month)
   const buttonClass = 'inline-flex items-center gap-1.5 rounded-lg border border-border bg-white px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50'
 
   return (
@@ -384,7 +471,7 @@ export default function PayrollPage() {
         <div>
           <h1 className="text-3xl font-bold text-foreground">Bảng lương</h1>
           <p className="text-sm text-muted-foreground">
-            Bảng lương dự kiến từ chấm công và đơn hàng. Sửa từng người, duyệt OT, rồi chốt.
+            Bảng lương dự kiến từ chấm công và đơn hàng. Sửa từng người, duyệt OT, rồi chốt sau khi hết tháng.
           </p>
         </div>
         <input
@@ -400,7 +487,7 @@ export default function PayrollPage() {
       {payroll === undefined && !error && <p className="text-sm text-muted-foreground">Đang tải…</p>}
 
       {payroll === null && (
-        <section className="rounded-3xl border border-dashed border-border bg-white/90 p-8 text-center space-y-3">
+        <section className="space-y-3 rounded-3xl border border-dashed border-border bg-white/90 p-8 text-center">
           <p className="text-foreground">Chưa có bảng lương tháng {month.slice(5)}/{month.slice(0, 4)}.</p>
           <button
             type="button"
@@ -445,7 +532,16 @@ export default function PayrollPage() {
                     className="w-20 rounded-lg border border-border px-2 py-1.5"
                   />
                 </label>
-                <button type="button" disabled={busy} onClick={() => run(() => lockPayroll(payroll.id))} className={buttonClass}>
+                <button
+                  type="button"
+                  disabled={busy || !canLock}
+                  title={canLock ? undefined : 'Chỉ chốt được khi đã hết tháng'}
+                  onClick={() =>
+                    confirm(`Chốt bảng lương tháng ${month.slice(5)}/${month.slice(0, 4)}? Hệ thống cập nhật dữ liệu mới nhất rồi chốt; sau đó không sửa được nữa.`) &&
+                    run(() => lockPayroll(payroll.id))
+                  }
+                  className={buttonClass}
+                >
                   <Lock className="h-4 w-4" /> Chốt bảng lương
                 </button>
               </>
@@ -463,6 +559,12 @@ export default function PayrollPage() {
             <a href={`/api/payroll/export?month=${month}`} className={buttonClass}>
               <Download className="h-4 w-4" /> Xuất Excel
             </a>
+            {!locked && (
+              <span className="text-xs text-muted-foreground">
+                Cập nhật lần cuối {dateTime(payroll.updatedAt)}
+                {!canLock && ' · chốt được từ ngày 01 tháng sau'}
+              </span>
+            )}
           </section>
 
           {payroll.summary.pendingOtDays > 0 && !locked && (
@@ -471,6 +573,15 @@ export default function PayrollPage() {
               <p>
                 Còn <strong>{payroll.summary.pendingOtDays}</strong> ngày có giờ ngoài khung làm việc chưa duyệt (đang tạm tính như OT).
                 Mở từng người để duyệt trước khi chốt.
+              </p>
+            </div>
+          )}
+          {payroll.summary.autoClosedDays > 0 && !locked && (
+            <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+              <p>
+                <strong>{payroll.summary.autoClosedDays}</strong> ca quên chấm công ra đang tính 0 giờ. Sửa giờ ở màn Điểm danh
+                rồi bấm &quot;Cập nhật dữ liệu mới&quot;.
               </p>
             </div>
           )}
@@ -493,13 +604,23 @@ export default function PayrollPage() {
               <tbody className="divide-y divide-border">
                 {payroll.lines.map((line) => (
                   <tr key={line.id} onClick={() => setEditing(line)} className="cursor-pointer hover:bg-muted/40">
-                    <td className="py-3 pr-3 font-medium text-foreground underline-offset-2 hover:underline">{line.userName}</td>
-                    <td className="px-3 py-3 text-muted-foreground">{line.payType === 'MONTHLY' ? 'Lương cứng' : 'Theo giờ'}</td>
+                    <td className="py-3 pr-3 font-medium text-foreground underline-offset-2 hover:underline">
+                      {line.userName}
+                      {missingRate(line) && (
+                        <span className="ml-1 rounded-full bg-red-100 px-1.5 text-xs font-normal text-red-700">Chưa có mức lương</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-3 whitespace-nowrap text-muted-foreground">
+                      {line.payType === 'MONTHLY' ? `Lương cứng · ${line.totals.daysWorked}/${line.totals.standardDays} công` : 'Theo giờ'}
+                    </td>
                     <td className="px-3 py-3">{hours(line.totals.regularHours)}</td>
-                    <td className="px-3 py-3">
-                      {hours(line.totals.otHours)}
+                    <td className="px-3 py-3 whitespace-nowrap">
+                      {hours(line.totals.otHours + line.totals.rushHours)}
                       {line.totals.pendingOtDays > 0 && (
                         <span className="ml-1 rounded-full bg-amber-100 px-1.5 text-xs text-amber-800">{line.totals.pendingOtDays} chờ</span>
+                      )}
+                      {line.totals.autoClosedDays > 0 && (
+                        <span className="ml-1 rounded-full bg-red-100 px-1.5 text-xs text-red-700">{line.totals.autoClosedDays} quên chấm ra</span>
                       )}
                     </td>
                     <td className="px-3 py-3 text-right">{money(line.totals.basePay)}</td>

@@ -10,7 +10,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ tas
     const { taskId } = await params
     const body = await readJsonBody(request)
     const before = await getTask(taskId)
-    const updated = await assignTask(taskId, body)
+    const updated = await assignTask(taskId, body, me)
     await audit(me, { action: 'task.assign', entity: 'task', entityId: taskId, summary: updated.taskTitle, changes: diff(before, updated, ['assigneeName', 'status']) })
     return NextResponse.json(updated)
   } catch (error) {

@@ -36,6 +36,18 @@ export const PRIVILEGED_USER_SELECT = {
   hourlyRate: true,
   commissionRate: true,
   salesCommissionRate: true,
+  holidayHourlyRate: true,
+  daysOffPerMonth: true,
+} as const
+
+/** The staff list as other staff see it (pickers, filters): no contact details. */
+export const STAFF_DIRECTORY_SELECT = {
+  id: true,
+  name: true,
+  role: true,
+  status: true,
+  avatar: true,
+  createdAt: true,
 } as const
 
 export const PAY_TYPES = ['MONTHLY', 'HOURLY'] as const

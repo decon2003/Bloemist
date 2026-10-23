@@ -1,19 +1,19 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { ArrowLeft, User, Truck, ClipboardList, Plus, Edit, Check, X, StickyNote, Trash2, Play, CheckCircle, Package } from "lucide-react"
+import { ArrowLeft, User, Truck, ClipboardList, Plus, Edit, Check, X, StickyNote, Trash2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useAppData } from "@/components/providers/app-data-provider"
 import { useLocale } from "@/components/providers/locale-provider"
 import { useAuth } from "@/components/providers/auth-provider"
 import AddTaskDialog from "@/components/tasks/add-task-dialog"
+import { ProductCard } from "@/components/orders/product-card"
 import { PhotoViewer } from "@/components/photo-viewer"
 import { fetchOrder, updateOrder, deleteOrder } from "@/lib/api"
 import type { CreateOrderInput, Order } from "@/lib/types"
-import { getDateKey } from "@/lib/date-utils"
-import { formatCurrencyDisplay, formatDateTime, fromDateTimeLocalValue, lockedPayrollNotice, toDateTimeLocalValue } from "@/lib/utils"
+import { cn, formatCurrencyDisplay, formatDateTime, fromDateTimeLocalValue, lockedPayrollNotice, toDateTimeLocalValue } from "@/lib/utils"
 import { thumbUrl } from "@/lib/image-compress"
 import { AuditTrail } from "@/components/audit-trail"
 
@@ -21,18 +21,28 @@ interface OrderDetailPageProps {
   orderId: string
 }
 
+/** Fields the edit form changes; only those that differ are sent on save, so
+ *  a status changed meanwhile (e.g. "Đã huỷ") is never overwritten. */
+const EDITABLE_FIELDS = ['customerName', 'customerPhone', 'receiverName', 'receiverPhone', 'deliveryAddress', 'receiveTime'] as const
+
+const CANCEL_CONFIRM =
+  'Huỷ đơn này? Doanh thu, hoa hồng sale và hoa hồng làm đơn của đơn sẽ không được tính nữa; các sản phẩm chưa làm sẽ dừng lại.'
+
+type Toast = { text: string; kind: 'success' | 'error' }
+
 export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
   const router = useRouter()
-  const { tasks, florists, assignTask, updateTaskStatus, setTaskScope, setOrderScope } = useAppData()
-  const { lang, t, getDeliveryLabel, getOrderStatusLabel, getTaskStatusLabel } = useLocale()
+  const { tasks, florists, setTaskScope, refreshTasks } = useAppData()
+  const { lang, t, getDeliveryLabel, getOrderStatusLabel } = useLocale()
   const { user } = useAuth()
   const [order, setOrder] = useState<Order | null>(null)
   const [isFetching, setIsFetching] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const [toast, setToast] = useState<Toast | null>(null)
 
   const [isEditMode, setIsEditMode] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
   const [editForm, setEditForm] = useState<Partial<Order>>({})
   const [viewer, setViewer] = useState<{ photos: string[]; index: number } | null>(null)
 
@@ -45,16 +55,13 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
         const response = await fetchOrder(orderId)
         if (!active) return
         setOrder(response)
-        setEditForm(response)
       } catch (error) {
         if (!active) return
         console.error("Failed to load order", error)
         setOrder(null)
-        setLoadError(t("orders.detail.loadError", "Unable to load order."))
+        setLoadError(error instanceof Error ? error.message : "Không tải được đơn hàng.")
       } finally {
-        if (active) {
-          setIsFetching(false)
-        }
+        if (active) setIsFetching(false)
       }
     }
 
@@ -62,17 +69,19 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
     return () => {
       active = false
     }
-  }, [orderId, t])
+  }, [orderId])
 
   // Load just this order's tasks.
   useEffect(() => setTaskScope({ orderId }), [orderId, setTaskScope])
 
-  // The add-task dialog picks from loaded orders; load this order's receive day
-  // so the order itself is among them.
-  const orderReceiveDay = order ? getDateKey(order.receiveTime) : null
-  useEffect(() => {
-    if (orderReceiveDay) setOrderScope({ from: orderReceiveDay, to: orderReceiveDay })
-  }, [orderReceiveDay, setOrderScope])
+  /** After a product is completed or reopened the order's status may move. */
+  const reloadOrder = useCallback(async () => {
+    try {
+      setOrder(await fetchOrder(orderId))
+    } catch {
+      // The products already show the change; the status catches up on the next visit.
+    }
+  }, [orderId])
 
   const relatedTasks = useMemo(
     () =>
@@ -81,14 +90,6 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
         .sort((taskA, taskB) => new Date(taskA.dueTime).getTime() - new Date(taskB.dueTime).getTime()),
     [tasks, orderId],
   )
-
-  const derivedStatus = useMemo(() => {
-    if (!order) return undefined
-    const allTasksReady = relatedTasks.length > 0 && relatedTasks.every((task) => task.status === 'READY')
-    // If explicit status set, prefer that, but logic can vary. For now rely on order.status primarily unless synced.
-    // The previous logic overrode derivedStatus. Let's stick to order.status if it's set to something specific.
-    return order.status
-  }, [order, relatedTasks])
 
   const orderThumbnail = useMemo(() => {
     const firstSample = relatedTasks.find((task) => task.samplePhotoUrls?.length)?.samplePhotoUrls?.[0]
@@ -103,15 +104,12 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
   const formatMoney = (value?: string | number | null, fallback?: string) =>
     formatCurrencyDisplay(value, fallback ?? '₫0')
 
-  const closeToast = () => setToastMessage(null)
-  const closeDialog = () => setDialogOpen(false)
-  const handleDialogSuccess = (message: string) => {
-    setToastMessage(message)
-    closeDialog()
-  }
+  const showError = (err: unknown, fallback: string) =>
+    setToast({ text: err instanceof Error ? err.message : fallback, kind: 'error' })
 
   const handleEditStart = () => {
-    setEditForm(order || {})
+    if (!order) return
+    setEditForm(Object.fromEntries(EDITABLE_FIELDS.map((field) => [field, order[field] ?? ''])) as Partial<Order>)
     setIsEditMode(true)
   }
 
@@ -121,19 +119,26 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
   }
 
   const handleEditSave = async () => {
-    if (order && editForm) {
-      try {
-        // The edit form covers contact and delivery details; amounts are left
-        // out so they are not re-sent (the server derives totals from prices).
-        const { listedPrice, discount, deliveryFee, deposit, sellingPrice, remainingBalance, total, ...details } = editForm
-        const updated = await updateOrder(order.id, details as Partial<CreateOrderInput>)
-        setOrder(updated)
-        setIsEditMode(false)
-        setToastMessage(t("orders.detail.updateSuccess", "Order updated successfully"))
-      } catch (err) {
-        console.error("Failed to update order", err)
-        setToastMessage(t("orders.detail.updateError", "Failed to update order"))
-      }
+    if (!order) return
+    const changes = Object.fromEntries(
+      EDITABLE_FIELDS.filter((field) => (editForm[field] ?? '') !== (order[field] ?? '')).map((field) => [field, editForm[field] ?? '']),
+    )
+    if (Object.keys(changes).length === 0) {
+      setIsEditMode(false)
+      return
+    }
+    setIsSaving(true)
+    try {
+      const updated = await updateOrder(order.id, changes as Partial<CreateOrderInput>)
+      setOrder(updated)
+      setIsEditMode(false)
+      // A new receive time moves the products' due times on the server.
+      if ('receiveTime' in changes) refreshTasks()
+      setToast({ text: 'Đã lưu thay đổi', kind: 'success' })
+    } catch (err) {
+      showError(err, 'Không lưu được đơn hàng')
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -146,25 +151,30 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
       if (notice) window.alert(notice)
       router.push(`/${lang}/orders`)
     } catch (err) {
-      console.error("Failed to delete order", err)
-      setToastMessage(t("orders.detail.deleteError"))
+      showError(err, 'Không xoá được đơn hàng')
     }
   }
 
-  const handleEditChange = (field: keyof Order, value: any) => {
+  const handleEditChange = (field: keyof Order, value: string) => {
     setEditForm({ ...editForm, [field]: value })
   }
 
   const handleUpdateStatus = async (newStatus: Order['status']) => {
     if (!order) return
-    if (newStatus === 'CANCELLED' && !window.confirm('Huỷ đơn này? Doanh thu, hoa hồng sale và hoa hồng làm đơn của đơn sẽ không được tính nữa; các sản phẩm chưa làm sẽ dừng lại.')) return
+    if (newStatus === 'CANCELLED' && !window.confirm(CANCEL_CONFIRM)) return
+    if (order.status === 'CANCELLED' && !window.confirm('Khôi phục đơn đã huỷ? Doanh thu và hoa hồng của đơn sẽ được tính lại.')) return
+    if (newStatus === 'DELIVERED' && relatedTasks.some((task) => task.status !== 'COMPLETED' && task.status !== 'CANCELLED')) {
+      if (!window.confirm('Đơn còn sản phẩm chưa hoàn tất. Vẫn đánh dấu "Đã giao"?')) return
+    }
     try {
       const updated = await updateOrder(order.id, { status: newStatus })
       setOrder(updated)
-      setToastMessage(lockedPayrollNotice(updated.lockedPayrollMonths) ?? t("orders.detail.updateSuccess", "Status updated"))
+      // Cancelling or restoring changes the products too.
+      if (newStatus === 'CANCELLED' || order.status === 'CANCELLED') refreshTasks()
+      const notice = lockedPayrollNotice(updated.lockedPayrollMonths)
+      setToast(notice ? { text: notice, kind: 'error' } : { text: 'Đã cập nhật trạng thái', kind: 'success' })
     } catch (err) {
-      console.error("Failed to update status", err)
-      setToastMessage(t("orders.detail.updateError", "Failed to update status"))
+      showError(err, 'Không cập nhật được trạng thái')
     }
   }
 
@@ -172,37 +182,31 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
     return (
       <div className="space-y-4 p-4 md:p-8">
         <div className="rounded-2xl border border-border bg-white/70 p-6 text-center text-sm text-muted-foreground">
-          {t("orders.loading", "Loading order...")}
+          Đang tải đơn hàng…
         </div>
       </div>
     )
   }
 
-  if (loadError) {
+  if (loadError || !order) {
     return (
       <div className="space-y-4 p-4 md:p-8">
         <Link href={`/${lang}/orders`} className="inline-flex items-center gap-2 text-sm text-primary">
           <ArrowLeft className="h-4 w-4" /> {t("orders.detail.back")}
         </Link>
         <div className="rounded-2xl border border-dashed border-border bg-white/70 p-10 text-center text-muted-foreground">
-          {loadError}
+          {loadError ?? t("orders.detail.notFound")}
         </div>
       </div>
     )
   }
 
-  if (!order) {
-    return (
-      <div className="space-y-4 p-4 md:p-8">
-        <Link href={`/${lang}/orders`} className="inline-flex items-center gap-2 text-sm text-primary">
-          <ArrowLeft className="h-4 w-4" /> {t("orders.detail.back")}
-        </Link>
-        <div className="rounded-2xl border border-dashed border-border bg-white/70 p-10 text-center text-muted-foreground">
-          {t("orders.detail.notFound")}
-        </div>
-      </div>
-    )
-  }
+  const statusStyle =
+    order.status === 'CANCELLED' ? 'bg-red-100 text-red-800 border-red-200'
+      : order.status === 'READY' ? 'bg-green-100 text-green-800 border-green-200'
+        : order.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800 border-blue-200'
+          : 'bg-muted text-foreground border-transparent'
+  const inputClass = "w-full rounded-lg border border-border bg-white px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
 
   return (
     <div className="space-y-6 p-4 md:p-8 pb-24 md:pb-12">
@@ -210,13 +214,16 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
         <ArrowLeft className="h-4 w-4" /> {t("orders.detail.back")}
       </Link>
 
-      {toastMessage && (
-        <div className="rounded-2xl border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+      {toast && (
+        <div
+          className={cn(
+            'rounded-2xl border p-3 text-sm',
+            toast.kind === 'error' ? 'border-red-200 bg-red-50 text-red-800' : 'border-green-200 bg-green-50 text-green-800',
+          )}
+        >
           <div className="flex items-center justify-between gap-2">
-            <span>{toastMessage}</span>
-            <button onClick={closeToast} className="text-green-700 underline">
-              {t("tasks.toast.close", "Close")}
-            </button>
+            <span>{toast.text}</span>
+            <button onClick={() => setToast(null)} className="underline">Đóng</button>
           </div>
         </div>
       )}
@@ -226,22 +233,17 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
           <div className="flex items-center gap-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{order.code}</p>
             <span className="text-xs text-muted-foreground">•</span>
-            <p className="text-xs text-muted-foreground">
-              {t('orders.detail.createdBy', 'Created by')}: {order.createdByName || '—'}
-            </p>
+            <p className="text-xs text-muted-foreground">Người tạo: {order.createdByName || '—'}</p>
           </div>
           <h1 className="text-3xl font-bold text-foreground">{order.bouquetName}</h1>
-          <p className="text-muted-foreground">{order.customerName}</p>
+          <p className="text-muted-foreground">{order.customerName || 'Chưa có tên khách'}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {canEdit ? (
             <select
               value={order.status}
               onChange={(e) => handleUpdateStatus(e.target.value as Order['status'])}
-              className={`h-9 rounded-full border px-4 py-2 text-sm font-medium focus:ring-1 focus:ring-primary ${order.status === 'CANCELLED' ? 'bg-red-100 text-red-800 border-red-200' : order.status === 'READY' ? 'bg-green-100 text-green-800 border-green-200' :
-                order.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800 border-blue-200' :
-                  'bg-muted text-foreground border-transparent'
-                }`}
+              className={`h-9 rounded-full border px-4 py-2 text-sm font-medium focus:ring-1 focus:ring-primary ${statusStyle}`}
             >
               <option value="NEW">{getOrderStatusLabel('NEW')}</option>
               <option value="IN_PROGRESS">{getOrderStatusLabel('IN_PROGRESS')}</option>
@@ -249,20 +251,24 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
               <option value="DELIVERED">{getOrderStatusLabel('DELIVERED')}</option>
               <option value="CANCELLED">{getOrderStatusLabel('CANCELLED')}</option>
             </select>
-
-            <span className="inline-flex items-center rounded-full bg-primary/10 px-4 py-2 text-sm font-semibold text-primary">
-              {getDeliveryLabel(order.deliveryType)}
+          ) : (
+            <span className={`inline-flex h-9 items-center rounded-full border px-4 text-sm font-medium ${statusStyle}`}>
+              {getOrderStatusLabel(order.status)}
             </span>
-          </div>
+          )}
+
+          <span className="inline-flex items-center rounded-full bg-primary/10 px-4 py-2 text-sm font-semibold text-primary">
+            {getDeliveryLabel(order.deliveryType)}
+          </span>
 
           {canEdit &&
             (!isEditMode ? (
-              <div className="flex gap-2">
+              <>
                 <button
                   onClick={handleEditStart}
                   className="inline-flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm font-medium hover:bg-muted"
                 >
-                  <Edit className="h-4 w-4" /> {t("common.edit", "Edit")}
+                  <Edit className="h-4 w-4" /> Sửa
                 </button>
                 {isManager && (
                   <button
@@ -273,22 +279,23 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
                     <Trash2 className="h-4 w-4" />
                   </button>
                 )}
-              </div>
+              </>
             ) : (
-              <div className="flex gap-2">
+              <>
                 <button
                   onClick={handleEditSave}
-                  className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700"
+                  disabled={isSaving}
+                  className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-60"
                 >
-                  <Check className="h-4 w-4" /> {t("common.save", "Save")}
+                  <Check className="h-4 w-4" /> {isSaving ? 'Đang lưu…' : 'Lưu'}
                 </button>
                 <button
                   onClick={handleEditCancel}
                   className="inline-flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm font-medium hover:bg-muted"
                 >
-                  <X className="h-4 w-4" /> {t("common.cancel", "Cancel")}
+                  <X className="h-4 w-4" /> Huỷ
                 </button>
-              </div>
+              </>
             ))}
         </div>
       </div>
@@ -305,7 +312,6 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
               onClick={() => setViewer({ photos: [orderThumbnail], index: 0 })}
             />
             <dl className="grid flex-1 grid-cols-2 gap-4 text-sm">
-
               <div>
                 <dt className="text-muted-foreground">{t("orders.detail.total")}</dt>
                 <dd className="text-2xl font-bold text-foreground">{formatMoney(order.total)}</dd>
@@ -315,71 +321,58 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
                 <dd className="text-lg font-semibold text-foreground">{getDeliveryLabel(order.deliveryType)}</dd>
               </div>
               <div>
-                <dt className="text-muted-foreground">Receive time</dt>
+                <dt className="text-muted-foreground">Giờ nhận</dt>
                 <dd className="font-semibold text-foreground">{formatDateTime(order.receiveTime, lang)}</dd>
               </div>
               <div>
-                <dt className="text-muted-foreground">Status</dt>
+                <dt className="text-muted-foreground">Trạng thái</dt>
                 <dd className="font-semibold text-foreground">{getOrderStatusLabel(order.status)}</dd>
               </div>
             </dl>
           </div>
         </section>
 
-
-
         <section className="rounded-2xl border border-border bg-white p-6">
-          <h2 className="text-base font-semibold text-foreground">{t('orders.detail.paymentSummary', 'Payment summary')}</h2>
+          <h2 className="text-base font-semibold text-foreground">{t('orders.detail.paymentSummary', 'Thanh toán')}</h2>
           <dl className="mt-4 grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
             <div>
-              <dt className="text-muted-foreground">{t('orders.detail.listedPrice', 'Listed price')}</dt>
+              <dt className="text-muted-foreground">{t('orders.detail.listedPrice', 'Giá niêm yết')}</dt>
               <dd className="text-lg font-semibold text-foreground">{formatMoney(order.listedPrice, '—')}</dd>
             </div>
-            {/* New orders have no discount field; only older orders may carry one. */}
-            {(order.discount ?? 0) > 0 && (
-              <div>
-                <dt className="text-muted-foreground">{t('orders.detail.discount', 'Discount')}</dt>
-                <dd className="text-lg font-semibold text-foreground">{formatMoney(order.discount)}</dd>
-              </div>
-            )}
             <div>
-              <dt className="text-muted-foreground">{t('orders.detail.vatPercent', 'VAT')}</dt>
+              <dt className="text-muted-foreground">VAT</dt>
               <dd className="text-lg font-semibold text-foreground">{order.vatPercent ?? 0}%</dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">{t('orders.detail.deliveryFee', 'Delivery fee')}</dt>
+              <dt className="text-muted-foreground">{t('orders.detail.deliveryFee', 'Phí giao hàng')}</dt>
               <dd className="text-lg font-semibold text-foreground">
                 {order.deliveryCoveredByShop ? 'Freeship' : order.deliveryType === 'DELIVERY' ? formatMoney(order.deliveryFee) : '—'}
               </dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">{t('orders.detail.deposit', 'Deposit')}</dt>
+              <dt className="text-muted-foreground">{t('orders.detail.deposit', 'Đã cọc')}</dt>
               <dd className="text-lg font-semibold text-foreground">{formatMoney(order.deposit)}</dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">{t('orders.detail.sellingPrice', 'Selling price')}</dt>
-              <dd className="text-lg font-semibold text-foreground">{formatMoney(order.sellingPrice || order.total)}</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">{t('orders.detail.remainingBalance', 'Remaining to pay')}</dt>
+              <dt className="text-muted-foreground">{t('orders.detail.remainingBalance', 'Còn phải thu')}</dt>
               <dd className="text-lg font-semibold text-foreground">{formatMoney(order.remainingBalance)}</dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">{t('orders.detail.total', 'Order total value')}</dt>
+              <dt className="text-muted-foreground">{t('orders.detail.total', 'Tổng tiền')}</dt>
               <dd className="text-lg font-semibold text-foreground">{formatMoney(order.total)}</dd>
             </div>
           </dl>
         </section>
 
         <section className="col-span-1 md:col-span-2 rounded-2xl border border-border bg-white p-6">
-          <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-foreground">
-            <StickyNote className="h-4 w-4" /> {t("orders.detail.notes", "Order Notes")}
+          <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
+            <StickyNote className="h-4 w-4" /> {t("orders.detail.notes", "Ghi chú")}
           </div>
           <div className="rounded-xl bg-muted/30 p-4 text-sm text-foreground">
             {order.notes ? (
               <p className="whitespace-pre-wrap">{order.notes}</p>
             ) : (
-              <p className="text-muted-foreground italic">{t("orders.detail.noNotes", "No notes")}</p>
+              <p className="italic text-muted-foreground">Không có ghi chú</p>
             )}
           </div>
         </section>
@@ -395,37 +388,38 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
                   type="text"
                   value={editForm.customerName || ""}
                   onChange={(e) => handleEditChange("customerName", e.target.value)}
-                  placeholder="Customer name"
-                  className="w-full rounded-lg border border-border bg-white px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="Tên người đặt"
+                  className={inputClass}
                 />
                 <input
                   type="tel"
+                  inputMode="tel"
                   value={editForm.customerPhone || ""}
                   onChange={(e) => handleEditChange("customerPhone", e.target.value)}
-                  placeholder="Phone number"
-                  className="w-full rounded-lg border border-border bg-white px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="SĐT người đặt"
+                  className={inputClass}
                 />
               </div>
             ) : (
               <>
                 <div className="mt-2 flex items-center gap-2">
-                  {order.customerId && (user?.role === 'boss' || user?.role === 'admin') ? (
+                  {order.customerId && isManager ? (
                     <Link href={`/${lang}/customers/${order.customerId}`} className="text-sm font-medium text-primary hover:underline">
-                      {order.customerName}
+                      {order.customerName || "Chưa có tên khách"}
                     </Link>
                   ) : (
                     <p className="text-sm text-muted-foreground">{order.customerName || "Chưa có tên khách"}</p>
                   )}
                   {order.new_customer && (
-                    <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700 uppercase tracking-wide">
-                      {t('orders.detail.newCustomer', 'New')}
+                    <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-700">
+                      Khách mới
                     </span>
                   )}
                 </div>
                 {canSeeContacts ? (
-                  <p className="text-sm text-muted-foreground">{order.customerPhone}</p>
+                  <p className="text-sm text-muted-foreground">{order.customerPhone || 'Chưa có SĐT'}</p>
                 ) : (
-                  <p className="text-sm text-muted-foreground">{t("orders.detail.contactHidden", "Contact details hidden")}</p>
+                  <p className="text-sm text-muted-foreground">SĐT chỉ sale và quản lý xem được</p>
                 )}
               </>
             )}
@@ -435,233 +429,124 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
             <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
               <Truck className="h-4 w-4" /> {t("orders.detail.receiver")}
             </div>
-            {canSeeContacts ? (
-              isEditMode && canEdit ? (
-                <div className="mt-3 space-y-2">
+            {isEditMode && canEdit ? (
+              <div className="mt-3 space-y-2">
+                <input
+                  type="text"
+                  value={editForm.receiverName || ""}
+                  onChange={(e) => handleEditChange("receiverName", e.target.value)}
+                  placeholder="Tên người nhận"
+                  className={inputClass}
+                />
+                <input
+                  type="tel"
+                  inputMode="tel"
+                  value={editForm.receiverPhone || ""}
+                  onChange={(e) => handleEditChange("receiverPhone", e.target.value)}
+                  placeholder="SĐT người nhận"
+                  className={inputClass}
+                />
+                {order.deliveryType === 'DELIVERY' && (
                   <input
                     type="text"
-                    value={editForm.receiverName || ""}
-                    onChange={(e) => handleEditChange("receiverName", e.target.value)}
-                    placeholder="Receiver name"
-                    className="w-full rounded-lg border border-border bg-white px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    value={editForm.deliveryAddress || ""}
+                    onChange={(e) => handleEditChange("deliveryAddress", e.target.value)}
+                    placeholder={t('orders.new.deliveryAddressPlaceholder')}
+                    className={inputClass}
                   />
-                  <input
-                    type="tel"
-                    value={editForm.receiverPhone || ""}
-                    onChange={(e) => handleEditChange("receiverPhone", e.target.value)}
-                    placeholder="Phone number"
-                    className="w-full rounded-lg border border-border bg-white px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
-                  {(editForm.deliveryType === 'DELIVERY' || (!editForm.deliveryType && order.deliveryType === 'DELIVERY')) && (
-                    <input
-                      type="text"
-                      value={editForm.deliveryAddress || ""}
-                      onChange={(e) => handleEditChange("deliveryAddress", e.target.value)}
-                      placeholder={t('orders.new.deliveryAddressPlaceholder')}
-                      className="w-full rounded-lg border border-border bg-white px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                    />
-                  )}
-                </div>
-              ) : (
-                <>
-                  <p className="mt-2 text-sm text-muted-foreground">{order.receiverName}</p>
-                  <p className="text-sm text-muted-foreground">{order.receiverPhone}</p>
-                  {order.deliveryType === 'DELIVERY' && order.deliveryAddress && (
-                    <div className="mt-2 border-t border-dashed border-border pt-2">
-                      <p className="text-xs font-medium text-muted-foreground mb-1">{t('orders.detail.deliveryAddress', 'Delivery Address')}:</p>
-                      <p className="text-sm text-foreground">{order.deliveryAddress}</p>
-                    </div>
-                  )}
-                </>
-              )
+                )}
+              </div>
             ) : (
-              <p className="mt-2 text-sm text-muted-foreground">{t("orders.detail.receiverHidden", "Receiver details hidden")}</p>
+              <>
+                <p className="mt-2 text-sm text-muted-foreground">{order.receiverName || 'Chưa có tên người nhận'}</p>
+                {canSeeContacts && <p className="text-sm text-muted-foreground">{order.receiverPhone || 'Chưa có SĐT'}</p>}
+                {order.deliveryType === 'DELIVERY' && (
+                  <div className="mt-2 border-t border-dashed border-border pt-2">
+                    <p className="mb-1 text-xs font-medium text-muted-foreground">Địa chỉ giao:</p>
+                    <p className="text-sm text-foreground">{order.deliveryAddress || 'Chưa có địa chỉ'}</p>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </section>
       </div>
 
-      {
-        isEditMode && (
-          <section className="rounded-2xl border border-border bg-white p-6">
-            <h2 className="mb-4 text-sm font-semibold text-foreground">
-              {t("orders.detail.deliveryInfo", "Delivery Information")}
-            </h2>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Receive Time</label>
-                {/* datetime-local is a LOCAL wall-clock control. Slicing an ISO
-                    (UTC) string into it showed the time 7h early in Vietnam and,
-                    because the value was read back as local time, shifted the
-                    stored timestamp another 7h earlier on every save - even when
-                    the field was never touched. */}
-                <input
-                  type="datetime-local"
-                  value={toDateTimeLocalValue(editForm.receiveTime)}
-                  onChange={(e) => {
-                    const iso = fromDateTimeLocalValue(e.target.value)
-                    // A cleared or partially typed value yields null; ignore it
-                    // rather than throwing RangeError during render.
-                    if (iso) handleEditChange("receiveTime", iso)
-                  }}
-                  className="w-full rounded-lg border border-border bg-white px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </div>
+      {isEditMode && (
+        <section className="rounded-2xl border border-border bg-white p-6">
+          <h2 className="mb-4 text-sm font-semibold text-foreground">Giờ nhận</h2>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Ngày giờ nhận</label>
+              {/* datetime-local is a LOCAL wall-clock control: convert to and
+                  from it explicitly, never by slicing an ISO (UTC) string. */}
+              <input
+                type="datetime-local"
+                value={toDateTimeLocalValue(editForm.receiveTime)}
+                onChange={(e) => {
+                  const iso = fromDateTimeLocalValue(e.target.value)
+                  // A cleared or partially typed value yields null; ignore it.
+                  if (iso) handleEditChange("receiveTime", iso)
+                }}
+                className={inputClass}
+              />
+              <p className="text-xs text-muted-foreground">Hạn làm của các sản phẩm chưa xong sẽ dời theo.</p>
             </div>
-          </section>
-        )
-      }
+          </div>
+        </section>
+      )}
 
       <section className="rounded-2xl border border-border bg-white p-6">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-6">
+        <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-            <ClipboardList className="h-4 w-4" /> {t("orders.new.taskListTitle", "Products")}
+            <ClipboardList className="h-4 w-4" /> Sản phẩm của đơn
           </div>
-          <button
-            onClick={() => setDialogOpen(true)}
-            className="inline-flex items-center justify-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-semibold text-primary hover:border-primary/60"
-          >
-            <Plus className="h-4 w-4" /> {t("orders.detail.addTask", "Add task")}
-          </button>
+          {canEdit && order.status !== 'CANCELLED' && (
+            <button
+              onClick={() => setDialogOpen(true)}
+              className="inline-flex items-center justify-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-semibold text-primary hover:border-primary/60"
+            >
+              <Plus className="h-4 w-4" /> Thêm việc
+            </button>
+          )}
         </div>
         {relatedTasks.length === 0 ? (
-          <p className="mt-4 text-sm text-muted-foreground">
-            {t("orders.detail.relatedEmpty")} {t("orders.detail.relatedCta")}
-          </p>
+          <p className="text-sm text-muted-foreground">Đơn này chưa có sản phẩm.</p>
         ) : (
-          <div className="space-y-8">
-            {relatedTasks.map((task) => {
-              const isMyTask = user?.id === task.assigneeId
-              return (
-                <div
-                  key={task.id}
-                  className={`flex flex-col gap-6 md:gap-8 border-b pb-8 last:border-0 last:pb-0 transition-colors rounded-xl p-4 ${isMyTask ? 'bg-blue-50/50 border border-blue-100 shadow-sm' : 'border-border'
-                    }`}
-                >
-                  {/* Task Header */}
-                  <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-                    <div>
-                      <div className="flex items-center gap-3 mb-2">
-                        <span className="inline-flex items-center rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary uppercase">
-                          {task.type || 'BO_HOA'}
-                        </span>
-                        <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ${task.status === 'READY' ? 'bg-green-100 text-green-700' :
-                            task.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-700' :
-                              'bg-muted text-foreground'
-                          }`}>
-                          {getTaskStatusLabel ? getTaskStatusLabel(task.status) : task.status}
-                        </span>
-                        {isMyTask && (
-                          <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700">
-                            {t('common.you', 'You')}
-                          </span>
-                        )}
-                      </div>
-                      <h3 className={`text-xl font-bold mb-1 ${isMyTask ? 'text-blue-700' : 'text-foreground'}`}>
-                        {task.taskTitle}
-                      </h3>
-                      <div className="flex items-center gap-2 text-sm mt-1">
-                        <span className="text-muted-foreground">{t("orders.detail.assignedTo", "Assigned to")}:</span>
-                        <select
-                          value={task.assigneeId || ""}
-                          onChange={(e) => {
-                            const selectedId = e.target.value
-                            const florist = florists.find((f) => f.id === selectedId)
-                            if (florist) {
-                              assignTask(task.id, { userId: florist.id, userName: florist.name })
-                              if (task.status === 'UNASSIGNED' || !task.status) {
-                                updateTaskStatus(task.id, 'IN_PROGRESS')
-                              }
-                            }
-                          }}
-                          className={`h-8 rounded-md border px-2 py-1 text-sm font-medium focus:ring-1 focus:ring-primary w-fit ${isMyTask ? 'border-blue-200 bg-white' : 'border-input bg-background'
-                            }`}
-                          disabled={!canEdit}
-                        >
-                          <option value="" disabled>
-                            {t('tasks.unassigned', 'Unassigned')}
-                          </option>
-                          {florists.map((f) => (
-                            <option key={f.id} value={f.id}>
-                              {f.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Task Images */}
-                  {(task.samplePhotoUrls && task.samplePhotoUrls.length > 0) ? (
-                    <div className="space-y-3">
-                      <p className="text-sm font-medium text-muted-foreground">{t("addTask.fields.samplePhoto", "Sample Photos")}</p>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        {task.samplePhotoUrls.map((url, idx) => (
-                          <div
-                            key={idx}
-                            className="relative aspect-square cursor-zoom-in overflow-hidden rounded-xl border border-border bg-muted"
-                            onClick={() => setViewer({ photos: task.samplePhotoUrls ?? [url], index: idx })}
-                          >
-                            <Image
-                              src={thumbUrl(url)}
-                              alt={`Sample ${idx + 1}`}
-                              fill
-                              className="object-cover transition-transform duration-300 hover:scale-105"
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : task.bouquetImage ? (
-                    <div className="space-y-3">
-                      <p className="text-sm font-medium text-muted-foreground">{t("addTask.fields.samplePhoto", "Sample Photos")}</p>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div
-                          className="relative aspect-square cursor-zoom-in overflow-hidden rounded-xl border border-border bg-muted"
-                          onClick={() => task.bouquetImage && setViewer({ photos: [task.bouquetImage], index: 0 })}
-                        >
-                          <Image
-                            src={thumbUrl(task.bouquetImage)}
-                            alt="Bouquet"
-                            fill
-                            className="object-cover transition-transform duration-300 hover:scale-105"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {/* Task Notes */}
-                  {task.notes && (
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium text-muted-foreground">{t('addTask.fields.notes', 'Notes')}</p>
-                      <div className="rounded-xl bg-yellow-50/50 border border-yellow-100 p-4 text-sm text-foreground">
-                        <p className="whitespace-pre-wrap leading-relaxed">{task.notes}</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
+          <div className="space-y-4">
+            {relatedTasks.map((task) => (
+              <ProductCard
+                key={task.id}
+                task={task}
+                user={user}
+                florists={florists}
+                lang={lang}
+                onViewPhotos={(photos, index) => setViewer({ photos, index })}
+                onOrderChanged={() => {
+                  reloadOrder()
+                  refreshTasks()
+                }}
+              />
+            ))}
           </div>
         )}
       </section>
 
-      {(user?.role === "boss" || user?.role === "admin") && (
-        <AuditTrail entity="order" entityId={orderId} lang={lang} />
-      )}
+      {isManager && <AuditTrail entity="order" entityId={orderId} lang={lang} />}
 
-      {viewer && (
-        <PhotoViewer photos={viewer.photos} startIndex={viewer.index} onClose={() => setViewer(null)} />
-      )}
+      {viewer && <PhotoViewer photos={viewer.photos} startIndex={viewer.index} onClose={() => setViewer(null)} />}
 
       <AddTaskDialog
         open={dialogOpen}
-        onClose={closeDialog}
-        onSuccess={handleDialogSuccess}
+        onClose={() => setDialogOpen(false)}
+        onSuccess={(message) => {
+          setToast({ text: message, kind: 'success' })
+          setDialogOpen(false)
+        }}
         initialOrderId={order.id}
+        order={order}
         lockOrderSelection
       />
-    </div >
+    </div>
   )
 }

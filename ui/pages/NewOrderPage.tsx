@@ -39,13 +39,22 @@ export default function NewOrderPage() {
   const [deliveryFee, setDeliveryFee] = useState('')
   // Freeship: the customer pays no delivery fee (stored as deliveryCoveredByShop).
   const [freeship, setFreeship] = useState(false)
-  const [vatPercent, setVatPercent] = useState<number>(10)
+  // VAT only when the customer asks for an invoice: enter it then, otherwise 0%.
+  const [vatPercent, setVatPercent] = useState<number>(0)
   const [deposit, setDeposit] = useState('')
   const [deliveryType, setDeliveryType] = useState<'DELIVERY' | 'PICKUP'>('DELIVERY')
   const [deliveryAddress, setDeliveryAddress] = useState('')
   const [receiveTime, setReceiveTime] = useState(() => toDateTimeLocalValue(new Date()))
   const [notes, setNotes] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  // Sample photos still uploading: the order waits for them.
+  const [uploading, setUploading] = useState(0)
+  // One id per order being created: a retry after a lost reply returns the
+  // order already created instead of a duplicate.
+  const [requestId] = useState(() =>
+    typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+  )
   const [products, setProducts] = useState<ProductForm[]>([
     { name: '', quantity: 1, unitPrice: '', note: '', samplePhotoUrls: [], draftSampleUrl: '' },
   ])
@@ -91,20 +100,13 @@ export default function NewOrderPage() {
     // customerNameAutofilled is read, not reacted to.
   }, [customerPhone])
 
-  const isNewCustomer = !knownCustomer
 
   // Listed price is the sum of the product lines; the server recomputes it.
   const listedPrice = String(
     products.reduce((sum, product) => sum + parseCurrencyToNumber(product.unitPrice) * (product.quantity || 1), 0),
   )
 
-  const dueTimeForTasks = useMemo(() => {
-    const receiveDate = new Date(receiveTime)
-    return new Date(receiveDate.getTime() - 1000 * 60 * 120).toISOString()
-  }, [receiveTime])
-
   const {
-    formattedSellingPrice,
     formattedOrderTotal,
     formattedRemainingBalance,
   } = useMemo(() => {
@@ -121,7 +123,6 @@ export default function NewOrderPage() {
     const remainingBalanceValue = Math.max(orderTotalValue - depositAmount, 0)
 
     return {
-      formattedSellingPrice: formatCurrencyFromNumber(sellingPriceValue),
       formattedOrderTotal: formatCurrencyFromNumber(orderTotalValue),
       formattedRemainingBalance: formatCurrencyFromNumber(remainingBalanceValue),
     }
@@ -142,7 +143,8 @@ export default function NewOrderPage() {
       prev.map((product, idx) => {
         if (idx !== index) return product
         if (key === 'quantity') {
-          return { ...product, quantity: Number(value) }
+          // Empty while typing (so "3" can replace "1"); checked on submit.
+          return { ...product, quantity: Math.max(0, Math.floor(Number(value) || 0)) }
         }
         if (key === 'unitPrice') {
           return { ...product, unitPrice: formatCurrencyInput(String(value)) }
@@ -187,10 +189,13 @@ export default function NewOrderPage() {
   const handleSampleFileUpload = async (index: number, fileList: FileList | null) => {
     const file = fileList?.[0]
     if (!file) return
+    setUploading((n) => n + 1)
     try {
       addSamplePhotoToProduct(index, await uploadPhoto(file))
     } catch (error) {
       alert(error instanceof Error ? error.message : 'Không tải được ảnh lên')
+    } finally {
+      setUploading((n) => n - 1)
     }
   }
 
@@ -204,6 +209,15 @@ export default function NewOrderPage() {
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    setSubmitError(null)
+    if (uploading > 0) {
+      setSubmitError('Ảnh mẫu đang tải lên, đợi xong rồi tạo đơn.')
+      return
+    }
+    if (!receiveTime || Number.isNaN(new Date(receiveTime).getTime())) {
+      setSubmitError('Vui lòng chọn ngày giờ nhận.')
+      return
+    }
     setIsSaving(true)
     setProductError(null)
 
@@ -215,6 +229,17 @@ export default function NewOrderPage() {
     }
     if (preparedProducts.some((product) => !product.unitPrice.trim())) {
       setProductError('Vui lòng nhập đơn giá cho từng sản phẩm.')
+      setIsSaving(false)
+      return
+    }
+    // "350k" would be read as 350 ₫: nothing in the shop costs under 1.000 ₫.
+    if (preparedProducts.some((product) => parseCurrencyToNumber(product.unitPrice) < 1000)) {
+      setProductError('Đơn giá phải từ 1.000 ₫. Gõ đủ số, ví dụ 350000 (không gõ "350k").')
+      setIsSaving(false)
+      return
+    }
+    if (preparedProducts.some((product) => !product.quantity || product.quantity < 1)) {
+      setProductError('Số lượng mỗi sản phẩm phải từ 1.')
       setIsSaving(false)
       return
     }
@@ -246,7 +271,7 @@ export default function NewOrderPage() {
         notes,
         createdById: user?.id,
         createdByName: user?.name,
-        new_customer: isNewCustomer,
+        requestId,
         assigneeId: assigneeId || undefined,
         assigneeName: florists.find((f) => f.id === assigneeId)?.name || undefined,
         salespersonId: salespersonId || user?.id,
@@ -264,6 +289,11 @@ export default function NewOrderPage() {
       router.push(`/${lang}/orders/${created.id}`)
     } catch (error) {
       console.error('Failed to create order', error)
+      setSubmitError(
+        error instanceof Error && error.message !== 'Failed to fetch'
+          ? error.message
+          : 'Mất kết nối khi tạo đơn. Bấm "Tạo đơn" lại: đơn sẽ không bị tạo trùng.',
+      )
       setIsSaving(false)
     }
   }
@@ -378,6 +408,8 @@ export default function NewOrderPage() {
               <label className="space-y-2 text-sm font-medium text-foreground">
                 <span>{t('orders.new.receiverPhone', 'Receiver phone')}</span>
                 <input
+                  type="tel"
+                  inputMode="tel"
                   value={receiverIsCustomer ? customerPhone : receiverPhone}
                   disabled={receiverIsCustomer}
                   onChange={(event) => setReceiverPhone(event.target.value)}
@@ -497,8 +529,8 @@ export default function NewOrderPage() {
                       <input
                         type="number"
                         min={1}
-                        value={product.quantity}
-                        onChange={(event) => handleProductChange(index, 'quantity', Number(event.target.value) || 1)}
+                        value={product.quantity || ''}
+                        onChange={(event) => handleProductChange(index, 'quantity', event.target.value)}
                         className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                       />
                     </label>
@@ -566,7 +598,7 @@ export default function NewOrderPage() {
                               <button
                                 type="button"
                                 onClick={() => removeSamplePhotoFromProduct(index, photoIndex)}
-                                className="absolute right-1 top-1 hidden h-6 w-6 rounded-full bg-black/70 text-white hover:bg-black/90 group-hover:block"
+                                className="absolute right-1 top-1 h-6 w-6 rounded-full bg-black/70 text-white hover:bg-black/90"
                                 aria-label={t('orders.new.removeSamplePhoto', 'Remove photo')}
                               >
                                 ×
@@ -685,6 +717,9 @@ export default function NewOrderPage() {
             </div>
           </section>
 
+          {submitError && (
+            <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{submitError}</p>
+          )}
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <Link
               href={`/${lang}/orders`}
@@ -694,10 +729,10 @@ export default function NewOrderPage() {
             </Link>
             <button
               type="submit"
-              disabled={isSaving}
+              disabled={isSaving || uploading > 0}
               className="rounded-xl bg-primary px-6 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70"
             >
-              {isSaving ? t('orders.new.saving', 'Saving...') : t('orders.new.submit', 'Create order')}
+              {uploading > 0 ? 'Đang tải ảnh…' : isSaving ? 'Đang tạo…' : t('orders.new.submit', 'Tạo đơn')}
             </button>
           </div>
         </form >

@@ -3,14 +3,16 @@ import { ApiError } from './api-error'
 import { audit, diff, type AuditActor } from './audit'
 import { addVnDays, parseVnDateKey, vnDateKey } from './vn-time'
 
-// Attendance rules. Hours feed hourly pay (sales, assistant florists), so a
-// shift must be complete and plausible:
-// - one shift per person per Vietnam day (unique staffId + workDate);
-// - a shift nobody checked out of is closed at closing time by the nightly
-//   job and flagged, so it is never left open or billed for days;
+// Attendance rules. Hours feed pay, so a shift must be complete and plausible:
+// - one shift per person per Vietnam day (unique staffId + workDate, the day
+//   the shift started); a shift may run past midnight, up to MAX_SHIFT_HOURS;
+// - a shift nobody checked out of within MAX_SHIFT_HOURS is closed with 0
+//   hours and flagged, and stays at 0 until someone enters the real time;
 // - staff may enter or fix their own times for today and the previous
 //   CORRECTION_DAYS days (no approval, but every change is audited);
-//   managers may fix anyone's shift within MANAGER_CORRECTION_DAYS.
+//   managers may fix anyone's shift within MANAGER_CORRECTION_DAYS, and
+//   delete a shift checked in by mistake;
+// - nothing can change in a month whose payroll is locked.
 
 export const CORRECTION_DAYS = 3
 const MANAGER_CORRECTION_DAYS = 62
@@ -21,15 +23,54 @@ export async function getShopSettings() {
   return db.shopSettings.upsert({ where: { id: 1 }, update: {}, create: { id: 1 } })
 }
 
-export async function updateShopSettings(actor: AuditActor, input: { openTime?: unknown; closeTime?: unknown }) {
+export type Holiday = { date: string; name: string }
+
+/** Public holidays stored in ShopSettings.holidays (JSON). */
+export function parseHolidays(value: string | null | undefined): Holiday[] {
+  try {
+    const list = JSON.parse(value || '[]')
+    if (!Array.isArray(list)) return []
+    return list
+      .filter((h) => h && typeof h.date === 'string' && parseVnDateKey(h.date))
+      .map((h) => ({ date: h.date as string, name: typeof h.name === 'string' ? h.name : '' }))
+      .sort((a, b) => a.date.localeCompare(b.date))
+  } catch {
+    return []
+  }
+}
+
+const readHolidays = (value: unknown): Holiday[] => {
+  if (!Array.isArray(value)) throw new ApiError(400, 'Danh sách ngày lễ không hợp lệ')
+  const byDate = new Map<string, Holiday>()
+  for (const raw of value as { date?: unknown; name?: unknown }[]) {
+    if (typeof raw?.date !== 'string' || !parseVnDateKey(raw.date)) throw new ApiError(400, 'Ngày lễ phải có dạng YYYY-MM-DD')
+    byDate.set(raw.date, { date: raw.date, name: typeof raw.name === 'string' ? raw.name.trim().slice(0, 100) : '' })
+  }
+  return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date))
+}
+
+export async function updateShopSettings(
+  actor: AuditActor,
+  input: { openTime?: unknown; closeTime?: unknown; holidays?: unknown },
+) {
   const current = await getShopSettings()
-  const openTime = input.openTime === undefined ? current.openTime : parseTime(input.openTime, 'openTime')
-  const closeTime = input.closeTime === undefined ? current.closeTime : parseTime(input.closeTime, 'closeTime')
+  const openTime = input.openTime === undefined ? current.openTime : parseTime(input.openTime, 'Giờ mở cửa')
+  const closeTime = input.closeTime === undefined ? current.closeTime : parseTime(input.closeTime, 'Giờ đóng cửa')
   if (closeTime <= openTime) throw new ApiError(400, 'Giờ đóng cửa phải sau giờ mở cửa')
-  const updated = await db.shopSettings.update({ where: { id: 1 }, data: { openTime, closeTime } })
-  const changes = diff(current, updated, ['openTime', 'closeTime'])
-  if (changes) await audit(actor, { action: 'settings.update', entity: 'settings', summary: 'Giờ làm việc', changes })
+  const holidays = input.holidays === undefined ? current.holidays : JSON.stringify(readHolidays(input.holidays))
+  const updated = await db.shopSettings.update({ where: { id: 1 }, data: { openTime, closeTime, holidays } })
+  const changes = diff(current, updated, ['openTime', 'closeTime', 'holidays'])
+  if (changes) await audit(actor, { action: 'settings.update', entity: 'settings', summary: 'Giờ làm việc / ngày lễ', changes })
   return updated
+}
+
+/** Shifts of a month whose payroll is locked are final. */
+async function assertMonthOpen(workDate: string) {
+  const month = workDate.slice(0, 7)
+  const payroll = await db.payroll.findUnique({ where: { month }, select: { status: true } })
+  if (payroll?.status === 'LOCKED') {
+    throw new ApiError(409, `Tháng ${month.slice(5)}/${month.slice(0, 4)} đã chốt lương, không sửa chấm công được nữa. Liên hệ quản lý.`)
+  }
 }
 
 function parseTime(value: unknown, field: string): string {
@@ -42,41 +83,44 @@ const atVnTime = (workDate: string, time: string) => new Date(`${workDate}T${tim
 
 const hoursBetween = (start: Date, end: Date) => Math.round(((end.getTime() - start.getTime()) / 3_600_000) * 100) / 100
 
-/** Close every shift from before today that nobody checked out of, at the
- *  shop's closing time (or at check-in if they checked in after closing).
- *  Run nightly, and also before check-ins are listed, so a missed job can't
- *  leave a shift open. Returns how many were closed. */
+/** Close every shift nobody checked out of within MAX_SHIFT_HOURS, with 0
+ *  hours: it is paid only once someone enters the real check-out time. Run
+ *  nightly, and also before check-ins are listed, so a missed job can't leave
+ *  a shift open. Returns how many were closed. */
 export async function closeOpenShifts(now = new Date()) {
-  const today = vnDateKey(now)
   const open = await db.staffCheckIn.findMany({
-    where: { checkOutAt: null, workDate: { lt: today } },
-    select: { id: true, staffId: true, staffName: true, workDate: true, checkInAt: true, timestamp: true },
+    where: { checkOutAt: null },
+    select: { id: true, staffName: true, workDate: true, checkInAt: true, timestamp: true },
   })
-  if (open.length === 0) return 0
-
-  const { closeTime } = await getShopSettings()
-  for (const shift of open) {
+  const stale = open.filter((shift) => hoursBetween(shift.checkInAt ?? shift.timestamp, now) > MAX_SHIFT_HOURS)
+  for (const shift of stale) {
     const checkIn = shift.checkInAt ?? shift.timestamp
-    const closing = atVnTime(shift.workDate, closeTime)
-    const checkOut = closing > checkIn ? closing : checkIn
     await db.staffCheckIn.update({
       where: { id: shift.id },
-      data: { checkOutAt: checkOut, workingHours: hoursBetween(checkIn, checkOut), autoClosed: true },
+      data: { checkOutAt: checkIn, workingHours: 0, autoClosed: true },
     })
     await audit(null, {
       action: 'checkin.auto_close',
       entity: 'checkin',
       entityId: shift.id,
-      summary: `${shift.staffName} ${shift.workDate}: quên chấm công ra, tự chốt lúc ${closeTime}`,
+      summary: `${shift.staffName} ${shift.workDate}: quên chấm công ra, tính 0 giờ cho tới khi sửa`,
     })
   }
-  return open.length
+  return stale.length
+}
+
+/** The person's shift still open (checked in, not out) within MAX_SHIFT_HOURS. */
+async function openShiftOf(staffId: string, now: Date) {
+  const open = await db.staffCheckIn.findMany({ where: { staffId, checkOutAt: null }, orderBy: { timestamp: 'desc' } })
+  return open.find((shift) => hoursBetween(shift.checkInAt ?? shift.timestamp, now) <= MAX_SHIFT_HOURS) ?? null
 }
 
 type Staff = { id: string; name: string; role: string }
 
 export async function checkIn(staff: Staff, now = new Date()) {
   const workDate = vnDateKey(now)
+  const open = await openShiftOf(staff.id, now)
+  if (open) throw new ApiError(409, 'Bạn chưa chấm công ra ca trước. Chấm công ra trước khi vào ca mới.')
   const existing = await db.staffCheckIn.findUnique({ where: { staffId_workDate: { staffId: staff.id, workDate } } })
   if (existing) throw new ApiError(409, 'Bạn đã chấm công vào hôm nay. Nếu giờ vào chưa đúng, dùng "Sửa giờ".')
   return db.staffCheckIn.create({
@@ -100,11 +144,12 @@ export async function checkOut(staffId: string, checkInId: string, now = new Dat
   const shift = await db.staffCheckIn.findUnique({ where: { id: checkInId } })
   if (!shift || shift.staffId !== staffId) throw new ApiError(404, 'Không tìm thấy ca làm')
   if (shift.checkOutAt) throw new ApiError(409, 'Ca này đã chấm công ra')
-  // Checking out "now" on an earlier day's shift would bill every hour since.
-  if (shift.workDate !== vnDateKey(now)) {
-    throw new ApiError(409, 'Ca này thuộc ngày khác. Dùng "Sửa giờ" để nhập giờ ra thực tế.')
-  }
   const checkInAt = shift.checkInAt ?? shift.timestamp
+  // A shift may cross midnight, but checking out "now" on a shift older than
+  // that would bill every hour since.
+  if (hoursBetween(checkInAt, now) > MAX_SHIFT_HOURS) {
+    throw new ApiError(409, `Ca này đã quá ${MAX_SHIFT_HOURS} tiếng. Dùng "Sửa giờ" để nhập giờ ra thực tế.`)
+  }
   return db.staffCheckIn.update({
     where: { id: checkInId },
     data: { checkOutAt: now, workingHours: hoursBetween(checkInAt, now) },
@@ -137,15 +182,17 @@ export async function correctShift(
 
   const reason = typeof input.reason === 'string' ? input.reason.trim() : ''
   if (!reason) throw new ApiError(400, 'Vui lòng ghi lý do')
+  await assertMonthOpen(workDate)
 
   const checkInAt = atVnTime(workDate, parseTime(input.checkIn, 'Giờ vào'))
-  const checkOutAt = input.checkOut === null || input.checkOut === undefined || input.checkOut === ''
+  let checkOutAt = input.checkOut === null || input.checkOut === undefined || input.checkOut === ''
     ? null
     : atVnTime(workDate, parseTime(input.checkOut, 'Giờ ra'))
+  // A check-out earlier than the check-in is the next morning (a shift past midnight).
+  if (checkOutAt && checkOutAt <= checkInAt) checkOutAt = new Date(checkOutAt.getTime() + 24 * 3_600_000)
 
   if (checkInAt > now) throw new ApiError(400, 'Giờ vào không được ở tương lai')
   if (checkOutAt && checkOutAt > now) throw new ApiError(400, 'Giờ ra không được ở tương lai')
-  if (checkOutAt && checkOutAt <= checkInAt) throw new ApiError(400, 'Giờ ra phải sau giờ vào')
   if (checkOutAt && hoursBetween(checkInAt, checkOutAt) > MAX_SHIFT_HOURS) {
     throw new ApiError(400, `Một ca không quá ${MAX_SHIFT_HOURS} tiếng`)
   }
@@ -196,4 +243,23 @@ export async function correctShift(
     },
   )
   return saved
+}
+
+/** Remove a shift checked in by mistake (managers only, with a reason). */
+export async function deleteShift(actor: Staff, checkInId: string, reasonInput: unknown) {
+  const reason = typeof reasonInput === 'string' ? reasonInput.trim() : ''
+  if (!reason) throw new ApiError(400, 'Vui lòng ghi lý do')
+  const shift = await db.staffCheckIn.findUnique({ where: { id: checkInId } })
+  if (!shift) throw new ApiError(404, 'Không tìm thấy ca làm')
+  await assertMonthOpen(shift.workDate)
+  await db.staffCheckIn.delete({ where: { id: checkInId } })
+  await audit(
+    { id: actor.id, name: actor.name },
+    {
+      action: 'checkin.delete',
+      entity: 'checkin',
+      entityId: checkInId,
+      summary: `${shift.staffName} ${shift.workDate}: xoá ca (${reason.slice(0, 120)})`,
+    },
+  )
 }

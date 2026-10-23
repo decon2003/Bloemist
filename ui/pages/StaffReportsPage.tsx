@@ -38,6 +38,8 @@ function SalaryConfigModal({ user, onClose, onSave }: { user: User, onClose: () 
   const [hourly, setHourly] = useState(String(user.hourlyRate ?? 0))
   const [makerRate, setMakerRate] = useState(String(user.commissionRate ?? 0))
   const [salesRate, setSalesRate] = useState(String(user.salesCommissionRate ?? 0))
+  const [holidayRate, setHolidayRate] = useState(user.holidayHourlyRate == null ? '' : String(user.holidayHourlyRate))
+  const [daysOff, setDaysOff] = useState(String(user.daysOffPerMonth ?? 4))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -51,6 +53,8 @@ function SalaryConfigModal({ user, onClose, onSave }: { user: User, onClose: () 
         hourlyRate: Number(hourly.replace(/\D/g, '') || 0),
         commissionRate: Number(makerRate),
         salesCommissionRate: Number(salesRate),
+        holidayHourlyRate: holidayRate.trim() ? Number(holidayRate.replace(/\D/g, '') || 0) : null,
+        daysOffPerMonth: Number(daysOff),
       })
       onClose()
     } catch (e) {
@@ -88,7 +92,27 @@ function SalaryConfigModal({ user, onClose, onSave }: { user: User, onClose: () 
             <input value={formatCurrencyInput(hourly)} onChange={(e) => setHourly(e.target.value.replace(/\D/g, ''))} className={field} />
           </label>
         </div>
-        <p className="text-xs text-muted-foreground">Đơn giá giờ cũng dùng để tính OT (kể cả người lương cứng).</p>
+        <p className="text-xs text-muted-foreground">Đơn giá giờ cũng dùng để tính OT và ca gấp (kể cả người lương cứng).</p>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block text-sm font-medium">
+            Ngày nghỉ được hưởng / tháng
+            <input type="number" min={0} max={15} value={daysOff} disabled={payType !== 'MONTHLY'} onChange={(e) => setDaysOff(e.target.value)} className={field} />
+          </label>
+          <label className="block text-sm font-medium">
+            Đơn giá giờ ngày lễ
+            <input
+              value={formatCurrencyInput(holidayRate)}
+              disabled={payType !== 'HOURLY'}
+              placeholder="Như ngày thường"
+              onChange={(e) => setHolidayRate(e.target.value.replace(/\D/g, ''))}
+              className={field}
+            />
+          </label>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Lương cứng chia theo ngày công: lương × số ngày đi làm ÷ (số ngày trong tháng − ngày nghỉ được hưởng).
+          Ngày lễ khai báo ở Cài đặt; người lương cứng ngày lễ tính như ngày thường.
+        </p>
         <div className="grid grid-cols-2 gap-3">
           {([
             ['% HH làm đơn', makerRate, setMakerRate],

@@ -19,7 +19,6 @@ export interface ApiClient {
   createOrder: (input: CreateOrderInput) => Promise<Order>
   updateOrder: (orderId: string, input: Partial<CreateOrderInput>) => Promise<Order>
   deleteOrder: (orderId: string) => Promise<{ lockedPayrollMonths: string[] }>
-  assignOrder: (orderId: string, payload: AssignTaskPayload) => Promise<Order>
   fetchFlorists: () => Promise<Florist[]>
   createTask: (input: CreateTaskInput) => Promise<Task>
   updateTask: (taskId: string, input: Partial<CreateTaskInput>) => Promise<Task>
@@ -32,8 +31,11 @@ export interface ApiClient {
   correctCheckIn: (input: ShiftCorrectionInput) => Promise<StaffCheckIn>
   fetchRecentCheckIns: (days: number) => Promise<StaffCheckIn[]>
   updateWorkingHours: (hours: { start: string; end: string }) => Promise<WorkspaceSettings>
+  updateHolidays: (holidays: { date: string; name: string }[]) => Promise<WorkspaceSettings>
   createCheckIn: (input: Partial<StaffCheckIn>) => Promise<StaffCheckIn>
   checkOut: (checkInId: string) => Promise<StaffCheckIn>
+  /** Managers: remove a shift checked in by mistake. */
+  deleteCheckIn: (checkInId: string, reason: string) => Promise<void>
   fetchDashboardStats: () => Promise<DashboardStats>
   fetchWorkspaceSettings: () => Promise<WorkspaceSettings>
   login: (email: string, password: string) => Promise<User>

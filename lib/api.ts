@@ -105,7 +105,6 @@ const apiClient: ApiClient = {
   createOrder: (input) => request<Order>('/orders', { method: 'POST', body: JSON.stringify(input) }),
   updateOrder: (orderId, input) => request<Order>(`/orders/${orderId}`, { method: 'PATCH', body: JSON.stringify(input) }),
   deleteOrder: (orderId) => request<{ lockedPayrollMonths: string[] }>(`/orders/${orderId}`, { method: 'DELETE' }),
-  assignOrder: (orderId, payload) => request<Order>(`/orders/${orderId}/assign`, { method: 'POST', body: JSON.stringify(payload) }),
 
   // Users & Florists
   fetchFlorists: () => request<Florist[]>('/florists'),
@@ -126,8 +125,11 @@ const apiClient: ApiClient = {
     request<StaffCheckIn>('/checkins/correct', { method: 'POST', body: JSON.stringify(input) }),
   updateWorkingHours: (hours) =>
     request<WorkspaceSettings>('/settings', { method: 'PATCH', body: JSON.stringify({ workingHours: hours }) }),
+  updateHolidays: (holidays) =>
+    request<WorkspaceSettings>('/settings', { method: 'PATCH', body: JSON.stringify({ holidays }) }),
   createCheckIn: (input) => request<StaffCheckIn>('/checkins', { method: 'POST', body: JSON.stringify(input) }),
   checkOut: (checkInId) => request<StaffCheckIn>(`/checkins/${checkInId}`, { method: 'PATCH' }),
+  deleteCheckIn: (checkInId, reason) => request<void>(`/checkins/${checkInId}`, { method: 'DELETE', body: JSON.stringify({ reason }) }),
 
   // Dashboard & Settings
   fetchDashboardStats: () => request<DashboardStats>('/reports/dashboard'),
@@ -142,7 +144,6 @@ export const fetchOrder = apiClient.fetchOrder
 export const createOrder = apiClient.createOrder
 export const updateOrder = apiClient.updateOrder
 export const deleteOrder = apiClient.deleteOrder
-export const assignOrder = apiClient.assignOrder
 export const fetchFlorists = apiClient.fetchFlorists
 export const createTask = apiClient.createTask
 export const updateTask = apiClient.updateTask
@@ -154,9 +155,11 @@ export const completeTask = apiClient.completeTask
 export const fetchCheckIns = apiClient.fetchCheckIns
 export const createCheckIn = apiClient.createCheckIn
 export const checkOut = apiClient.checkOut
+export const deleteCheckIn = apiClient.deleteCheckIn
 export const correctCheckIn = apiClient.correctCheckIn
 export const fetchRecentCheckIns = apiClient.fetchRecentCheckIns
 export const updateWorkingHours = apiClient.updateWorkingHours
+export const updateHolidays = apiClient.updateHolidays
 export const fetchDashboardStats = apiClient.fetchDashboardStats
 export const fetchWorkspaceSettings = apiClient.fetchWorkspaceSettings
 export const login = apiClient.login

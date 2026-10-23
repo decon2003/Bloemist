@@ -75,6 +75,14 @@ export async function PATCH(request: Request, context: RouteContext) {
         if (body.salesCommissionRate !== undefined) data.salesCommissionRate = parseCommissionRate(body.salesCommissionRate, 'salesCommissionRate')
         if (body.payType !== undefined) data.payType = assertOneOf(body.payType, PAY_TYPES, 'payType')
         if (body.hourlyRate !== undefined) data.hourlyRate = toVnd(body.hourlyRate, 'hourlyRate') ?? 0
+        if (body.holidayHourlyRate !== undefined) {
+            data.holidayHourlyRate = body.holidayHourlyRate === null || body.holidayHourlyRate === '' ? null : toVnd(body.holidayHourlyRate, 'holidayHourlyRate')
+        }
+        if (body.daysOffPerMonth !== undefined) {
+            const days = Number(body.daysOffPerMonth)
+            if (!Number.isInteger(days) || days < 0 || days > 15) throw new ApiError(400, 'Số ngày nghỉ phải từ 0 đến 15')
+            data.daysOffPerMonth = days
+        }
         // Password reset by a manager: issue a new temporary password, force a
         // change on next login and sign the user out everywhere.
         if (body.password !== undefined && body.password !== '') {
@@ -86,27 +94,51 @@ export async function PATCH(request: Request, context: RouteContext) {
         }
 
         if (Object.keys(data).length === 0) {
-            throw new ApiError(400, 'No updatable fields supplied')
+            throw new ApiError(400, 'Không có gì để lưu')
         }
 
         const existing = await db.user.findUnique({ where: { id: userId } })
         if (!existing) {
-            throw new ApiError(404, 'User not found')
+            throw new ApiError(404, 'Không tìm thấy nhân viên')
         }
 
-        // The main admin's role and status are what keep the account usable;
-        // allowing them to be changed re-opens the deletion hole below.
-        if (existing.email === PROTECTED_ADMIN_EMAIL && (data.role !== undefined || data.status !== undefined || data.email !== undefined)) {
-            throw new ApiError(403, 'Cannot change the role, status or email of the main admin account')
+        const roleChanges = data.role !== undefined && data.role !== existing.role
+        const statusChanges = data.status !== undefined && data.status !== existing.status
+        const emailChanges = data.email !== undefined && data.email !== existing.email
+        // The main admin's role, status and email keep the account usable.
+        if (existing.email === PROTECTED_ADMIN_EMAIL && (roleChanges || statusChanges || emailChanges)) {
+            throw new ApiError(403, 'Không đổi được vai trò, trạng thái hoặc email của tài khoản Admin chính')
         }
+        if (userId === me.id && (roleChanges || statusChanges)) {
+            throw new ApiError(403, 'Không tự đổi vai trò hoặc ngừng tài khoản của chính mình')
+        }
+        // Never leave the shop without an active manager.
+        const isManagerRole = (role: string) => role === 'boss' || role === 'admin'
+        const losesManager =
+            isManagerRole(existing.role) && existing.status === 'active' &&
+            ((roleChanges && !isManagerRole(data.role as string)) || (statusChanges && data.status !== 'active'))
+        if (losesManager) {
+            const others = await db.user.count({ where: { id: { not: userId }, status: 'active', role: { in: ['boss', 'admin'] } } })
+            if (others === 0) throw new ApiError(409, 'Cần giữ ít nhất một quản lý đang làm việc')
+        }
+        const deactivating = statusChanges && data.status !== 'active'
+        // A leaver is signed out everywhere at once.
+        if (deactivating) data.sessionVersion = { increment: 1 }
 
         const user = await db.user.update({
             where: { id: userId },
             data,
             select: PRIVILEGED_USER_SELECT,
         })
+        // Products they had not made yet go back to "Chưa có người làm".
+        if (deactivating) {
+            await db.task.updateMany({
+                where: { assigneeId: userId, status: { notIn: ['COMPLETED', 'CANCELLED'] } },
+                data: { assigneeId: null, assigneeName: null, status: 'UNASSIGNED', lastAssigneeName: existing.name, lastAssignedAt: new Date() },
+            })
+        }
 
-        const changes = diff(existing, user, ['name', 'email', 'phone', 'role', 'status', 'avatar', 'payType', 'baseSalary', 'hourlyRate', 'commissionRate', 'salesCommissionRate'])
+        const changes = diff(existing, user, ['name', 'email', 'phone', 'role', 'status', 'avatar', 'payType', 'baseSalary', 'hourlyRate', 'holidayHourlyRate', 'daysOffPerMonth', 'commissionRate', 'salesCommissionRate'])
         const passwordReset = data.passwordHash !== undefined
         if (changes || passwordReset) {
             await audit(me, {
@@ -139,28 +171,29 @@ export async function DELETE(request: Request, context: RouteContext) {
 
         const user = await db.user.findUnique({ where: { id: userId } })
         if (!user) {
-            throw new ApiError(404, 'User not found')
+            throw new ApiError(404, 'Không tìm thấy nhân viên')
         }
 
         // Don't allow deleting the main admin
         if (user.email === PROTECTED_ADMIN_EMAIL) {
-            throw new ApiError(403, 'Cannot delete the main admin account')
+            throw new ApiError(403, 'Không xoá được tài khoản Admin chính')
         }
 
         // Deleting a user who still owns tasks, orders or check-ins raises an FK
         // violation; report it as a conflict the caller can act on rather than
         // letting it surface as an opaque 500.
-        const [assignedTasks, createdOrders, assignedOrders, checkIns] = await Promise.all([
+        const [assignedTasks, createdOrders, assignedOrders, soldOrders, checkIns] = await Promise.all([
             db.task.count({ where: { assigneeId: userId } }),
             db.order.count({ where: { createdById: userId } }),
             db.order.count({ where: { assigneeId: userId } }),
+            db.order.count({ where: { salespersonId: userId } }),
             db.staffCheckIn.count({ where: { staffId: userId } }),
         ])
 
-        if (assignedTasks || createdOrders || assignedOrders || checkIns) {
+        if (assignedTasks || createdOrders || assignedOrders || soldOrders || checkIns) {
             throw new ApiError(
                 409,
-                'This user still has assigned work or check-in history. Deactivate the account instead of deleting it.',
+                'Nhân viên này đã có đơn hàng, sản phẩm hoặc chấm công nên không xoá được. Hãy chuyển trạng thái sang "Đã nghỉ việc".',
             )
         }
 

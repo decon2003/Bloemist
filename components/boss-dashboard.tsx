@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import {
   DollarSign,
   Clock,
@@ -25,8 +25,13 @@ import { parseCurrencyToNumber, formatCurrencyFromNumber, formatDateTime } from 
 
 export default function BossDashboard() {
   const { t, lang, getOrderStatusLabel } = useLocale()
-  const dashboardQuery = useQuery({ queryKey: ['dashboard-stats'], queryFn: fetchDashboardStats })
+  const dashboardQuery = useQuery({ queryKey: ['dashboard-stats'], queryFn: fetchDashboardStats, keepPreviousData: true })
   const stats = dashboardQuery.data
+  // Fresh figures on every visit (the cached ones are shown meanwhile).
+  const { refetch } = dashboardQuery
+  useEffect(() => {
+    refetch()
+  }, [refetch])
 
   // Time calculations
   const today = useMemo(() => {
@@ -70,12 +75,18 @@ export default function BossDashboard() {
         </p>
       </div>
 
+      {dashboardQuery.error && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          Không tải được số liệu, các con số dưới đây có thể chưa đúng. Tải lại trang để thử lại.
+        </div>
+      )}
+
       {/* KPI Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {/* Revenue */}
         <div className="rounded-2xl border border-border bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
-            <span className="text-sm font-medium text-muted-foreground uppercase">{t('dashboard.kpis.revenue', 'Doanh thu tháng')}</span>
+            <span className="text-sm font-medium text-muted-foreground uppercase">Doanh thu tháng (theo ngày đặt)</span>
             <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center text-green-600">
               <DollarSign className="h-4 w-4" />
             </div>
@@ -127,7 +138,7 @@ export default function BossDashboard() {
           <div className="mb-6 flex items-center justify-between">
             <h3 className="font-semibold text-foreground flex items-center gap-2">
               <TrendingUp className="h-4 w-4" />
-              {t('dashboard.charts.weeklyRevenue', 'Revenue (Last 7 Days)')}
+              Doanh thu 7 ngày qua (theo ngày đặt)
             </h3>
           </div>
           <div className="h-[300px] w-full">
@@ -145,12 +156,12 @@ export default function BossDashboard() {
                   axisLine={false}
                   tickLine={false}
                   tick={{ fill: '#6B7280', fontSize: 12 }}
-                  tickFormatter={(value) => `${value / 1000}k`}
+                  tickFormatter={(value) => (value >= 1_000_000 ? `${(value / 1_000_000).toLocaleString('vi-VN')}tr` : `${value / 1000}k`)}
                 />
                 <Tooltip
                   cursor={{ fill: '#F3F4F6' }}
                   contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                  formatter={(value: any) => [formatCurrencyFromNumber(Number(value || 0)), t('dashboard.revenue', 'Revenue')]}
+                  formatter={(value: any) => [formatCurrencyFromNumber(Number(value || 0)), 'Doanh thu']}
                 />
                 <Bar
                   dataKey="revenue"
@@ -165,7 +176,7 @@ export default function BossDashboard() {
 
         {/* Recent Orders List */}
         <div className="rounded-3xl border border-border bg-white p-6 shadow-sm flex flex-col">
-          <h3 className="font-semibold text-foreground mb-4">{t('dashboard.recentOrders', 'Recent Orders')}</h3>
+          <h3 className="font-semibold text-foreground mb-4">Đơn mới tạo</h3>
           <div className="flex-1 space-y-4 overflow-y-auto max-h-[300px] pr-2">
             {recentOrders.map(order => (
               <Link href={`/${lang}/orders/${order.id}`} key={order.id} className="block group">
@@ -191,12 +202,12 @@ export default function BossDashboard() {
               </Link>
             ))}
             {recentOrders.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-8">{t('dashboard.noOrders', 'No orders found')}</p>
+              <p className="text-sm text-muted-foreground text-center py-8">Chưa có đơn nào</p>
             )}
           </div>
           <div className="mt-4 pt-4 border-t border-border">
             <Link href={`/${lang}/orders`} className="flex items-center justify-center gap-2 text-sm font-medium text-primary hover:underline">
-              {t('dashboard.viewAll', 'View all orders')} <ArrowRight className="h-4 w-4" />
+              Xem tất cả đơn <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
         </div>

@@ -1,7 +1,7 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
-import { Users, Plus, Edit2, Trash2, X, Clock } from 'lucide-react'
+import React, { useEffect, useMemo, useState } from 'react'
+import { CalendarDays, Users, Plus, Edit2, Trash2, X, Clock } from 'lucide-react'
 import { useLocale } from '@/components/providers/locale-provider'
 import { useAuth } from '@/components/providers/auth-provider'
 import { useAppData } from '@/components/providers/app-data-provider'
@@ -13,7 +13,15 @@ interface UserFormData {
   email: string
   phone: string
   role: User['role']
+  status: User['status']
   password: string
+}
+
+const ROLE_LABEL: Record<User['role'], string> = {
+  boss: 'Chủ shop',
+  admin: 'Quản trị viên',
+  sales: 'Sale',
+  florist: 'Thợ hoa',
 }
 
 const UserFormModal = ({
@@ -42,16 +50,18 @@ const UserFormModal = ({
     email: '',
     phone: '',
     role: 'sales',
+    status: 'active',
     password: '',
   })
 
-  // Reset or initialize state when modal opens or initialData changes
+  // Reset or initialize state when the modal opens (initialData is memoised by
+  // the caller, so a re-render while saving no longer wipes what was typed).
   useEffect(() => {
     if (isOpen) {
       if (initialData) {
         setLocalData(initialData)
       } else {
-        setLocalData({ name: '', email: '', phone: '', role: 'sales', password: '' })
+        setLocalData({ name: '', email: '', phone: '', role: 'sales', status: 'active', password: '' })
       }
     }
   }, [isOpen, initialData])
@@ -109,12 +119,31 @@ const UserFormModal = ({
               onChange={(e) => setLocalData(prev => ({ ...prev, role: e.target.value as User['role'] }))}
               className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
             >
-              <option value="sales">Sales</option>
-              <option value="florist">Florist</option>
-              <option value="boss">Boss</option>
-              <option value="admin">Admin</option>
+              {(Object.keys(ROLE_LABEL) as User['role'][]).map((role) => (
+                <option key={role} value={role}>{ROLE_LABEL[role]}</option>
+              ))}
             </select>
           </div>
+
+          {!passwordRequired && (
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Trạng thái</label>
+              <select
+                value={localData.status}
+                onChange={(e) => setLocalData(prev => ({ ...prev, status: e.target.value as User['status'] }))}
+                className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                <option value="active">Đang làm việc</option>
+                <option value="inactive">Đã nghỉ việc</option>
+              </select>
+              {localData.status === 'inactive' && (
+                <p className="mt-1 text-xs text-amber-700">
+                  Người đã nghỉ không đăng nhập được nữa và không có trong danh sách chọn người làm; sản phẩm chưa làm của họ
+                  trở về &quot;Chưa có người làm&quot;. Lịch sử đơn và chấm công vẫn giữ nguyên.
+                </p>
+              )}
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">
@@ -164,14 +193,31 @@ export default function SettingsPage() {
   const [showAddUserModal, setShowAddUserModal] = useState(false)
   const [showEditUserModal, setShowEditUserModal] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
-  const [workingHours, setWorkingHours] = useState({ start: '08:00', end: '18:00' })
+  // Empty until the real hours load, so nothing wrong is shown (or saved) meanwhile.
+  const [workingHours, setWorkingHours] = useState({ start: '', end: '' })
+  const [holidays, setHolidays] = useState<{ date: string; name: string }[]>([])
+  const [newHoliday, setNewHoliday] = useState({ date: '', name: '' })
+  const [holidayMessage, setHolidayMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (settings) {
       setWorkingHours(settings.workingHours)
+      setHolidays(settings.holidays ?? [])
     }
   }, [settings])
+
+  const saveHolidays = async (next: { date: string; name: string }[]) => {
+    setHolidayMessage('')
+    try {
+      const { updateHolidays } = await import('@/lib/api')
+      const saved = await updateHolidays(next)
+      setHolidays(saved.holidays)
+      setHolidayMessage('Đã lưu ngày lễ')
+    } catch (error) {
+      setHolidayMessage(error instanceof Error ? error.message : 'Không lưu được')
+    }
+  }
 
   const canManageUsers = user?.role === 'boss' || user?.role === 'admin'
   const canEditSettings = canManageUsers
@@ -217,6 +263,21 @@ export default function SettingsPage() {
     }
   }
 
+  const editingInitialData = useMemo<UserFormData | undefined>(
+    () =>
+      editingUser
+        ? {
+            name: editingUser.name,
+            email: editingUser.email,
+            phone: editingUser.phone || '',
+            role: editingUser.role,
+            status: editingUser.status,
+            password: '',
+          }
+        : undefined,
+    [editingUser],
+  )
+
   const handleEditClick = (u: User) => {
     setEditingUser(u)
     setShowEditUserModal(true)
@@ -238,13 +299,27 @@ export default function SettingsPage() {
     setIsSubmitting(true)
     try {
       const { updateUser } = await import('@/lib/api')
-      await updateUser(editingUser.id, {
-        name: data.name,
-        email: data.email,
-        phone: data.phone,
-        role: data.role,
-        ...(data.password ? { password: data.password } : {}),
-      })
+      // Only what changed is sent (the main admin's email and role cannot be re-sent).
+      const changes: Partial<User> = {}
+      if (data.name !== editingUser.name) changes.name = data.name
+      if (data.email !== editingUser.email) changes.email = data.email
+      if (data.phone !== (editingUser.phone || '')) changes.phone = data.phone
+      if (data.role !== editingUser.role) changes.role = data.role
+      if (data.status !== editingUser.status) {
+        if (data.status === 'inactive' && !confirm(`Chuyển ${editingUser.name} sang "Đã nghỉ việc"? Họ sẽ bị đăng xuất và không đăng nhập được nữa.`)) {
+          setIsSubmitting(false)
+          return
+        }
+        changes.status = data.status
+      }
+      if (data.password) changes.password = data.password
+      if (Object.keys(changes).length === 0) {
+        setShowEditUserModal(false)
+        setEditingUser(null)
+        setIsSubmitting(false)
+        return
+      }
+      await updateUser(editingUser.id, changes)
       alert(data.password ? 'Đã cập nhật và cấp mật khẩu tạm mới.' : 'Cập nhật thành công!')
       setShowEditUserModal(false)
       setEditingUser(null)
@@ -376,14 +451,15 @@ export default function SettingsPage() {
           </div>
         </div>
         <p className="text-xs text-muted-foreground">
-          Ca nào quên chấm công ra sẽ được hệ thống tự chốt ở giờ kết thúc, và nhân viên tự sửa lại giờ thực tế.
+          Giờ làm ngoài khung này (từ 15 phút trở lên) tính là OT, quản lý duyệt trong Bảng lương. Đổi giờ giữa tháng sẽ tính
+          lại OT của cả tháng khi cập nhật bảng lương nháp.
         </p>
         {canEditSettings && (
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={saveWorkingHours}
-              disabled={savingHours}
+              disabled={savingHours || !settings}
               className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
             >
               {savingHours ? 'Đang lưu...' : 'Lưu giờ làm việc'}
@@ -391,6 +467,71 @@ export default function SettingsPage() {
             {hoursMessage && <span className="text-sm text-muted-foreground">{hoursMessage}</span>}
           </div>
         )}
+      </section>
+
+      {/* Public holidays */}
+      <section className="space-y-4 rounded-3xl border border-border bg-white/90 p-6">
+        <div className="flex items-center gap-3">
+          <CalendarDays className="h-5 w-5 text-primary" />
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">Ngày lễ</h2>
+            <p className="text-sm text-muted-foreground">
+              Ngày lễ, nhân viên lương theo giờ được tính đơn giá giờ ngày lễ (trong Hồ sơ lương); người lương cứng tính như ngày thường.
+            </p>
+          </div>
+        </div>
+        {holidays.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Chưa có ngày lễ nào.</p>
+        ) : (
+          <ul className="divide-y divide-border text-sm">
+            {holidays.map((h) => (
+              <li key={h.date} className="flex items-center justify-between gap-3 py-2">
+                <span>
+                  <span className="font-medium text-foreground">{h.date.split('-').reverse().join('/')}</span>
+                  {h.name && <span className="text-muted-foreground"> · {h.name}</span>}
+                </span>
+                {canEditSettings && (
+                  <button
+                    type="button"
+                    onClick={() => saveHolidays(holidays.filter((x) => x.date !== h.date))}
+                    className="rounded p-1 text-muted-foreground hover:bg-red-50 hover:text-red-600"
+                    title="Bỏ ngày lễ"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+        {canEditSettings && (
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              type="date"
+              value={newHoliday.date}
+              onChange={(e) => setNewHoliday((h) => ({ ...h, date: e.target.value }))}
+              className="rounded-xl border border-border bg-white px-3 py-2 text-sm"
+            />
+            <input
+              value={newHoliday.name}
+              onChange={(e) => setNewHoliday((h) => ({ ...h, name: e.target.value }))}
+              placeholder="Tên ngày lễ, ví dụ: Quốc khánh"
+              className="flex-1 rounded-xl border border-border bg-white px-3 py-2 text-sm"
+            />
+            <button
+              type="button"
+              disabled={!newHoliday.date}
+              onClick={() => {
+                saveHolidays([...holidays.filter((x) => x.date !== newHoliday.date), newHoliday])
+                setNewHoliday({ date: '', name: '' })
+              }}
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+            >
+              Thêm ngày lễ
+            </button>
+          </div>
+        )}
+        {holidayMessage && <p className="text-sm text-muted-foreground">{holidayMessage}</p>}
       </section>
 
       {/* User Management Section */}
@@ -445,7 +586,7 @@ export default function SettingsPage() {
                       </td>
                       <td className="px-4 py-3">
                         <span className={`inline-block px-3 py-1 rounded-lg text-xs font-semibold ${getRoleColor(u.role)}`}>
-                          {u.role.charAt(0).toUpperCase() + u.role.slice(1)}
+                          {ROLE_LABEL[u.role] ?? u.role}
                         </span>
                       </td>
                       <td className="px-4 py-3">
@@ -453,7 +594,7 @@ export default function SettingsPage() {
                           ? 'bg-green-100 text-green-800'
                           : 'bg-red-100 text-red-800'
                           }`}>
-                          {u.status === 'active' ? 'Hoạt động' : 'Vô hiệu'}
+                          {u.status === 'active' ? 'Đang làm việc' : 'Đã nghỉ việc'}
                         </span>
                       </td>
                       <td className="px-4 py-3">
@@ -505,13 +646,7 @@ export default function SettingsPage() {
         onClose={() => { setShowEditUserModal(false); setEditingUser(null) }}
         onSubmit={handleUpdateUser}
         submitLabel="Lưu thay đổi"
-        initialData={editingUser ? {
-          name: editingUser.name,
-          email: editingUser.email,
-          phone: editingUser.phone || '',
-          role: editingUser.role,
-          password: '',
-        } : undefined}
+        initialData={editingInitialData}
         isSubmitting={isSubmitting}
         passwordRequired={false}
       />

@@ -24,6 +24,7 @@ const OT_LABEL: Record<Exclude<OtDecision, 'NONE'>, string> = {
   OT: 'Tính OT',
   REGULAR: 'Tính giờ thường',
   EXCLUDE: 'Không tính',
+  RUSH: 'Ca gấp (tính OT)',
 }
 
 function Stat({ label, value, hint, strong }: { label: string; value: string; hint?: string; strong?: boolean }) {
@@ -170,12 +171,16 @@ export default function MyPayPage() {
             <Stat
               label={line.payType === 'MONTHLY' ? 'Lương cứng' : 'Lương theo giờ'}
               value={money(t.basePay)}
-              hint={line.payType === 'MONTHLY' ? 'Cả tháng' : `${hours(t.regularHours)} × ${money(line.hourlyRate)}`}
+              hint={
+                line.payType === 'MONTHLY'
+                  ? `${t.daysWorked}/${t.standardDays} ngày công`
+                  : `${hours(t.regularHours)} giờ${t.holidayHours > 0 ? ` (${hours(t.holidayHours)} ngày lễ)` : ''}`
+              }
             />
             <Stat
               label="Tiền OT"
               value={money(t.otPay)}
-              hint={`${hours(t.otHours)} × ${data!.otMultiplier}${t.pendingOtDays ? ` · ${t.pendingOtDays} ngày chờ duyệt` : ''}`}
+              hint={`${hours(t.otHours + t.rushHours)} × ${data!.otMultiplier}${t.pendingOtDays ? ` · ${t.pendingOtDays} ngày chờ duyệt` : ''}`}
             />
             <Stat label="HH làm đơn" value={money(t.commissionByKind.MAKER)} hint={`${makerItems.length} sản phẩm · ${line.makerRate}%`} />
             <Stat label="HH sale" value={money(t.commissionByKind.SALES)} hint={`${salesItems.length} đơn · ${line.salesRate}%`} />
@@ -225,7 +230,7 @@ export default function MyPayPage() {
             <div className="mb-3 flex items-baseline justify-between gap-3">
               <h2 className="font-semibold text-foreground">Ca làm ({shifts.length})</h2>
               <span className="text-sm text-muted-foreground">
-                {hours(t.regularHours)} giờ thường · {hours(t.otHours)} OT
+                {hours(t.regularHours)} giờ thường · {hours(t.otHours + t.rushHours)} OT
               </span>
             </div>
             {shifts.length === 0 ? (
@@ -246,11 +251,17 @@ export default function MyPayPage() {
                   <tbody>
                     {shifts.map((s) => (
                       <tr key={s.date} className="border-t border-border">
-                        <td className="py-2 pr-3">{dayLabel(s.date)}</td>
+                        <td className="py-2 pr-3 whitespace-nowrap">
+                          {dayLabel(s.date)}
+                          {s.holiday && <span className="ml-1 rounded bg-violet-100 px-1 text-xs text-violet-800">Lễ</span>}
+                        </td>
                         <td className="py-2 pr-3">{time(s.checkIn)}</td>
                         <td className="py-2 pr-3">
-                          {time(s.checkOut)}
-                          {s.autoClosed && <span className="ml-1 text-xs text-amber-700">(tự đóng)</span>}
+                          {s.autoClosed ? (
+                            <span className="text-xs font-medium text-red-700">Quên chấm ra – 0 giờ</span>
+                          ) : (
+                            time(s.checkOut)
+                          )}
                         </td>
                         <td className="py-2 pr-3 text-right">{hours(s.hours)}</td>
                         <td className="py-2 pr-3 text-right">{s.otHours > 0.01 ? hours(s.otHours) : '—'}</td>

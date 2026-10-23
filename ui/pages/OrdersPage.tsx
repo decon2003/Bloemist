@@ -17,6 +17,12 @@ import { useViewSettings } from '@/components/providers/view-settings-provider'
 import { thumbUrl } from '@/lib/image-compress'
 
 const baseStatuses: Order['status'][] = ['NEW', 'IN_PROGRESS', 'READY', 'DELIVERED', 'CANCELLED']
+
+const statusStyle = (status: Order['status']) =>
+  status === 'CANCELLED' ? 'bg-red-100 text-red-800 border-red-200'
+    : status === 'READY' ? 'bg-green-100 text-green-800 border-green-200'
+      : status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800 border-blue-200'
+        : 'bg-muted text-foreground border-transparent'
 const orderStatuses: Array<'ALL' | Order['status']> = ['ALL', ...baseStatuses]
 
 type OrderFilter = (typeof orderStatuses)[number]
@@ -96,7 +102,8 @@ export default function OrdersPage() {
   // any window that includes today).
   const todayKey = getDateKey(new Date()) ?? ''
   const isOverdue = (order: Order) =>
-    (order.status === 'NEW' || order.status === 'IN_PROGRESS') && (getDateKey(new Date(order.receiveTime)) ?? '') < todayKey
+    (order.status === 'NEW' || order.status === 'IN_PROGRESS' || order.status === 'READY') &&
+    (getDateKey(new Date(order.receiveTime)) ?? '') < todayKey
 
   const handleDeleteOrder = async (e: React.MouseEvent, orderId: string) => {
     e.stopPropagation()
@@ -290,31 +297,40 @@ export default function OrdersPage() {
                     </div>
 
                     <div className="text-left md:text-right" onClick={(e) => e.stopPropagation()}>
-                      <p className="text-muted-foreground">Status</p>
+                      <p className="text-muted-foreground">Trạng thái</p>
                       <div className="flex md:justify-end">
-                        <select
-                          value={order.status}
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={async (e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            const next = e.target.value as Order['status']
-                            if (next === 'CANCELLED' && !confirm('Huỷ đơn này? Doanh thu, hoa hồng sale và hoa hồng làm đơn của đơn sẽ không được tính nữa; các sản phẩm chưa làm sẽ dừng lại.')) return
-                            const updated = await updateOrder(order.id, { status: next })
-                            const notice = lockedPayrollNotice(updated.lockedPayrollMonths)
-                            if (notice) alert(notice)
-                          }}
-                          className={`h-8 rounded-md border px-2 py-1 text-xs font-medium focus:ring-1 focus:ring-primary ${order.status === 'CANCELLED' ? 'bg-red-100 text-red-800 border-red-200' : order.status === 'READY' ? 'bg-green-100 text-green-800 border-green-200' :
-                            order.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800 border-blue-200' :
-                              'bg-muted text-foreground border-transparent'
-                            }`}
-                        >
-                          {baseStatuses.map((s) => (
-                            <option key={s} value={s}>
-                              {getOrderStatusLabel(s)}
-                            </option>
-                          ))}
-                        </select>
+                        {user?.role === 'florist' ? (
+                          // Florists don't change order status: it follows their "Hoàn tất".
+                          <span className={`inline-flex h-8 items-center rounded-md border px-2 text-xs font-medium ${statusStyle(order.status)}`}>
+                            {getOrderStatusLabel(order.status)}
+                          </span>
+                        ) : (
+                          <select
+                            value={order.status}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={async (e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              const next = e.target.value as Order['status']
+                              if (next === 'CANCELLED' && !confirm('Huỷ đơn này? Doanh thu, hoa hồng sale và hoa hồng làm đơn của đơn sẽ không được tính nữa; các sản phẩm chưa làm sẽ dừng lại.')) return
+                              if (order.status === 'CANCELLED' && !confirm('Khôi phục đơn đã huỷ? Doanh thu và hoa hồng của đơn sẽ được tính lại.')) return
+                              try {
+                                const updated = await updateOrder(order.id, { status: next })
+                                const notice = lockedPayrollNotice(updated.lockedPayrollMonths)
+                                if (notice) alert(notice)
+                              } catch (error) {
+                                alert(error instanceof Error ? error.message : 'Không cập nhật được trạng thái')
+                              }
+                            }}
+                            className={`h-8 rounded-md border px-2 py-1 text-xs font-medium focus:ring-1 focus:ring-primary ${statusStyle(order.status)}`}
+                          >
+                            {baseStatuses.map((s) => (
+                              <option key={s} value={s}>
+                                {getOrderStatusLabel(s)}
+                              </option>
+                            ))}
+                          </select>
+                        )}
                       </div>
                     </div>
 

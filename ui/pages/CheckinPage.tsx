@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, CheckCircle2, Clock, Pencil, Plus, X } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Clock, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { useAuth } from '@/components/providers/auth-provider'
 import { useLocale } from '@/components/providers/locale-provider'
 import { useAppData } from '@/components/providers/app-data-provider'
@@ -12,6 +12,8 @@ import { cn } from '@/lib/utils'
 // Staff may fix their own shifts for today and the previous days below;
 // must match CORRECTION_DAYS in lib/server/attendance.ts.
 const CORRECTION_DAYS = 3
+// A shift may run past midnight up to this long (MAX_SHIFT_HOURS on the server).
+const MAX_SHIFT_HOURS = 16
 
 const VN = 'Asia/Ho_Chi_Minh'
 /** YYYY-MM-DD of an instant in Vietnam. */
@@ -34,7 +36,7 @@ const hoursLabel = (hours?: number | null) => {
 
 function ShiftTag({ entry }: { entry: StaffCheckIn }) {
   const [label, tone] = entry.autoClosed
-    ? ['Tự chốt – chưa sửa', 'bg-amber-50 text-amber-800 border-amber-200']
+    ? ['Quên chấm ra – 0 giờ', 'bg-amber-50 text-amber-800 border-amber-200']
     : entry.correctedAt
       ? ['Đã sửa tay', 'bg-sky-50 text-sky-700 border-sky-200']
       : !entry.checkOutAt
@@ -102,7 +104,7 @@ function CorrectionModal({
 
         {target.entry?.autoClosed && (
           <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
-            Ca này quên chấm công ra nên hệ thống tạm chốt lúc {closeTime}. Nhập giờ ra thực tế.
+            Ca này quên chấm công ra nên đang tính 0 giờ. Nhập giờ ra thực tế.
           </p>
         )}
 
@@ -137,7 +139,13 @@ function CorrectionModal({
             className={inputClass}
           />
         </label>
+        {checkIn && checkOut && checkOut <= checkIn && (
+          <p className="rounded-lg bg-sky-50 px-3 py-2 text-xs text-sky-800">
+            Giờ ra trước giờ vào: tính là ca qua đêm, ra lúc {checkOut} sáng hôm sau.
+          </p>
+        )}
         <p className="text-xs text-muted-foreground">
+          Ca qua đêm: nhập giờ ra như bình thường (ví dụ vào 18:00, ra 01:30).
           Thay đổi được lưu ngay và ghi vào nhật ký (ai sửa, giờ cũ → giờ mới).
           {!isManager && ` Chỉ tự sửa được trong ${CORRECTION_DAYS} ngày gần nhất.`}
         </p>
@@ -165,13 +173,14 @@ function CorrectionModal({
 export default function CheckinPage() {
   const { user } = useAuth()
   const { t } = useLocale()
-  const { checkins, settings, users, createCheckIn, checkOut, correctCheckIn, setCheckinMonth } = useAppData()
+  const { checkins, settings, users, createCheckIn, checkOut, correctCheckIn, deleteCheckIn, setCheckinMonth } = useAppData()
   const today = vnDay()
   const isAdmin = user?.role === 'admin' || user?.role === 'boss'
 
   const [selectedDate, setSelectedDate] = useState<string>(today)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [actionError, setActionError] = useState('')
+  const [actionMessage, setActionMessage] = useState('')
   const [correcting, setCorrecting] = useState<CorrectionTarget | null>(null)
 
   // The month table: the selected day's month for managers, this month for staff.
@@ -198,7 +207,7 @@ export default function CheckinPage() {
   // ---------------- Manager view ----------------
   if (isAdmin) {
     const dayEntries = new Map(checkins.filter((entry) => entry.workDate === selectedDate).map((entry) => [entry.staffId, entry]))
-    const activeStaff = (users as User[]).filter((u) => u.status !== 'disabled' && (u.status as string) !== 'inactive')
+    const activeStaff = (users as User[]).filter((u) => u.status === 'active')
     const rows = activeStaff
       .map((u) => ({ staff: u, entry: dayEntries.get(u.id) }))
       .sort((a, b) => Number(Boolean(b.entry)) - Number(Boolean(a.entry)) || a.staff.name.localeCompare(b.staff.name, 'vi'))
@@ -210,7 +219,7 @@ export default function CheckinPage() {
           <div>
             <h1 className="text-3xl font-bold text-foreground">Chấm công</h1>
             <p className="text-sm text-muted-foreground">
-              Giờ làm việc {openTime} – {closeTime}. Ca quên chấm ra được tự chốt lúc {closeTime}.
+              Giờ làm việc {openTime} – {closeTime}. Ca quên chấm ra quá {MAX_SHIFT_HOURS} tiếng tính 0 giờ cho tới khi được sửa.
             </p>
           </div>
           <input
@@ -226,7 +235,7 @@ export default function CheckinPage() {
           <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
             <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
             <div>
-              <p className="font-semibold">{needsFix.length} ca trong tháng bị tự chốt vì quên chấm công ra, chưa ai sửa:</p>
+              <p className="font-semibold">{needsFix.length} ca trong tháng quên chấm công ra (đang tính 0 giờ), chưa ai sửa:</p>
               <p>{needsFix.map((entry) => `${entry.staffName} (${dayLabel(entry.workDate)})`).join(', ')}</p>
             </div>
           </div>
@@ -265,7 +274,7 @@ export default function CheckinPage() {
                       <span className="text-xs text-muted-foreground">Chưa chấm công</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="whitespace-nowrap px-4 py-3 text-right">
                     <button
                       type="button"
                       onClick={() => setCorrecting({ staffId: staff.id, staffName: staff.name, workDate: selectedDate, entry })}
@@ -274,6 +283,24 @@ export default function CheckinPage() {
                       {entry ? <Pencil className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
                       {entry ? 'Sửa' : 'Thêm'}
                     </button>
+                    {entry && (
+                      <button
+                        type="button"
+                        title="Xoá ca chấm nhầm"
+                        onClick={async () => {
+                          const reason = window.prompt(`Xoá ca ${dayLabel(entry.workDate)} của ${staff.name}? Ghi lý do (ví dụ: bấm nhầm ngày nghỉ):`)
+                          if (!reason?.trim()) return
+                          try {
+                            await deleteCheckIn(entry.id, reason.trim())
+                          } catch (error) {
+                            window.alert(error instanceof Error ? error.message : 'Không xoá được ca')
+                          }
+                        }}
+                        className="ml-2 inline-flex items-center rounded-lg border border-red-200 px-2 py-1.5 text-xs text-red-700 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -295,16 +322,25 @@ export default function CheckinPage() {
   }
 
   // ---------------- Staff view ----------------
-  const todayEntry = recent.find((entry) => entry.workDate === today) ?? null
+  // The shift in progress may have started yesterday evening (past midnight).
+  const openEntry =
+    recent.find(
+      (entry) =>
+        !entry.checkOutAt &&
+        Date.now() - new Date(entry.checkInAt ?? entry.timestamp).getTime() <= MAX_SHIFT_HOURS * 3_600_000,
+    ) ?? null
+  const todayEntry = openEntry ?? recent.find((entry) => entry.workDate === today) ?? null
   const earliestFixable = shiftDay(today, -CORRECTION_DAYS)
   const toFix = recent.filter((entry) => entry.autoClosed && entry.workDate >= earliestFixable)
   const monthEntries = [...checkins].sort((a, b) => b.workDate.localeCompare(a.workDate))
 
-  const run = async (action: () => Promise<unknown>) => {
+  const run = async (action: () => Promise<StaffCheckIn | unknown>, done: string) => {
     setIsSubmitting(true)
     setActionError('')
+    setActionMessage('')
     try {
       await action()
+      setActionMessage(`${done} lúc ${vnTime(new Date().toISOString())}`)
       loadRecent()
     } catch (error) {
       setActionError(error instanceof Error ? error.message : 'Thao tác không thành công')
@@ -327,7 +363,7 @@ export default function CheckinPage() {
           <div className="flex items-start gap-3">
             <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
             <p>
-              Ngày <strong>{dayLabel(entry.workDate)}</strong> bạn quên chấm công ra. Hệ thống tạm chốt lúc {closeTime} ({hoursLabel(entry.workingHours)}).
+              Ngày <strong>{dayLabel(entry.workDate)}</strong> bạn quên chấm công ra nên ca đang tính 0 giờ. Nhập giờ ra để được tính công.
             </p>
           </div>
           <button
@@ -344,12 +380,18 @@ export default function CheckinPage() {
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <h2 className="flex items-center gap-2 text-2xl font-semibold text-foreground">
             {todayEntry ? <CheckCircle2 className="h-6 w-6 text-green-600" /> : <Clock className="h-6 w-6 text-muted-foreground" />}
-            {!todayEntry ? 'Chưa chấm công hôm nay' : todayEntry.checkOutAt ? 'Đã xong ca hôm nay' : 'Đang trong ca'}
+            {!todayEntry
+              ? 'Chưa chấm công hôm nay'
+              : todayEntry.checkOutAt
+                ? 'Đã xong ca hôm nay'
+                : todayEntry.workDate !== today
+                  ? `Đang trong ca (từ ${dayLabel(todayEntry.workDate)})`
+                  : 'Đang trong ca'}
           </h2>
           {!todayEntry ? (
             <button
               type="button"
-              onClick={() => run(() => createCheckIn({}))}
+              onClick={() => run(() => createCheckIn({}), 'Đã chấm công vào')}
               disabled={isSubmitting}
               className="h-12 rounded-full bg-primary px-8 text-base font-semibold text-primary-foreground shadow-lg hover:bg-primary/90 disabled:opacity-60"
             >
@@ -358,7 +400,9 @@ export default function CheckinPage() {
           ) : !todayEntry.checkOutAt ? (
             <button
               type="button"
-              onClick={() => run(() => checkOut(todayEntry.id))}
+              onClick={() => {
+                if (window.confirm('Chấm công ra, kết thúc ca làm?')) run(() => checkOut(todayEntry.id), 'Đã chấm công ra')
+              }}
               disabled={isSubmitting}
               className="h-12 rounded-full bg-amber-500 px-8 text-base font-semibold text-white shadow-lg hover:bg-amber-600 disabled:opacity-60"
             >
@@ -385,15 +429,16 @@ export default function CheckinPage() {
         )}
 
         {actionError && <p className="text-sm text-red-700">{actionError}</p>}
+        {actionMessage && !actionError && <p className="text-sm font-medium text-green-700">{actionMessage}</p>}
 
         <div className="flex flex-wrap gap-2 border-t border-border pt-4">
           {todayEntry && (
             <button
               type="button"
-              onClick={() => setCorrecting({ workDate: today, entry: todayEntry })}
+              onClick={() => setCorrecting({ workDate: todayEntry.workDate, entry: todayEntry })}
               className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-2 text-sm hover:bg-muted"
             >
-              <Pencil className="h-4 w-4" /> Sửa giờ hôm nay
+              <Pencil className="h-4 w-4" /> Sửa giờ ca này
             </button>
           )}
           <button

@@ -67,7 +67,6 @@ export interface Order {
   lockedPayrollMonths?: string[]
   // Money is whole VND.
   listedPrice: number
-  discount?: number | null
   deliveryFee?: number | null
   deliveryCoveredByShop?: boolean
   vatPercent?: number | null
@@ -85,13 +84,6 @@ export interface Order {
   salespersonName?: string | null
   new_customer?: boolean
   deliveryAddress?: string
-  sourcePlatform?: string
-  sourceChatId?: string
-  sourceMessageId?: string
-  sourceThreadId?: string
-  sourceRawText?: string
-  requiresAttention?: boolean
-  sourceLastUpdatedAt?: string | null
   createdAt: string
 }
 
@@ -121,26 +113,19 @@ export interface CreateOrderInput {
   // Price inputs: whole VND or typed text ("1.250.000"). The server derives
   // sellingPrice, total and remainingBalance itself.
   listedPrice: number | string
-  discount?: number | string
   deliveryFee?: number | string
   deliveryCoveredByShop?: boolean
   vatPercent?: number
   deposit?: number | string
   notes?: string
-  code?: string
   createdById?: string
   createdByName?: string
   new_customer?: boolean
   assigneeId?: string
   assigneeName?: string
-  sourcePlatform?: string
-  sourceChatId?: string
-  sourceMessageId?: string
-  sourceThreadId?: string
-  sourceRawText?: string
-  requiresAttention?: boolean
-  sourceLastUpdatedAt?: string | null
-  tasks?: Array<{ name: string; price?: string; note?: string }>
+  /** One-off id per "Tạo đơn" press; a retry with the same id returns the
+   *  order already created instead of a duplicate. */
+  requestId?: string
   /** One task per line; with lines, the listed price is their sum. */
   products?: Array<{ name: string; quantity: number; note?: string; samplePhotoUrls?: string[]; unitPrice: number | string; image?: string }>
   /** Staff member credited with the sale; defaults to the creator. */
@@ -220,7 +205,9 @@ export interface StaffCheckIn {
   correctionReason?: string | null
 }
 
-export type OtDecision = 'PENDING' | 'OT' | 'REGULAR' | 'EXCLUDE' | 'NONE'
+/** For time outside opening hours: PENDING / OT / REGULAR / EXCLUDE; NONE = no
+ *  overtime; RUSH = "ca gấp", the whole shift paid as overtime. */
+export type OtDecision = 'PENDING' | 'OT' | 'REGULAR' | 'EXCLUDE' | 'NONE' | 'RUSH'
 
 export interface PayrollShift {
   date: string
@@ -230,7 +217,12 @@ export interface PayrollShift {
   regularHours: number
   otHours: number
   otDecision: OtDecision
+  /** Nobody checked out: 0 hours until the shift is corrected. */
   autoClosed: boolean
+  /** Times entered or fixed by hand. */
+  corrected?: boolean
+  /** A public holiday (Settings). */
+  holiday?: boolean
 }
 
 export type CommissionKind = 'MAKER' | 'SALES'
@@ -261,6 +253,12 @@ export interface PayrollLine {
   hourlyRate: number
   makerRate: number
   salesRate: number
+  /** Hourly rate on public holidays; null = the normal hourly rate. */
+  holidayHourlyRate?: number | null
+  /** MONTHLY: paid days off per month. */
+  daysOffPerMonth?: number
+  /** This month's rates were set by hand (a refresh keeps them). */
+  ratesOverridden?: boolean
   shifts: PayrollShift[]
   commissions: PayrollCommission[]
   adjustments: PayrollAdjustment[]
@@ -268,7 +266,16 @@ export interface PayrollLine {
   totals: {
     regularHours: number
     otHours: number
+    /** Hours of "ca gấp" shifts, paid as overtime. */
+    rushHours: number
+    /** Regular hours on public holidays (hourly staff). */
+    holidayHours: number
     pendingOtDays: number
+    /** Shifts nobody checked out of (0 hours until corrected). */
+    autoClosedDays: number
+    /** Days with hours; MONTHLY base = salary x daysWorked / standardDays. */
+    daysWorked: number
+    standardDays: number
     basePay: number
     otPay: number
     commissionByKind: Record<CommissionKind, number>
@@ -285,8 +292,10 @@ export interface Payroll {
   otMultiplier: number
   lockedAt: string | null
   lockedByName: string | null
+  /** Last refresh ("Cập nhật dữ liệu mới"). */
+  updatedAt: string
   lines: PayrollLine[]
-  summary: { total: number; pendingOtDays: number }
+  summary: { total: number; pendingOtDays: number; autoClosedDays: number }
 }
 
 /** "Thu nhập" (own pay): the locked line, or an estimate while the month is open. */
@@ -305,6 +314,8 @@ export interface PayrollLineUpdate {
   hourlyRate?: number
   makerRate?: number
   salesRate?: number
+  holidayHourlyRate?: number | null
+  daysOffPerMonth?: number
   shiftDecisions?: { date: string; otDecision: OtDecision }[]
   commissionChanges?: { key: string; included?: boolean; rate?: number }[]
   adjustments?: PayrollAdjustment[]
@@ -337,6 +348,8 @@ export interface WorkspaceSettings {
     start: string
     end: string
   }
+  /** Public holidays: hourly staff are paid their holiday rate on these days. */
+  holidays: { date: string; name: string }[]
 }
 
 export interface User {
@@ -345,7 +358,8 @@ export interface User {
   email: string
   phone: string
   role: UserRole
-  status: 'active' | 'disabled'
+  /** inactive = đã nghỉ việc: cannot sign in, not offered in pickers. */
+  status: 'active' | 'inactive'
   avatar?: string
   createdAt: string
   /** MONTHLY = lương cứng, HOURLY = theo giờ. */
@@ -358,6 +372,10 @@ export interface User {
   commissionRate?: number
   /** % of the orders credited to this person as salesperson (hoa hồng sale). */
   salesCommissionRate?: number
+  /** Hourly rate on public holidays; null = the normal hourly rate. */
+  holidayHourlyRate?: number | null
+  /** MONTHLY: paid days off per month (base is paid per day worked). */
+  daysOffPerMonth?: number
   mustChangePassword?: boolean
   /** Write-only: a temporary password set by a manager. Never returned. */
   password?: string

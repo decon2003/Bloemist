@@ -25,8 +25,6 @@ interface DateFilterSwitcherProps {
   locale?: string
   /** More filter fields shown on the same row as the from/to dates. */
   extraFields?: React.ReactNode
-  /** More quick ranges after the built-in ones (e.g. "7 ngày qua"). */
-  extraQuickOptions?: Array<{ key: string; label: string; from: string; to: string }>
   /** Earliest pickable day (YYYY-MM-DD). */
   minDate?: string
 }
@@ -54,7 +52,6 @@ export function DateFilterSwitcher({
   locale,
   showModeToggle = true,
   extraFields,
-  extraQuickOptions = [],
   minDate,
 }: DateFilterSwitcherProps) {
   const quickOptions = [
@@ -63,7 +60,6 @@ export function DateFilterSwitcher({
     { key: 'dayAfter', from: getOffsetDateKey(2), to: getOffsetDateKey(2), label: quickLabels.dayAfter },
     { key: 'threeDays', from: getOffsetDateKey(3), to: getOffsetDateKey(3), label: quickLabels.threeDays },
     { key: 'allDays', from: '', to: '', label: quickLabels.allDays },
-    ...extraQuickOptions,
   ]
 
   const allowModeChange = showModeToggle

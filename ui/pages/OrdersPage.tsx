@@ -84,13 +84,6 @@ export default function OrdersPage() {
   useEffect(() => setOrderScope(scope), [scope, setOrderScope])
 
   const isManager = user?.role === 'boss' || user?.role === 'admin'
-  // Sales and florists: shortcuts into their 30 days of history.
-  const quickRanges = isManager
-    ? []
-    : [
-        { key: 'last7', label: '7 ngày qua', from: daysAgoKey(6), to: daysAgoKey(0) },
-        { key: 'last30', label: '30 ngày qua', from: daysAgoKey(STAFF_HISTORY_DAYS), to: daysAgoKey(0) },
-      ]
   const staff = useMemo(() => users.filter((u) => u.status === 'active'), [users])
 
   const filteredOrders = useMemo(
@@ -203,7 +196,6 @@ export default function OrdersPage() {
         todayLabel={t('tasks.dateLabels.today', 'Today')}
         weekDayLabels={weekDayLabels}
         locale={lang === 'vi' ? 'vi-VN' : undefined}
-        extraQuickOptions={quickRanges}
         minDate={isManager ? undefined : daysAgoKey(STAFF_HISTORY_DAYS)}
         extraFields={
           user ? (

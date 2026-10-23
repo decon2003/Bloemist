@@ -119,7 +119,7 @@ export default function MyPayPage() {
     <div className="space-y-6 p-4 pb-24 md:p-8 md:pb-12">
       <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Lương của tôi</h1>
+          <h1 className="text-3xl font-bold text-foreground">Thu nhập</h1>
           <p className="text-muted-foreground">Giờ công, sản phẩm đã làm, đơn đã sale và lương trong tháng</p>
         </div>
         <label className="flex items-center gap-2 text-sm font-medium text-foreground">

@@ -1,52 +1,12 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { Bell, Shield, Users, Plus, Edit2, Trash2, X, Clock } from 'lucide-react'
+import { Users, Plus, Edit2, Trash2, X, Clock } from 'lucide-react'
 import { useLocale } from '@/components/providers/locale-provider'
 import { useAuth } from '@/components/providers/auth-provider'
 import { useAppData } from '@/components/providers/app-data-provider'
 import { User } from '@/lib/types'
 import { AuditTrail } from '@/components/audit-trail'
-
-const sections = [
-  {
-    id: 'notifications',
-    icon: Bell,
-    keyTitle: 'settings.notificationsTitle',
-    keyCopy: 'settings.notificationsCopy',
-    fallbackTitle: 'Notifications',
-    fallbackCopy: 'Configure SMS and email alerts.',
-    items: [
-      'SMS alerts for urgent orders',
-      'Daily digest with revenue snapshot',
-      'Florist assignment notifications',
-    ],
-  },
-  {
-    id: 'roles',
-    icon: Users,
-    keyTitle: 'settings.rolesTitle',
-    keyCopy: 'settings.rolesCopy',
-    fallbackTitle: 'Team Roles',
-    fallbackCopy: 'Manage florist and sales permissions.',
-    items: [
-      'Invite new florists to the workspace',
-      'Grant manager access for reporting',
-      'Review pending invitations',
-    ],
-  },
-  {
-    id: 'security',
-    icon: Shield,
-    fallbackTitle: 'Security',
-    fallbackCopy: 'Protect sign-ins and audit changes.',
-    items: [
-      'Enable two-factor authentication',
-      'Review connected devices',
-      'Export audit log',
-    ],
-  },
-]
 
 interface UserFormData {
   name: string
@@ -365,7 +325,7 @@ export default function SettingsPage() {
         <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">{t('settings.subtitle')}</p>
         <h1 className="text-3xl font-bold text-foreground">{t('settings.title')}</h1>
         <p className="text-muted-foreground">
-          Quản lý thông báo, phân quyền và cài đặt không gian làm việc.
+          Giờ làm việc, địa điểm điểm danh và tài khoản nhân viên.
         </p>
         {!canEditSettings && (
           <div className="rounded-2xl border border-dashed border-muted bg-muted/50 p-3 text-sm text-muted-foreground">
@@ -432,39 +392,6 @@ export default function SettingsPage() {
           </div>
         )}
       </section>
-
-      {/* Settings Sections */}
-      <div className="grid gap-6 md:grid-cols-2">
-        {sections.map((section) => (
-          <section key={section.id} className="rounded-2xl border border-border bg-white p-6 shadow-sm">
-            <div className="flex items-center gap-3">
-              <section.icon className="h-5 w-5 text-primary" />
-              <div>
-                <h2 className="text-lg font-semibold text-foreground">
-                  {section.keyTitle ? t(section.keyTitle) : section.fallbackTitle}
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  {section.keyCopy ? t(section.keyCopy) : section.fallbackCopy}
-                </p>
-              </div>
-            </div>
-            <ul className="mt-4 space-y-3 text-sm text-foreground">
-              {section.items.map((item) => (
-                <li key={item} className="flex items-center gap-2 text-muted-foreground">
-                  <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden />
-                  {item}
-                </li>
-              ))}
-            </ul>
-            <button
-              disabled={!canEditSettings}
-              className="mt-5 rounded-xl border border-border px-4 py-2 text-sm font-semibold text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              Quản lý
-            </button>
-          </section>
-        ))}
-      </div>
 
       {/* User Management Section */}
       {canManageUsers && (

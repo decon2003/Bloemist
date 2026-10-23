@@ -76,8 +76,9 @@ type CustomerRow = {
 }
 
 const summarise = (customer: CustomerRow) => {
+  // Cancelled orders count neither towards spend nor as the last purchase.
   const counted = customer.orders.filter((order) => !REVENUE_EXCLUDED_STATUSES.includes(order.status))
-  const latest = customer.orders[0]
+  const latest = counted[0]
   return {
     id: customer.id,
     phone: customer.phone,
@@ -119,7 +120,12 @@ export async function listCustomers({ q, sort, page, pageSize }: { q: string; so
       }
     : {}
 
-  const rows = await db.customer.findMany({ where, include: { orders: ORDER_SUMMARY_SELECT } })
+  // A customer whose only orders were deleted or moved to another phone is
+  // not listed (the record stays and comes back with their next order).
+  const rows = await db.customer.findMany({
+    where: { AND: [where, { orders: { some: {} } }] },
+    include: { orders: ORDER_SUMMARY_SELECT },
+  })
   const summaries = rows.map(summarise)
   const key: Record<CustomerSort, (c: ReturnType<typeof summarise>) => number> = {
     spend: (c) => c.totalSpend,
@@ -163,6 +169,49 @@ export async function lookupCustomer(phone: string) {
   }).slice(0, 5)
 
   return { ...summarise(customer), recentReceivers }
+}
+
+/** One customer's page: totals, everyone they sent flowers to, and every order. */
+export async function getCustomer(id: string) {
+  const customer = await db.customer.findUnique({ where: { id }, include: { orders: ORDER_SUMMARY_SELECT } })
+  if (!customer) throw new ApiError(404, 'Không tìm thấy khách hàng')
+
+  const orders = await db.order.findMany({
+    where: { customerId: id },
+    orderBy: { receiveTime: 'desc' },
+    select: {
+      id: true, code: true, receiveTime: true, createdAt: true, status: true, total: true, bouquetName: true,
+      receiverName: true, receiverPhone: true, deliveryType: true, deliveryAddress: true, salespersonName: true,
+    },
+  })
+
+  // People they sent flowers to, most frequent first.
+  const receivers = new Map<string, { receiverName: string; receiverPhone: string; deliveryAddress: string | null; count: number; lastAt: string }>()
+  for (const o of orders) {
+    if (o.status === 'CANCELLED') continue
+    const key = `${o.receiverName.trim().toLowerCase()}|${normalizeCustomerPhone(o.receiverPhone)}`
+    const existing = receivers.get(key)
+    if (existing) existing.count += 1
+    else receivers.set(key, { receiverName: o.receiverName, receiverPhone: o.receiverPhone, deliveryAddress: o.deliveryAddress, count: 1, lastAt: o.receiveTime.toISOString() })
+  }
+  const counted = orders.filter((o) => o.status !== 'CANCELLED')
+
+  return {
+    ...summarise(customer),
+    // Both by receive day, so first and latest read the same way.
+    firstOrderAt: counted.length ? counted[counted.length - 1].receiveTime.toISOString() : null,
+    lastOrderAt: counted.length ? counted[0].receiveTime.toISOString() : null,
+    lastBouquet: counted[0]?.bouquetName ?? null,
+    receivers: [...receivers.values()].sort((a, b) => b.count - a.count),
+    orders: orders.map((o) => ({ ...o, receiveTime: o.receiveTime.toISOString(), createdAt: o.createdAt.toISOString() })),
+  }
+}
+
+/** True when the phone belongs to no customer with a non-cancelled order yet. */
+export async function isNewCustomer(customerId: string | null) {
+  if (!customerId) return true
+  const previous = await db.order.count({ where: { customerId, status: { notIn: REVENUE_EXCLUDED_STATUSES } } })
+  return previous === 0
 }
 
 export async function updateCustomer(id: string, body: Record<string, unknown>) {

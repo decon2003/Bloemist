@@ -11,7 +11,7 @@ import { computeOrderTotals, parseCurrencyToNumber, toVatPercent, toVnd, type Or
 import { addVnDays, startOfVnMonth, vnDateKey } from './vn-time'
 import { LIST_LIMIT, SEARCH_LIMIT, type ListScope } from './list-scope'
 import type { Prisma } from '@prisma/client'
-import { linkCustomer, normalizeCustomerPhone, orderSearchWhere } from './customers'
+import { isNewCustomer, linkCustomer, normalizeCustomerPhone, orderSearchWhere } from './customers'
 import { TASK_STATUSES, assertOneOf } from './validation'
 
 // Helper to map Prisma entity to App entity
@@ -296,6 +296,9 @@ export const createOrder = async (input: CreateOrderInput) => {
   // Codes are always assigned here; a client-supplied code could collide or mislead.
   const code = await nextOrderCode()
   const customerId = await linkCustomer(input.customerPhone, input.customerName)
+  // Decided here, not by the form: a slow phone lookup used to mark repeat
+  // customers as new.
+  const newCustomer = await isNewCustomer(customerId)
 
   const order = await db.$transaction(async (tx) => {
     const created = await tx.order.create({
@@ -319,7 +322,7 @@ export const createOrder = async (input: CreateOrderInput) => {
         createdByName: input.createdByName,
         assigneeId: input.assigneeId,
         assigneeName: input.assigneeName,
-        new_customer: input.new_customer,
+        new_customer: newCustomer,
         ...salesperson,
       },
     })

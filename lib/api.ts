@@ -1,7 +1,7 @@
 // ============================================================
 // API Layer - Calls Real Backend API Routes
 // ============================================================
-import type { AuditEntry, BouquetSuggestion, MyPay, Payroll, PayrollLineUpdate, ShiftCorrectionInput, CreateOrderInput, CreateTaskInput, CustomerLookup, ListParams, CustomerPage, CustomerSummary, DashboardStats, Order, Task, TaskStatus, Florist, User, StaffCheckIn, WorkspaceSettings } from './types'
+import type { AuditEntry, BouquetSuggestion, MyPay, Payroll, PayrollLineUpdate, ShiftCorrectionInput, CreateOrderInput, CreateTaskInput, CustomerLookup, CustomerDetail, ListParams, CustomerPage, CustomerSummary, DashboardStats, Order, Task, TaskStatus, Florist, User, StaffCheckIn, WorkspaceSettings } from './types'
 import type { ApiClient, AssignTaskPayload, CompleteTaskPayload } from './api.types'
 import { compressImage, makeThumbnail } from './image-compress'
 
@@ -94,6 +94,7 @@ const apiClient: ApiClient = {
   // Customers
   fetchCustomers: ({ q = '', sort = 'spend', page = 1 }) =>
     request<CustomerPage>(`/customers?${new URLSearchParams({ q, sort, page: String(page) })}`),
+  fetchCustomer: (customerId) => request<CustomerDetail>(`/customers/${encodeURIComponent(customerId)}`),
   lookupCustomer: (phone) => request<CustomerLookup | null>(`/customers/lookup?${new URLSearchParams({ phone })}`),
   updateCustomer: (customerId, input) =>
     request<CustomerSummary>(`/customers/${customerId}`, { method: 'PATCH', body: JSON.stringify(input) }),
@@ -173,6 +174,7 @@ export const lockPayroll = apiClient.lockPayroll
 export const unlockPayroll = apiClient.unlockPayroll
 export const fetchStaffReport = apiClient.fetchStaffReport
 export const lookupCustomer = apiClient.lookupCustomer
+export const fetchCustomer = apiClient.fetchCustomer
 export const updateCustomer = apiClient.updateCustomer
 export const fetchCurrentUser = apiClient.fetchCurrentUser
 export const changePassword = apiClient.changePassword

@@ -401,7 +401,13 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
             ) : (
               <>
                 <div className="mt-2 flex items-center gap-2">
-                  <p className="text-sm text-muted-foreground">{order.customerName}</p>
+                  {order.customerId && (user?.role === 'boss' || user?.role === 'admin') ? (
+                    <Link href={`/${lang}/customers/${order.customerId}`} className="text-sm font-medium text-primary hover:underline">
+                      {order.customerName}
+                    </Link>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">{order.customerName}</p>
+                  )}
                   {order.new_customer && (
                     <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700 uppercase tracking-wide">
                       {t('orders.detail.newCustomer', 'New')}

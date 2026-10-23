@@ -51,6 +51,8 @@ export interface Task {
 export interface Order {
   id: string
   code: string
+  /** The customer record this order belongs to (by sender phone). */
+  customerId?: string | null
   customerName: string
   customerPhone: string
   receiverName: string
@@ -284,7 +286,7 @@ export interface Payroll {
   summary: { total: number; pendingOtDays: number }
 }
 
-/** "Lương của tôi": the locked line, or an estimate while the month is open. */
+/** "Thu nhập" (own pay): the locked line, or an estimate while the month is open. */
 export interface MyPay {
   month: string
   status: 'LOCKED' | 'ESTIMATE'
@@ -411,6 +413,25 @@ export interface CustomerSummary {
 
 export interface CustomerLookup extends CustomerSummary {
   recentReceivers: { receiverName: string; receiverPhone: string; deliveryAddress: string | null }[]
+}
+
+export interface CustomerDetail extends CustomerSummary {
+  firstOrderAt: string | null
+  receivers: { receiverName: string; receiverPhone: string; deliveryAddress: string | null; count: number; lastAt: string }[]
+  orders: {
+    id: string
+    code: string
+    receiveTime: string
+    createdAt: string
+    status: Order['status'] | 'CANCELLED'
+    total: number
+    bouquetName: string
+    receiverName: string
+    receiverPhone: string
+    deliveryType: string
+    deliveryAddress: string | null
+    salespersonName: string | null
+  }[]
 }
 
 export interface CustomerPage {

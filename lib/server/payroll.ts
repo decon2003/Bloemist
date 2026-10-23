@@ -285,7 +285,7 @@ export async function getPayroll(monthKey: string) {
   }
 }
 
-/** A staff member's own pay for a month ("Lương của tôi"). Once the payroll is
+/** A staff member's own pay for a month ("Thu nhập"). Once the payroll is
  *  locked it is exactly the locked line. Before that it is an estimate from
  *  their pay profile and the month's facts so far: overtime awaiting review
  *  counts as OT (as in the manager's draft), and the manager's draft edits and

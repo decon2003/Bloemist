@@ -1,5 +1,7 @@
 'use client'
 
+import { ImagePlus } from 'lucide-react'
+
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -20,7 +22,6 @@ type ProductForm = {
   unitPrice: string
   note?: string
   samplePhotoUrls: string[]
-  draftSampleUrl?: string
 }
 
 export default function NewOrderPage() {
@@ -56,7 +57,7 @@ export default function NewOrderPage() {
     typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
   )
   const [products, setProducts] = useState<ProductForm[]>([
-    { name: '', quantity: 1, unitPrice: '', note: '', samplePhotoUrls: [], draftSampleUrl: '' },
+    { name: '', quantity: 1, unitPrice: '', note: '', samplePhotoUrls: [] },
   ])
   const [knownCustomer, setKnownCustomer] = useState<CustomerLookup | null>(null)
   // "Người đặt là người nhận": the receiver mirrors the customer's name and phone.
@@ -157,21 +158,16 @@ export default function NewOrderPage() {
     )
   }
 
-  const setDraftSampleUrl = (index: number, value: string) => {
-    setProducts((prev) => prev.map((product, idx) => (idx === index ? { ...product, draftSampleUrl: value } : product)))
-  }
-
   const addSamplePhotoToProduct = (index: number, url: string) => {
     const trimmed = url.trim()
     if (!trimmed) return
     setProducts((prev) =>
       prev.map((product, idx) =>
         idx === index
-          ? { ...product, samplePhotoUrls: [...product.samplePhotoUrls, trimmed], draftSampleUrl: '' }
+          ? { ...product, samplePhotoUrls: [...product.samplePhotoUrls, trimmed] }
           : product,
       ),
     )
-    setProductPreviewUrl(trimmed)
   }
 
   const removeSamplePhotoFromProduct = (index: number, photoIndex: number) => {
@@ -186,21 +182,34 @@ export default function NewOrderPage() {
     )
   }
 
-  const handleSampleFileUpload = async (index: number, fileList: FileList | null) => {
-    const file = fileList?.[0]
-    if (!file) return
-    setUploading((n) => n + 1)
-    try {
-      addSamplePhotoToProduct(index, await uploadPhoto(file))
-    } catch (error) {
-      alert(error instanceof Error ? error.message : 'Không tải được ảnh lên')
-    } finally {
-      setUploading((n) => n - 1)
+  /** Upload sample photos (picked, taken or pasted) one after another. */
+  const handleSampleFiles = async (index: number, files: File[]) => {
+    const images = files.filter((file) => file.type.startsWith('image/'))
+    if (images.length === 0) return
+    setUploading((n) => n + images.length)
+    const failed: string[] = []
+    for (const file of images) {
+      try {
+        addSamplePhotoToProduct(index, await uploadPhoto(file))
+      } catch (error) {
+        failed.push(error instanceof Error ? error.message : 'Không tải được ảnh lên')
+      } finally {
+        setUploading((n) => n - 1)
+      }
     }
+    if (failed.length) alert(`${failed.length} ảnh không tải lên được: ${failed[0]}`)
+  }
+
+  /** Ctrl+V of a photo copied from Zalo/Messenger on a computer. */
+  const handleSamplePaste = (index: number, event: React.ClipboardEvent) => {
+    const files = Array.from(event.clipboardData.files)
+    if (!files.some((file) => file.type.startsWith('image/'))) return
+    event.preventDefault()
+    handleSampleFiles(index, files)
   }
 
   const addProductRow = () => {
-    setProducts((prev) => [...prev, { name: '', quantity: 1, unitPrice: '', note: '', samplePhotoUrls: [], draftSampleUrl: '' }])
+    setProducts((prev) => [...prev, { name: '', quantity: 1, unitPrice: '', note: '', samplePhotoUrls: [] }])
   }
 
   const removeProductRow = (index: number) => {
@@ -460,7 +469,7 @@ export default function NewOrderPage() {
               />
             </label>
             <label className="space-y-2 text-sm font-medium text-foreground">
-              <span>{t('orders.assignee', 'Phân công Florist')} ({t('common.optional', 'Tuỳ chọn')})</span>
+              <span>{t('orders.assignee', 'Thợ làm')} (tuỳ chọn, thợ cũng có thể tự nhận)</span>
               <select
                 value={assigneeId}
                 onChange={(event) => setAssigneeId(event.target.value)}
@@ -558,57 +567,48 @@ export default function NewOrderPage() {
                         </span>
                       )}
                     </div>
-                    <div className="space-y-2 rounded-lg border border-border bg-white p-3">
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                        <input
-                          value={product.draftSampleUrl || ''}
-                          onChange={(event) => setDraftSampleUrl(index, event.target.value)}
-                          className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                          placeholder={t('orders.new.samplePhotoPlaceholder', 'Paste one or more inspiration image URLs')}
-                        />
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => addSamplePhotoToProduct(index, product.draftSampleUrl || '')}
-                            className="flex items-center justify-center rounded-lg border border-border px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-muted"
-                          >
-                            {t('orders.new.addSamplePhoto', 'Add photo')}
-                          </button>
-                          <label className="flex cursor-pointer items-center justify-center rounded-lg border border-border px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-muted">
-                            <input
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={(event) => handleSampleFileUpload(index, event.target.files)}
+                    <div
+                      tabIndex={0}
+                      onPaste={(event) => handleSamplePaste(index, event)}
+                      className="space-y-2 rounded-lg border border-dashed border-border bg-white p-3 focus:outline-none focus:ring-2 focus:ring-primary"
+                    >
+                      <div className="flex flex-wrap gap-2">
+                        {product.samplePhotoUrls.map((photoUrl, photoIndex) => (
+                          <div key={`${photoUrl}-${photoIndex}`} className="relative h-20 w-20 overflow-hidden rounded-lg border border-border bg-muted">
+                            <img
+                              src={thumbUrl(photoUrl)}
+                              alt={`Ảnh mẫu ${photoIndex + 1}`}
+                              className="h-full w-full cursor-zoom-in object-cover"
+                              onClick={() => setProductPreviewUrl(photoUrl)}
                             />
-                            {t('orders.new.uploadSample', 'Upload')}
-                          </label>
-                        </div>
+                            <button
+                              type="button"
+                              onClick={() => removeSamplePhotoFromProduct(index, photoIndex)}
+                              className="absolute right-1 top-1 h-6 w-6 rounded-full bg-black/70 text-white hover:bg-black/90"
+                              aria-label="Bỏ ảnh"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                        <label className="flex h-20 w-20 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border text-[11px] font-semibold text-muted-foreground transition hover:bg-muted">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            className="hidden"
+                            onChange={(event) => {
+                              handleSampleFiles(index, Array.from(event.target.files ?? []))
+                              event.target.value = ''
+                            }}
+                          />
+                          <ImagePlus className="h-5 w-5" />
+                          Thêm ảnh
+                        </label>
                       </div>
-                      {product.samplePhotoUrls.length > 0 && (
-                        <div className="flex flex-wrap gap-2">
-                          {product.samplePhotoUrls.map((photoUrl, photoIndex) => (
-                            <div key={`${photoUrl}-${photoIndex}`} className="group relative h-20 w-20 overflow-hidden rounded-lg border border-border bg-muted">
-                              <img
-                                src={thumbUrl(photoUrl)}
-                                alt={t('orders.new.samplePhotoAlt', 'Sample arrangement inspiration')}
-                                className="h-full w-full object-cover"
-                                onClick={() => setProductPreviewUrl(photoUrl)}
-                              />
-                              <button
-                                type="button"
-                                onClick={() => removeSamplePhotoFromProduct(index, photoIndex)}
-                                className="absolute right-1 top-1 h-6 w-6 rounded-full bg-black/70 text-white hover:bg-black/90"
-                                aria-label={t('orders.new.removeSamplePhoto', 'Remove photo')}
-                              >
-                                ×
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      <p className="text-[11px] text-muted-foreground">
-                        {t('orders.new.samplePhotoHint', 'Attach multiple inspiration photos for florists to reference.')}
+                      <p className="text-[11px] font-normal text-muted-foreground">
+                        Chụp hoặc chọn ảnh từ máy (chọn được nhiều ảnh). Trên máy tính có thể dán ảnh (Ctrl+V) copy từ Zalo,
+                        Messenger vào khung này. Thợ bấm vào ảnh để phóng to.
                       </p>
                     </div>
                   </div>

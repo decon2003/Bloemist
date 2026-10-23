@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { ImagePlus, Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useAppData } from '@/components/providers/app-data-provider'
 import type { Order, TaskType } from '@/lib/types'
@@ -46,7 +46,6 @@ export default function AddTaskDialog({
   const [quantity, setQuantity] = useState(1)
   const [orderless, setOrderless] = useState(false)
   const [samplePhotoUrls, setSamplePhotoUrls] = useState<string[]>([])
-  const [samplePhotoInput, setSamplePhotoInput] = useState('')
   const [samplePreviewUrl, setSamplePreviewUrl] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const sampleFileInputRef = useRef<HTMLInputElement | null>(null)
@@ -81,12 +80,21 @@ export default function AddTaskDialog({
     { value: 'SHIP_DON', label: t('addTask.taskType.shipDon', 'Delivery') },
   ]
 
-  const addSamplePhoto = useCallback((url: string) => {
-    const trimmed = url.trim()
-    if (!trimmed) return
-    setSamplePhotoUrls((prev) => [...prev, trimmed])
-    setSamplePhotoInput('')
-    setSamplePreviewUrl(trimmed)
+  const [uploadingSamples, setUploadingSamples] = useState(0)
+  /** Upload sample photos (picked, taken or pasted) one after another. */
+  const uploadSamples = useCallback(async (files: File[]) => {
+    const images = files.filter((file) => file.type.startsWith('image/'))
+    setUploadingSamples((n) => n + images.length)
+    for (const file of images) {
+      try {
+        const url = await uploadPhoto(file)
+        setSamplePhotoUrls((prev) => [...prev, url])
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Không tải được ảnh lên')
+      } finally {
+        setUploadingSamples((n) => n - 1)
+      }
+    }
   }, [])
 
   const removeSamplePhoto = useCallback((index: number) => {
@@ -143,7 +151,6 @@ export default function AddTaskDialog({
     setQuantity(1)
     setOrderless(false)
     setSamplePhotoUrls([])
-    setSamplePhotoInput('')
     setSamplePreviewUrl(null)
   }, [applyOrderDefaults, initialOrderId, defaultOrder])
 
@@ -157,6 +164,7 @@ export default function AddTaskDialog({
     setError(null)
     if (!taskTitle.trim()) return setError('Vui lòng nhập tên việc')
     if (!dueTime) return setError('Vui lòng chọn hạn làm')
+    if (uploadingSamples > 0) return setError('Ảnh mẫu đang tải lên, đợi xong rồi thêm việc')
     const resolvedOrderId = orderless ? undefined : selectedOrderId || undefined
 
     try {
@@ -279,78 +287,52 @@ export default function AddTaskDialog({
                 </span>
               )}
             </div>
-            <div className="space-y-2 rounded-xl border border-border bg-white p-3">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <input
-                  value={samplePhotoInput}
-                  onChange={(event) => setSamplePhotoInput(event.target.value)}
-                  className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder={t('addTask.fields.samplePhotoPlaceholder', 'Paste one or more image links or upload files')}
-                />
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => addSamplePhoto(samplePhotoInput)}
-                    className="inline-flex items-center justify-center rounded-lg border border-border px-3 py-2 text-sm font-semibold text-foreground hover:bg-muted"
-                  >
-                    {t('addTask.fields.addSamplePhoto', 'Add photo')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => sampleFileInputRef.current?.click()}
-                    className="inline-flex items-center justify-center rounded-lg border border-border px-3 py-2 text-sm font-semibold text-foreground hover:bg-muted"
-                  >
-                    {t('addTask.fields.uploadSample', 'Upload')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSamplePreviewUrl(samplePhotoUrls[0] || null)}
-                    disabled={samplePhotoUrls.length === 0}
-                    className="inline-flex items-center justify-center rounded-lg border border-border px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {t('addTask.fields.previewSample', 'Preview')}
-                  </button>
+            <div
+              tabIndex={0}
+              onPaste={(event) => {
+                const files = Array.from(event.clipboardData.files)
+                if (!files.some((file) => file.type.startsWith('image/'))) return
+                event.preventDefault()
+                uploadSamples(files)
+              }}
+              className="space-y-2 rounded-xl border border-dashed border-border bg-white p-3 focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              <div className="flex flex-wrap gap-2">
+                {samplePhotoUrls.map((photoUrl, index) => (
+                  <div key={`${photoUrl}-${index}`} className="relative h-20 w-20 overflow-hidden rounded-lg border border-border bg-muted">
+                    <img
+                      src={thumbUrl(photoUrl)}
+                      alt={`Ảnh mẫu ${index + 1}`}
+                      className="h-full w-full cursor-zoom-in object-cover"
+                      onClick={() => setSamplePreviewUrl(photoUrl)}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeSamplePhoto(index)}
+                      className="absolute right-1 top-1 h-6 w-6 rounded-full bg-black/70 text-white hover:bg-black/90"
+                      aria-label="Bỏ ảnh"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+                <label className="flex h-20 w-20 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border text-[11px] font-semibold text-muted-foreground hover:bg-muted">
                   <input
                     ref={sampleFileInputRef}
                     type="file"
                     accept="image/*"
+                    multiple
                     className="hidden"
-                    onChange={async (event) => {
-                      const file = event.target.files?.[0]
-                      if (!file) return
+                    onChange={(event) => {
+                      uploadSamples(Array.from(event.target.files ?? []))
                       event.target.value = ''
-                      try {
-                        addSamplePhoto(await uploadPhoto(file))
-                      } catch (error) {
-                        alert(error instanceof Error ? error.message : 'Không tải được ảnh lên')
-                      }
                     }}
                   />
-                </div>
+                  <ImagePlus className="h-5 w-5" />
+                  {uploadingSamples > 0 ? 'Đang tải…' : 'Thêm ảnh'}
+                </label>
               </div>
-              {samplePhotoUrls.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {samplePhotoUrls.map((photoUrl, index) => (
-                    <div key={`${photoUrl}-${index}`} className="group relative h-20 w-20 overflow-hidden rounded-lg border border-border bg-muted">
-                      <img
-                        src={thumbUrl(photoUrl)}
-                        alt={t('addTask.fields.samplePhotoAlt', 'Arrangement sample')}
-                        className="h-full w-full object-cover"
-                        onClick={() => setSamplePreviewUrl(photoUrl)}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeSamplePhoto(index)}
-                        className="absolute right-1 top-1 h-6 w-6 rounded-full bg-black/70 text-white hover:bg-black/90"
-                        aria-label={t('addTask.fields.removeSamplePhoto', 'Remove photo')}
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <p className="text-xs text-muted-foreground">{t('addTask.fields.samplePhotoHint', 'Florists can open these photos full-screen inside the task.')}</p>
+              <p className="text-xs text-muted-foreground">Chụp, chọn từ máy hoặc dán ảnh (Ctrl+V). Thợ bấm vào ảnh để phóng to.</p>
             </div>
           </div>
 

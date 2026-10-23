@@ -40,13 +40,20 @@ export async function GET(request: Request) {
 
         if (!value) throw new ApiError(404, 'Photo not found')
 
-        const match = /^data:([^;,]+);base64,([A-Za-z0-9+/=\s]*)$/.exec(value)
+        // Only images: a stored "data:text/html" must never be served as a page
+        // from this site, and links only lead to our photos or to https.
+        const match = /^data:(image\/(?:png|jpe?g|webp|gif|heic|heif));base64,([A-Za-z0-9+/=\s]*)$/i.exec(value)
         if (match) {
             return new NextResponse(new Uint8Array(Buffer.from(match[2], 'base64')), {
-                headers: { 'Content-Type': match[1], 'Cache-Control': 'private, max-age=3600' },
+                headers: {
+                    'Content-Type': match[1],
+                    'Cache-Control': 'private, max-age=3600',
+                    'X-Content-Type-Options': 'nosniff',
+                    'Content-Security-Policy': "default-src 'none'; sandbox",
+                },
             })
         }
-        if (value.startsWith('/') || /^https?:\/\//.test(value)) {
+        if (value.startsWith('/api/photos/') || /^https:\/\//i.test(value)) {
             return NextResponse.redirect(new URL(value, request.url), 302)
         }
         throw new ApiError(404, 'Photo not found')

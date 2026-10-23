@@ -130,7 +130,7 @@ const dictionaries: Record<SupportedLocale, Record<string, string>> = {
     'orders.new.taskListTitle': 'Sản phẩm của đơn',
     'orders.new.taskListSubtitle':
       'Thêm sản phẩm. Mỗi dòng sẽ tạo một công việc cắm/bó hoa và có thể đính kèm ảnh gợi ý.',
-    'orders.new.addTask': 'Thêm công việc',
+    'orders.new.addTask': 'Thêm sản phẩm',
     'orders.new.removeTask': 'Xoá',
     'orders.new.taskValidation': 'Vui lòng nhập tên cho mỗi công việc.',
     'orders.new.productLabel': 'Sản phẩm trong đơn',
@@ -394,7 +394,7 @@ const dictionaries: Record<SupportedLocale, Record<string, string>> = {
     'role.florist': 'Thợ hoa',
     'role.user': 'Người dùng',
     'orders.floristWarning': 'Thợ hoa chỉ được xem đơn hàng, chỉ có Sales mới được tạo đơn mới.',
-    'orders.assignee': 'Phân công Florist',
+    'orders.assignee': 'Thợ làm',
     'common.select': 'Chọn',
     'common.optional': 'Tuỳ chọn',
     'orders.detail.createdBy': 'Người tạo',

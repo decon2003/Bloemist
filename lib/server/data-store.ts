@@ -255,6 +255,27 @@ export const nextOrderCode = async (now = new Date()) => {
   return `${date}${month}${year.slice(2)}-${String(value).padStart(3, '0')}`
 }
 
+/** A stored photo value: our own photo links, an inline image (only when R2 is
+ *  not configured) or an https link kept from older orders. Anything else -
+ *  notably a pasted "data:text/html" - is refused. */
+const isPhotoValue = (value: string) =>
+  value.startsWith('/api/photos/') ||
+  value.startsWith('/api/legacy-photos?') ||
+  /^data:image\/(png|jpe?g|webp|gif|heic|heif);base64,/i.test(value) ||
+  /^https:\/\//i.test(value)
+
+const readPhoto = (value: unknown): string | null => {
+  if (value === undefined || value === null || value === '') return null
+  if (typeof value !== 'string' || !isPhotoValue(value)) throw new ApiError(400, 'Ảnh không hợp lệ, hãy tải ảnh lên lại')
+  return value
+}
+
+const readPhotoList = (value: unknown): string[] => {
+  if (value === undefined || value === null) return []
+  if (!Array.isArray(value)) throw new ApiError(400, 'Ảnh mẫu không hợp lệ')
+  return value.map((item) => readPhoto(item)).filter((item): item is string => item !== null)
+}
+
 type ProductInput = { name: string; quantity: number; note: string; samplePhotoUrls: string[]; image: string | null; lineTotal: number }
 
 /** Validate the order's product lines. Each line becomes one task, and its
@@ -269,13 +290,13 @@ const readProducts = (value: unknown): ProductInput[] => {
     const quantity = item.quantity === undefined ? 1 : Number(item.quantity)
     if (!Number.isInteger(quantity) || quantity < 1) throw new ApiError(400, `${label}: số lượng không hợp lệ`)
     const unitPrice = toVnd(item.unitPrice, `${label}: đơn giá`, { required: true })!
-    const photos = Array.isArray(item.samplePhotoUrls) ? item.samplePhotoUrls.filter((url): url is string => typeof url === 'string') : []
+    const photos = readPhotoList(item.samplePhotoUrls)
     return {
       name: item.name.trim().slice(0, 300),
       quantity,
       note: typeof item.note === 'string' ? item.note.trim() : '',
       samplePhotoUrls: photos,
-      image: typeof item.image === 'string' && item.image ? item.image : photos[0] ?? null,
+      image: readPhoto(item.image) ?? photos[0] ?? null,
       lineTotal: unitPrice * quantity,
     }
   })
@@ -334,7 +355,7 @@ export const createOrder = async (input: CreateOrderInput) => {
         receiverName: text(input.receiverName),
         receiverPhone: text(input.receiverPhone),
         bouquetName: input.bouquetName,
-        bouquetImage: input.bouquetImage,
+        bouquetImage: readPhoto(input.bouquetImage),
         receiveTime,
         deliveryType,
         deliveryAddress: deliveryType === 'DELIVERY' ? text(input.deliveryAddress) || null : null,
@@ -419,6 +440,7 @@ export const updateOrder = async (orderId: string, input: Partial<CreateOrderInp
   }
   if (data.status !== undefined) assertOneOf(data.status, ORDER_STATUSES, 'status')
   if (data.deliveryType !== undefined) assertOneOf(data.deliveryType, DELIVERY_TYPES, 'deliveryType')
+  if (data.bouquetImage !== undefined) data.bouquetImage = readPhoto(data.bouquetImage)
 
   // A new receive time moves the due time of the products not yet made by the
   // same amount, so they show up on the right day for the florists.
@@ -520,10 +542,12 @@ export const createTask = async (input: CreateTaskInput) => {
       orderId: input.orderId,
       orderCode: linkedOrder?.code,
       bouquetName: input.bouquetName || linkedOrder?.bouquetName || 'Sản phẩm',
-      bouquetImage: input.bouquetImage || linkedOrder?.bouquetImage,
+      bouquetImage: readPhoto(input.bouquetImage) ?? linkedOrder?.bouquetImage,
       taskTitle,
       samplePhotoUrls: JSON.stringify(
-        input.samplePhotoUrls || (input.bouquetImage ? [input.bouquetImage] : linkedOrder?.bouquetImage ? [linkedOrder.bouquetImage] : [])
+        input.samplePhotoUrls !== undefined
+          ? readPhotoList(input.samplePhotoUrls)
+          : input.bouquetImage ? [readPhoto(input.bouquetImage)] : linkedOrder?.bouquetImage ? [linkedOrder.bouquetImage] : [],
       ),
       status: maker ? 'ASSIGNED' : 'UNASSIGNED',
       dueTime,
@@ -602,7 +626,7 @@ export const updateTask = async (taskId: string, input: Partial<CreateTaskInput>
     data.taskTitle = input.taskTitle.trim().slice(0, 300)
   }
   if (input.bouquetName !== undefined) data.bouquetName = String(input.bouquetName).slice(0, 300)
-  if (input.bouquetImage !== undefined) data.bouquetImage = input.bouquetImage || null
+  if (input.bouquetImage !== undefined) data.bouquetImage = readPhoto(input.bouquetImage)
   if (input.notes !== undefined) data.notes = typeof input.notes === 'string' ? input.notes : ''
   if (input.type !== undefined) data.type = String(input.type)
   if (input.quantity !== undefined) {
@@ -615,12 +639,7 @@ export const updateTask = async (taskId: string, input: Partial<CreateTaskInput>
     data.price = toVnd(input.price, 'price')
   }
   if (input.dueTime !== undefined) data.dueTime = parseRequiredDate(input.dueTime, 'dueTime')
-  if (input.samplePhotoUrls !== undefined) {
-    if (!Array.isArray(input.samplePhotoUrls) || input.samplePhotoUrls.some((url) => typeof url !== 'string')) {
-      throw new ApiError(400, 'Ảnh mẫu không hợp lệ')
-    }
-    data.samplePhotoUrls = JSON.stringify(input.samplePhotoUrls)
-  }
+  if (input.samplePhotoUrls !== undefined) data.samplePhotoUrls = JSON.stringify(readPhotoList(input.samplePhotoUrls))
 
   if (Object.keys(data).length > 0) {
     await db.task.update({ where: { id: taskId }, data })

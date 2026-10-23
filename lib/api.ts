@@ -95,6 +95,8 @@ const apiClient: ApiClient = {
   fetchCustomers: ({ q = '', sort = 'spend', page = 1 }) =>
     request<CustomerPage>(`/customers?${new URLSearchParams({ q, sort, page: String(page) })}`),
   fetchCustomer: (customerId) => request<CustomerDetail>(`/customers/${encodeURIComponent(customerId)}`),
+  mergeCustomer: (customerId, targetId) =>
+    request<{ targetId: string; moved: number }>(`/customers/${encodeURIComponent(customerId)}/merge`, { method: 'POST', body: JSON.stringify({ targetId }) }),
   lookupCustomer: (phone) => request<CustomerLookup | null>(`/customers/lookup?${new URLSearchParams({ phone })}`),
   updateCustomer: (customerId, input) =>
     request<CustomerSummary>(`/customers/${customerId}`, { method: 'PATCH', body: JSON.stringify(input) }),
@@ -175,6 +177,7 @@ export const unlockPayroll = apiClient.unlockPayroll
 export const fetchStaffReport = apiClient.fetchStaffReport
 export const lookupCustomer = apiClient.lookupCustomer
 export const fetchCustomer = apiClient.fetchCustomer
+export const mergeCustomer = apiClient.mergeCustomer
 export const updateCustomer = apiClient.updateCustomer
 export const fetchCurrentUser = apiClient.fetchCurrentUser
 export const changePassword = apiClient.changePassword

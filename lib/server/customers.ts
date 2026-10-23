@@ -196,7 +196,17 @@ export async function getCustomer(id: string) {
   }
   const counted = orders.filter((o) => o.status !== 'CANCELLED')
 
+  // Same name under another phone is often one person with a mistyped number.
+  const possibleDuplicates = customer.name.trim()
+    ? await db.customer.findMany({
+        where: { id: { not: id }, name: { equals: customer.name.trim(), mode: 'insensitive' }, orders: { some: {} } },
+        select: { id: true, name: true, phone: true },
+        take: 5,
+      })
+    : []
+
   return {
+    possibleDuplicates,
     ...summarise(customer),
     // Both by receive day, so first and latest read the same way.
     firstOrderAt: counted.length ? counted[counted.length - 1].receiveTime.toISOString() : null,
@@ -212,6 +222,37 @@ export async function isNewCustomer(customerId: string | null) {
   if (!customerId) return true
   const previous = await db.order.count({ where: { customerId, status: { notIn: REVENUE_EXCLUDED_STATUSES } } })
   return previous === 0
+}
+
+/** Merge a duplicate customer into another (e.g. one order was typed with a
+ *  wrong phone). Every order moves to the target and takes the target's phone,
+ *  notes are combined, and the duplicate is removed. */
+export async function mergeCustomers(sourceId: string, targetId: string) {
+  if (sourceId === targetId) throw new ApiError(400, 'Chọn một khách hàng khác để gộp')
+  const [source, target] = await Promise.all([
+    db.customer.findUnique({ where: { id: sourceId } }),
+    db.customer.findUnique({ where: { id: targetId } }),
+  ])
+  if (!source || !target) throw new ApiError(404, 'Không tìm thấy khách hàng')
+
+  const notes = [target.notes, source.notes].filter((n) => n && n.trim()).join(' · ')
+  const moved = await db.$transaction(async (tx) => {
+    const { count } = await tx.order.updateMany({
+      where: { customerId: sourceId },
+      data: { customerId: targetId, customerPhone: target.phone },
+    })
+    await tx.customer.update({
+      where: { id: targetId },
+      data: {
+        notes: notes || null,
+        source: target.source ?? source.source,
+        marketingConsent: target.marketingConsent || source.marketingConsent,
+      },
+    })
+    await tx.customer.delete({ where: { id: sourceId } })
+    return count
+  })
+  return { source, target, moved }
 }
 
 export async function updateCustomer(id: string, body: Record<string, unknown>) {

@@ -419,6 +419,8 @@ export interface CustomerLookup extends CustomerSummary {
 }
 
 export interface CustomerDetail extends CustomerSummary {
+  /** Other customers with the same name - candidates for "Gộp khách". */
+  possibleDuplicates: { id: string; name: string; phone: string }[]
   firstOrderAt: string | null
   receivers: { receiverName: string; receiverPhone: string; deliveryAddress: string | null; count: number; lastAt: string }[]
   orders: {

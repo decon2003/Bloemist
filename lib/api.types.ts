@@ -52,7 +52,6 @@ export interface ApiClient {
   fetchCustomers: (params: { q?: string; sort?: 'spend' | 'recent' | 'orders'; page?: number }) => Promise<CustomerPage>
   lookupCustomer: (phone: string) => Promise<CustomerLookup | null>
   fetchCustomer: (customerId: string) => Promise<CustomerDetail>
-  mergeCustomer: (customerId: string, targetId: string) => Promise<{ targetId: string; moved: number }>
   updateCustomer: (customerId: string, input: Partial<Pick<CustomerSummary, 'name' | 'notes' | 'source' | 'marketingConsent'>>) => Promise<CustomerSummary>
   fetchCurrentUser: () => Promise<User>
   changePassword: (currentPassword: string, newPassword: string) => Promise<User>

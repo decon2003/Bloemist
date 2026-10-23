@@ -2,13 +2,12 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { ArrowLeft, Merge, Pencil, X } from 'lucide-react'
+import { ArrowLeft, Pencil } from 'lucide-react'
 import { useLocale } from '@/components/providers/locale-provider'
-import { EditCustomerModal, SOURCE_LABELS, inputClass } from '@/components/customer-edit-modal'
-import { fetchCustomer, fetchCustomers, mergeCustomer } from '@/lib/api'
+import { EditCustomerModal, SOURCE_LABELS } from '@/components/customer-edit-modal'
+import { fetchCustomer } from '@/lib/api'
 import { formatCurrencyFromNumber, formatDateTime } from '@/lib/utils'
-import type { CustomerDetail, CustomerSummary } from '@/lib/types'
+import type { CustomerDetail } from '@/lib/types'
 
 const dateOnly = (iso: string | null, lang: string) =>
   iso ? new Date(iso).toLocaleDateString(lang === 'vi' ? 'vi-VN' : 'en-GB', { timeZone: 'Asia/Ho_Chi_Minh' }) : '—'
@@ -22,80 +21,11 @@ function Stat({ label, value }: { label: string; value: string }) {
   )
 }
 
-/** Merge this (duplicate) customer into another one found by name or phone. */
-function MergeModal({ customer, onClose, onMerge }: {
-  customer: CustomerDetail
-  onClose: () => void
-  onMerge: (target: { id: string; name: string; phone: string }) => void
-}) {
-  const [query, setQuery] = useState(customer.name)
-  const [results, setResults] = useState<CustomerSummary[]>([])
-
-  useEffect(() => {
-    let cancelled = false
-    const timer = setTimeout(() => {
-      if (!query.trim()) return setResults([])
-      fetchCustomers({ q: query.trim() })
-        .then((page) => !cancelled && setResults(page.items.filter((c) => c.id !== customer.id)))
-        .catch(() => !cancelled && setResults([]))
-    }, 300)
-    return () => {
-      cancelled = true
-      clearTimeout(timer)
-    }
-  }, [query, customer.id])
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-md space-y-4 rounded-2xl bg-white p-6">
-        <div className="flex items-center justify-between">
-          <h3 className="text-xl font-bold text-foreground">Gộp khách</h3>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground" aria-label="Đóng">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          Chọn khách đúng. {customer.orders.length} đơn của <b>{customer.name} · {customer.phone}</b> sẽ chuyển sang khách đó
-          (SĐT trên các đơn đổi theo), ghi chú được gộp lại, khách này bị xoá.
-        </p>
-        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tên hoặc SĐT" className={inputClass} />
-        <ul className="max-h-64 divide-y divide-border overflow-y-auto text-sm">
-          {results.map((c) => (
-            <li key={c.id}>
-              <button onClick={() => onMerge(c)} className="flex w-full items-center justify-between gap-3 px-1 py-2 text-left hover:bg-muted">
-                <span>
-                  <span className="font-medium text-foreground">{c.name}</span>
-                  <span className="text-muted-foreground"> · {c.phone}</span>
-                </span>
-                <span className="text-xs text-muted-foreground">{c.orderCount} đơn</span>
-              </button>
-            </li>
-          ))}
-          {query.trim() && results.length === 0 && <li className="py-2 text-muted-foreground">Không tìm thấy khách khác.</li>}
-        </ul>
-      </div>
-    </div>
-  )
-}
-
 export default function CustomerDetailPage({ customerId }: { customerId: string }) {
   const { lang, getOrderStatusLabel } = useLocale()
   const [customer, setCustomer] = useState<CustomerDetail | null>(null)
   const [error, setError] = useState('')
   const [editing, setEditing] = useState(false)
-  const [merging, setMerging] = useState(false)
-  const router = useRouter()
-
-  const mergeInto = async (target: { id: string; name: string; phone: string }) => {
-    if (!customer) return
-    if (!window.confirm(`Gộp ${customer.name} · ${customer.phone} vào ${target.name} · ${target.phone}? Không hoàn tác được.`)) return
-    try {
-      await mergeCustomer(customer.id, target.id)
-      router.push(`/${lang}/customers/${target.id}`)
-    } catch (err) {
-      window.alert(err instanceof Error ? err.message : 'Không gộp được')
-    }
-  }
 
   useEffect(() => {
     let cancelled = false
@@ -128,37 +58,13 @@ export default function CustomerDetailPage({ customerId }: { customerId: string 
               </p>
               {customer.notes && <p className="mt-2 max-w-2xl italic text-muted-foreground">“{customer.notes}”</p>}
             </div>
-            <div className="flex gap-2 self-start">
-              <button
-                onClick={() => setEditing(true)}
-                className="inline-flex items-center gap-2 rounded-xl border border-border bg-white px-4 py-2 text-sm font-medium hover:bg-muted"
-              >
-                <Pencil className="h-4 w-4" /> Sửa thông tin
-              </button>
-              <button
-                onClick={() => setMerging(true)}
-                className="inline-flex items-center gap-2 rounded-xl border border-border bg-white px-4 py-2 text-sm font-medium hover:bg-muted"
-              >
-                <Merge className="h-4 w-4" /> Gộp khách
-              </button>
-            </div>
+            <button
+              onClick={() => setEditing(true)}
+              className="inline-flex items-center gap-2 self-start rounded-xl border border-border bg-white px-4 py-2 text-sm font-medium hover:bg-muted"
+            >
+              <Pencil className="h-4 w-4" /> Sửa thông tin
+            </button>
           </header>
-
-          {customer.possibleDuplicates.length > 0 && (
-            <div className="space-y-2 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-              <p className="font-medium">Có thể trùng khách (cùng tên, khác SĐT). Nếu là một người, gộp vào số đúng:</p>
-              <div className="flex flex-wrap gap-2">
-                {customer.possibleDuplicates.map((d) => (
-                  <span key={d.id} className="inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-white px-2 py-1">
-                    <Link href={`/${lang}/customers/${d.id}`} className="font-medium hover:underline">{d.name} · {d.phone}</Link>
-                    <button onClick={() => mergeInto(d)} className="text-xs font-semibold text-primary hover:underline">
-                      Gộp vào số này
-                    </button>
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
 
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             <Stat label="Tổng chi tiêu" value={formatCurrencyFromNumber(customer.totalSpend)} />
@@ -223,7 +129,6 @@ export default function CustomerDetailPage({ customerId }: { customerId: string 
             </div>
           </section>
 
-          {merging && <MergeModal customer={customer} onClose={() => setMerging(false)} onMerge={mergeInto} />}
           {editing && (
             <EditCustomerModal
               customer={customer}

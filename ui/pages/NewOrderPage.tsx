@@ -50,6 +50,8 @@ export default function NewOrderPage() {
     { name: '', quantity: 1, unitPrice: '', note: '', samplePhotoUrls: [], draftSampleUrl: '' },
   ])
   const [knownCustomer, setKnownCustomer] = useState<CustomerLookup | null>(null)
+  // "Người đặt là người nhận": the receiver mirrors the customer's name and phone.
+  const [receiverIsCustomer, setReceiverIsCustomer] = useState(false)
   const [customerNameAutofilled, setCustomerNameAutofilled] = useState(false)
   const [productError, setProductError] = useState<string | null>(null)
   const [productPreviewUrl, setProductPreviewUrl] = useState<string | null>(null)
@@ -226,8 +228,9 @@ export default function NewOrderPage() {
       const created = await createOrder({
         customerName,
         customerPhone,
-        receiverName,
-        receiverPhone,
+        // Any of these may be left blank and filled in later on the order.
+        receiverName: receiverIsCustomer ? customerName : receiverName,
+        receiverPhone: receiverIsCustomer ? customerPhone : receiverPhone,
         bouquetName: primaryProduct.name,
         bouquetImage: primaryProduct.samplePhotoUrls[0] || matched?.image,
         deliveryType,
@@ -303,7 +306,6 @@ export default function NewOrderPage() {
               <label className="space-y-2 text-sm font-medium text-foreground">
                 <span>{t('orders.new.customerName', 'Customer name')}</span>
                 <input
-                  required
                   value={customerName}
                   onChange={(event) => {
                     setCustomerName(event.target.value)
@@ -315,7 +317,6 @@ export default function NewOrderPage() {
               <label className="space-y-2 text-sm font-medium text-foreground">
                 <span>{t('orders.new.customerPhone', 'Customer phone')}</span>
                 <input
-                  required
                   value={customerPhone}
                   onChange={(event) => setCustomerPhone(event.target.value)}
                   type="tel"
@@ -338,6 +339,7 @@ export default function NewOrderPage() {
                           key={`${receiver.receiverName}|${receiver.receiverPhone}|${receiver.deliveryAddress ?? ''}`}
                           type="button"
                           onClick={() => {
+                            setReceiverIsCustomer(false)
                             setReceiverName(receiver.receiverName)
                             setReceiverPhone(receiver.receiverPhone)
                             if (receiver.deliveryAddress) {
@@ -355,22 +357,31 @@ export default function NewOrderPage() {
                   )}
                 </div>
               )}
+              <label className="col-span-1 flex items-center gap-2 text-sm font-medium text-foreground md:col-span-2">
+                <input
+                  type="checkbox"
+                  checked={receiverIsCustomer}
+                  onChange={(event) => setReceiverIsCustomer(event.target.checked)}
+                  className="h-4 w-4"
+                />
+                Người đặt là người nhận
+              </label>
               <label className="space-y-2 text-sm font-medium text-foreground">
                 <span>{t('orders.new.receiverName', 'Receiver name')}</span>
                 <input
-                  required
-                  value={receiverName}
+                  value={receiverIsCustomer ? customerName : receiverName}
+                  disabled={receiverIsCustomer}
                   onChange={(event) => setReceiverName(event.target.value)}
-                  className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-muted/50"
                 />
               </label>
               <label className="space-y-2 text-sm font-medium text-foreground">
                 <span>{t('orders.new.receiverPhone', 'Receiver phone')}</span>
                 <input
-                  required
-                  value={receiverPhone}
+                  value={receiverIsCustomer ? customerPhone : receiverPhone}
+                  disabled={receiverIsCustomer}
                   onChange={(event) => setReceiverPhone(event.target.value)}
-                  className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-muted/50"
                 />
               </label>
               <label className="space-y-2 text-sm font-medium text-foreground">

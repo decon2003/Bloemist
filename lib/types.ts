@@ -61,7 +61,10 @@ export interface Order {
   bouquetImage?: string
   receiveTime: string
   deliveryType: 'DELIVERY' | 'PICKUP'
-  status: 'NEW' | 'IN_PROGRESS' | 'READY' | 'DELIVERED'
+  status: 'NEW' | 'IN_PROGRESS' | 'READY' | 'DELIVERED' | 'CANCELLED'
+  /** Set on PATCH/DELETE replies: payroll months already locked that still
+   *  include this order's commissions. */
+  lockedPayrollMonths?: string[]
   // Money is whole VND.
   listedPrice: number
   discount?: number | null

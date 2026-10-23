@@ -18,7 +18,7 @@ export interface ApiClient {
   fetchOrder: (orderId: string) => Promise<Order>
   createOrder: (input: CreateOrderInput) => Promise<Order>
   updateOrder: (orderId: string, input: Partial<CreateOrderInput>) => Promise<Order>
-  deleteOrder: (orderId: string) => Promise<void>
+  deleteOrder: (orderId: string) => Promise<{ lockedPayrollMonths: string[] }>
   assignOrder: (orderId: string, payload: AssignTaskPayload) => Promise<Order>
   fetchFlorists: () => Promise<Florist[]>
   createTask: (input: CreateTaskInput) => Promise<Task>

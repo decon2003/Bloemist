@@ -12,7 +12,7 @@ import { addVnDays, startOfVnMonth, vnDateKey } from './vn-time'
 import { LIST_LIMIT, SEARCH_LIMIT, type ListScope } from './list-scope'
 import type { Prisma } from '@prisma/client'
 import { isNewCustomer, linkCustomer, normalizeCustomerPhone, orderSearchWhere } from './customers'
-import { TASK_STATUSES, assertOneOf } from './validation'
+import { ORDER_STATUSES, TASK_STATUSES, assertOneOf } from './validation'
 
 // Helper to map Prisma entity to App entity
 // Most fields match exactly due to camelCase in schema
@@ -298,17 +298,19 @@ export const createOrder = async (input: CreateOrderInput) => {
   const customerId = await linkCustomer(input.customerPhone, input.customerName)
   // Decided here, not by the form: a slow phone lookup used to mark repeat
   // customers as new.
-  const newCustomer = await isNewCustomer(customerId)
+  const newCustomer = customerId ? await isNewCustomer(customerId) : false
+  // Customers often give only part of the details; blanks are filled in later.
+  const text = (value: unknown) => (typeof value === 'string' ? value.trim() : '')
 
   const order = await db.$transaction(async (tx) => {
     const created = await tx.order.create({
       data: {
         code,
         customerId,
-        customerName: input.customerName,
-        customerPhone: input.customerPhone,
-        receiverName: input.receiverName,
-        receiverPhone: input.receiverPhone,
+        customerName: text(input.customerName),
+        customerPhone: text(input.customerPhone),
+        receiverName: text(input.receiverName),
+        receiverPhone: text(input.receiverPhone),
         bouquetName: input.bouquetName,
         bouquetImage: input.bouquetImage,
         receiveTime: parseRequiredDate(input.receiveTime, 'receiveTime'),
@@ -387,6 +389,7 @@ export const updateOrder = async (orderId: string, input: Partial<CreateOrderInp
   for (const field of ORDER_UPDATABLE_FIELDS) {
     if (input[field] !== undefined) data[field] = input[field]
   }
+  if (data.status !== undefined) assertOneOf(data.status, ORDER_STATUSES, 'status')
 
   if (input.receiveTime !== undefined) {
     data.receiveTime = parseRequiredDate(input.receiveTime, 'receiveTime')
@@ -426,6 +429,18 @@ export const updateOrder = async (orderId: string, input: Partial<CreateOrderInp
     data
   })
   return mapOrder(order)
+}
+
+/** Cancelling an order cancels its products not yet made, so florists stop
+ *  on them; restoring it puts those products back in the queue. Products
+ *  already made stay completed (cancelled orders earn no commission). */
+export const syncTasksWithOrderStatus = async (orderId: string, previous: string, next: string) => {
+  if (next === 'CANCELLED' && previous !== 'CANCELLED') {
+    await db.task.updateMany({ where: { orderId, status: { notIn: ['COMPLETED', 'CANCELLED'] } }, data: { status: 'CANCELLED' } })
+  } else if (previous === 'CANCELLED' && next !== 'CANCELLED') {
+    await db.task.updateMany({ where: { orderId, status: 'CANCELLED', assigneeId: null }, data: { status: 'UNASSIGNED' } })
+    await db.task.updateMany({ where: { orderId, status: 'CANCELLED', assigneeId: { not: null } }, data: { status: 'ASSIGNED' } })
+  }
 }
 
 export const deleteOrder = async (orderId: string) => {

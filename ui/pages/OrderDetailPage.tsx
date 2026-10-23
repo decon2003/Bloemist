@@ -13,7 +13,7 @@ import { PhotoViewer } from "@/components/photo-viewer"
 import { fetchOrder, updateOrder, deleteOrder } from "@/lib/api"
 import type { CreateOrderInput, Order } from "@/lib/types"
 import { getDateKey } from "@/lib/date-utils"
-import { formatCurrencyDisplay, formatDateTime, fromDateTimeLocalValue, toDateTimeLocalValue } from "@/lib/utils"
+import { formatCurrencyDisplay, formatDateTime, fromDateTimeLocalValue, lockedPayrollNotice, toDateTimeLocalValue } from "@/lib/utils"
 import { thumbUrl } from "@/lib/image-compress"
 import { AuditTrail } from "@/components/audit-trail"
 
@@ -97,6 +97,8 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
 
   const canSeeContacts = user?.role !== 'florist'
   const canEdit = user?.role !== 'florist'
+  // Sales edit orders; only managers delete them.
+  const isManager = user?.role === 'boss' || user?.role === 'admin'
 
   const formatMoney = (value?: string | number | null, fallback?: string) =>
     formatCurrencyDisplay(value, fallback ?? '₫0')
@@ -140,7 +142,8 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
     if (!window.confirm(t('orders.detail.deleteConfirmation'))) return
 
     try {
-      await deleteOrder(order.id)
+      const notice = lockedPayrollNotice((await deleteOrder(order.id)).lockedPayrollMonths)
+      if (notice) window.alert(notice)
       router.push(`/${lang}/orders`)
     } catch (err) {
       console.error("Failed to delete order", err)
@@ -154,10 +157,11 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
 
   const handleUpdateStatus = async (newStatus: Order['status']) => {
     if (!order) return
+    if (newStatus === 'CANCELLED' && !window.confirm('Huỷ đơn này? Doanh thu, hoa hồng sale và hoa hồng làm đơn của đơn sẽ không được tính nữa; các sản phẩm chưa làm sẽ dừng lại.')) return
     try {
       const updated = await updateOrder(order.id, { status: newStatus })
       setOrder(updated)
-      setToastMessage(t("orders.detail.updateSuccess", "Status updated"))
+      setToastMessage(lockedPayrollNotice(updated.lockedPayrollMonths) ?? t("orders.detail.updateSuccess", "Status updated"))
     } catch (err) {
       console.error("Failed to update status", err)
       setToastMessage(t("orders.detail.updateError", "Failed to update status"))
@@ -234,7 +238,7 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
             <select
               value={order.status}
               onChange={(e) => handleUpdateStatus(e.target.value as Order['status'])}
-              className={`h-9 rounded-full border px-4 py-2 text-sm font-medium focus:ring-1 focus:ring-primary ${order.status === 'READY' ? 'bg-green-100 text-green-800 border-green-200' :
+              className={`h-9 rounded-full border px-4 py-2 text-sm font-medium focus:ring-1 focus:ring-primary ${order.status === 'CANCELLED' ? 'bg-red-100 text-red-800 border-red-200' : order.status === 'READY' ? 'bg-green-100 text-green-800 border-green-200' :
                 order.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800 border-blue-200' :
                   'bg-muted text-foreground border-transparent'
                 }`}
@@ -243,6 +247,7 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
               <option value="IN_PROGRESS">{getOrderStatusLabel('IN_PROGRESS')}</option>
               <option value="READY">{getOrderStatusLabel('READY')}</option>
               <option value="DELIVERED">{getOrderStatusLabel('DELIVERED')}</option>
+              <option value="CANCELLED">{getOrderStatusLabel('CANCELLED')}</option>
             </select>
 
             <span className="inline-flex items-center rounded-full bg-primary/10 px-4 py-2 text-sm font-semibold text-primary">
@@ -259,12 +264,15 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
                 >
                   <Edit className="h-4 w-4" /> {t("common.edit", "Edit")}
                 </button>
-                <button
-                  onClick={handleDelete}
-                  className="inline-flex items-center gap-2 rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive hover:bg-destructive/20"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
+                {isManager && (
+                  <button
+                    onClick={handleDelete}
+                    title="Xoá đơn (chỉ quản lý)"
+                    className="inline-flex items-center gap-2 rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive hover:bg-destructive/20"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
               </div>
             ) : (
               <div className="flex gap-2">
@@ -406,7 +414,7 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
                       {order.customerName}
                     </Link>
                   ) : (
-                    <p className="text-sm text-muted-foreground">{order.customerName}</p>
+                    <p className="text-sm text-muted-foreground">{order.customerName || "Chưa có tên khách"}</p>
                   )}
                   {order.new_customer && (
                     <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700 uppercase tracking-wide">

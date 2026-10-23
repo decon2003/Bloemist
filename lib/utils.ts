@@ -1,6 +1,14 @@
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 
+/** Shown after cancelling, restoring or deleting an order whose commissions
+ *  sit in a payroll that is already locked. */
+export function lockedPayrollNotice(months: string[] | undefined) {
+  if (!months?.length) return null
+  const list = months.map((m) => `${m.slice(5)}/${m.slice(0, 4)}`).join(', ')
+  return `Bảng lương tháng ${list} đã chốt nên chưa đổi. Mở khoá và cập nhật bảng lương, hoặc thêm khoản điều chỉnh.`
+}
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }

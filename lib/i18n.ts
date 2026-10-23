@@ -224,6 +224,7 @@ const dictionaries: Record<SupportedLocale, Record<string, string>> = {
     'status.order.IN_PROGRESS': 'Đang xử lý',
     'status.order.READY': 'Sẵn sàng',
     'status.order.DELIVERED': 'Đã giao',
+    'status.order.CANCELLED': 'Đã huỷ',
     'delivery.DELIVERY': 'Giao tận nơi',
     'delivery.PICKUP': 'Nhận tại shop',
     'checkins.title': 'Điểm danh',

@@ -104,7 +104,7 @@ const apiClient: ApiClient = {
   fetchOrder: (orderId) => request<Order>(`/orders/${orderId}`),
   createOrder: (input) => request<Order>('/orders', { method: 'POST', body: JSON.stringify(input) }),
   updateOrder: (orderId, input) => request<Order>(`/orders/${orderId}`, { method: 'PATCH', body: JSON.stringify(input) }),
-  deleteOrder: (orderId) => request<void>(`/orders/${orderId}`, { method: 'DELETE' }),
+  deleteOrder: (orderId) => request<{ lockedPayrollMonths: string[] }>(`/orders/${orderId}`, { method: 'DELETE' }),
   assignOrder: (orderId, payload) => request<Order>(`/orders/${orderId}/assign`, { method: 'POST', body: JSON.stringify(payload) }),
 
   // Users & Florists

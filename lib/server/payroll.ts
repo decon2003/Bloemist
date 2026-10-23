@@ -3,7 +3,7 @@ import db from './db'
 import { ApiError } from './api-error'
 import { audit, type AuditActor } from './audit'
 import { getShopSettings } from './attendance'
-import { parseVnMonth } from './vn-time'
+import { parseVnMonth, vnDateKey } from './vn-time'
 
 // Monthly payroll. The system pre-fills a draft from facts recorded during the
 // month (shifts, products made, orders sold); a manager adjusts it
@@ -262,6 +262,32 @@ export async function generatePayroll(monthKey: string, actor: AuditActor) {
     summary: `Bảng lương ${month.key}`,
   })
   return getPayroll(month.key)
+}
+
+/** Payroll months an order's commissions fall in: the month it was created
+ *  (sales commission) and the months its products were completed (making
+ *  commission). Read before the order is cancelled or deleted. */
+export async function payrollMonthsForOrder(orderId: string) {
+  const order = await db.order.findUnique({
+    where: { id: orderId },
+    select: { createdAt: true, tasks: { where: { completedAt: { not: null } }, select: { completedAt: true } } },
+  })
+  if (!order) return []
+  const dates = [order.createdAt, ...order.tasks.map((t) => t.completedAt!)]
+  return [...new Set(dates.map((d) => vnDateKey(d).slice(0, 7)))]
+}
+
+/** After an order is cancelled, restored or deleted: refresh those months'
+ *  draft payrolls (manual edits are kept). Locked payrolls are left as locked;
+ *  their months are returned so the caller can say so. */
+export async function refreshPayrollsFor(months: string[], actor: AuditActor) {
+  const payrolls = await db.payroll.findMany({ where: { month: { in: months } } })
+  const locked: string[] = []
+  for (const payroll of payrolls) {
+    if (payroll.status === 'LOCKED') locked.push(payroll.month)
+    else await generatePayroll(payroll.month, actor)
+  }
+  return { lockedMonths: locked }
 }
 
 /** The month's payroll with computed totals, or null if not created yet. */

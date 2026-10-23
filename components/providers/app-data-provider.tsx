@@ -58,7 +58,7 @@ interface AppDataContextValue {
   correctCheckIn: (input: ShiftCorrectionInput) => Promise<StaffCheckIn>
   users: User[]
   assignOrder: (orderId: string, payload: AssignTaskPayload) => Promise<Order>
-  deleteOrder: (orderId: string) => Promise<void>
+  deleteOrder: (orderId: string) => Promise<{ lockedPayrollMonths: string[] }>
   updateUser: (userId: string, input: Partial<User>) => Promise<User>
   /** Which orders/tasks the current page shows. Lists load nothing until the
    *  page sets a scope, so no page downloads every order or task. */

@@ -12,11 +12,11 @@ import { DateFilterSwitcher, DateRange } from '@/components/date-filter-switcher
 import { getDateKey } from '@/lib/date-utils'
 import { useListParams } from '@/lib/use-list-params'
 import type { Order } from '@/lib/types'
-import { formatCurrencyDisplay, formatDateTime } from '@/lib/utils'
+import { formatCurrencyDisplay, formatDateTime, lockedPayrollNotice } from '@/lib/utils'
 import { useViewSettings } from '@/components/providers/view-settings-provider'
 import { thumbUrl } from '@/lib/image-compress'
 
-const baseStatuses: Order['status'][] = ['NEW', 'IN_PROGRESS', 'READY', 'DELIVERED']
+const baseStatuses: Order['status'][] = ['NEW', 'IN_PROGRESS', 'READY', 'DELIVERED', 'CANCELLED']
 const orderStatuses: Array<'ALL' | Order['status']> = ['ALL', ...baseStatuses]
 
 type OrderFilter = (typeof orderStatuses)[number]
@@ -109,7 +109,8 @@ export default function OrdersPage() {
     e.stopPropagation()
     if (confirm(t('orders.detail.deleteConfirmation', 'Are you sure you want to delete this order?'))) {
       try {
-        await deleteOrder(orderId)
+        const notice = lockedPayrollNotice((await deleteOrder(orderId)).lockedPayrollMonths)
+        if (notice) alert(notice)
       } catch (error) {
         console.error('Failed to delete order', error)
         alert(t('orders.detail.deleteError', 'Failed to delete order'))
@@ -268,7 +269,7 @@ export default function OrdersPage() {
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{order.code}</p>
                       <h2 className="text-lg font-semibold text-foreground">{order.bouquetName}</h2>
-                      <p className="text-sm text-muted-foreground">{order.customerName}</p>
+                      <p className="text-sm text-muted-foreground">{order.customerName || <span className="italic">Chưa có tên khách</span>}</p>
                       {isOverdue(order) && (
                         <p className="mt-1 inline-block rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
                           Quá hạn · nhận {formatDateTime(order.receiveTime, lang)}
@@ -302,12 +303,16 @@ export default function OrdersPage() {
                         <select
                           value={order.status}
                           onClick={(e) => e.stopPropagation()}
-                          onChange={(e) => {
+                          onChange={async (e) => {
                             e.preventDefault()
                             e.stopPropagation()
-                            updateOrder(order.id, { status: e.target.value as Order['status'] })
+                            const next = e.target.value as Order['status']
+                            if (next === 'CANCELLED' && !confirm('Huỷ đơn này? Doanh thu, hoa hồng sale và hoa hồng làm đơn của đơn sẽ không được tính nữa; các sản phẩm chưa làm sẽ dừng lại.')) return
+                            const updated = await updateOrder(order.id, { status: next })
+                            const notice = lockedPayrollNotice(updated.lockedPayrollMonths)
+                            if (notice) alert(notice)
                           }}
-                          className={`h-8 rounded-md border px-2 py-1 text-xs font-medium focus:ring-1 focus:ring-primary ${order.status === 'READY' ? 'bg-green-100 text-green-800 border-green-200' :
+                          className={`h-8 rounded-md border px-2 py-1 text-xs font-medium focus:ring-1 focus:ring-primary ${order.status === 'CANCELLED' ? 'bg-red-100 text-red-800 border-red-200' : order.status === 'READY' ? 'bg-green-100 text-green-800 border-green-200' :
                             order.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800 border-blue-200' :
                               'bg-muted text-foreground border-transparent'
                             }`}
@@ -323,7 +328,7 @@ export default function OrdersPage() {
 
 
                   </div>
-                  {user?.role !== 'florist' && (
+                  {isManager && (
                     <div className="flex shrink-0 items-center justify-end md:pl-4" onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={(e) => handleDeleteOrder(e, order.id)}

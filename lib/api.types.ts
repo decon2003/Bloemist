@@ -1,4 +1,4 @@
-import { CreateOrderInput, CreateTaskInput, DashboardStats, Order, Task, TaskStatus, Florist, StaffCheckIn, WorkspaceSettings, User, CustomerPage, CustomerLookup, CustomerSummary, ListParams, BouquetSuggestion, AuditEntry, ShiftCorrectionInput, Payroll, PayrollLineUpdate } from './types'
+import { CreateOrderInput, CreateTaskInput, DashboardStats, Order, Task, TaskStatus, Florist, StaffCheckIn, WorkspaceSettings, User, CustomerPage, CustomerLookup, CustomerSummary, ListParams, BouquetSuggestion, AuditEntry, ShiftCorrectionInput, Payroll, PayrollLineUpdate, MyPay } from './types'
 
 export interface AssignTaskPayload {
   userId: string
@@ -42,6 +42,7 @@ export interface ApiClient {
   fetchBouquets: () => Promise<BouquetSuggestion[]>
   fetchAudit: (params: { entity?: string; entityId?: string }) => Promise<AuditEntry[]>
   fetchPayroll: (month: string) => Promise<Payroll | null>
+  fetchMyPay: (month: string) => Promise<MyPay>
   generatePayroll: (month: string) => Promise<Payroll>
   updatePayrollLine: (lineId: string, input: PayrollLineUpdate) => Promise<Payroll>
   updatePayrollSettings: (payrollId: string, input: { otMultiplier: number }) => Promise<Payroll>

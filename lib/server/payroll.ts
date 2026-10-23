@@ -285,6 +285,59 @@ export async function getPayroll(monthKey: string) {
   }
 }
 
+/** A staff member's own pay for a month ("Lương của tôi"). Once the payroll is
+ *  locked it is exactly the locked line. Before that it is an estimate from
+ *  their pay profile and the month's facts so far: overtime awaiting review
+ *  counts as OT (as in the manager's draft), and the manager's draft edits and
+ *  adjustments stay private until the payroll is locked. */
+export async function getMyPay(userId: string, monthKey: string) {
+  const month = parseVnMonth(monthKey)
+  if (!month) throw new ApiError(400, 'month must be YYYY-MM')
+  if (month.start > new Date()) throw new ApiError(400, 'Tháng chưa bắt đầu')
+
+  const payroll = await db.payroll.findUnique({ where: { month: month.key }, include: { lines: { where: { userId } } } })
+  if (payroll?.status === 'LOCKED') {
+    const line = payroll.lines[0]
+    return {
+      month: month.key,
+      status: 'LOCKED' as const,
+      lockedAt: payroll.lockedAt?.toISOString() ?? null,
+      otMultiplier: payroll.otMultiplier,
+      line: line ? { ...line, totals: computeLine(line, payroll.otMultiplier) } : null,
+    }
+  }
+
+  const user = await db.user.findUnique({ where: { id: userId } })
+  if (!user) throw new ApiError(404, 'User not found')
+  const { settings, shiftsByUser, commissionsByUser } = await collectFacts(month)
+  const rates = {
+    payType: user.payType,
+    baseSalary: user.baseSalary ?? 0,
+    hourlyRate: user.hourlyRate,
+    makerRate: user.commissionRate ?? 0,
+    salesRate: user.salesCommissionRate,
+  }
+  const line = {
+    id: null,
+    userId,
+    userName: user.name,
+    role: user.role,
+    ...rates,
+    shifts: shiftsByUser.get(userId) ?? [],
+    commissions: (commissionsByUser.get(userId) ?? []).map((item) => ({ ...item, rate: rateFor(rates, item.kind), included: true })),
+    adjustments: [] as Adjustment[],
+    note: null,
+  }
+  const otMultiplier = payroll?.otMultiplier ?? settings.otMultiplier
+  return {
+    month: month.key,
+    status: 'ESTIMATE' as const,
+    lockedAt: null,
+    otMultiplier,
+    line: { ...line, totals: computeLine(line, otMultiplier) },
+  }
+}
+
 async function draftOf(payrollId: string) {
   const payroll = await db.payroll.findUnique({ where: { id: payrollId } })
   if (!payroll) throw new ApiError(404, 'Không tìm thấy bảng lương')

@@ -21,6 +21,9 @@ export const protectedRoutes: ProtectedRoute[] = [
   // Payroll - bosses and admins only
   { path: '/payroll', allowedRoles: ['boss', 'admin'] },
 
+  // Own pay - everyone sees only their own
+  { path: '/my-pay', allowedRoles: ['boss', 'admin', 'sales', 'florist'] },
+
   // Staff performance reporting - bosses and admins only
   { path: '/staff', allowedRoles: ['boss', 'admin'] },
 ]

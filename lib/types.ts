@@ -284,6 +284,16 @@ export interface Payroll {
   summary: { total: number; pendingOtDays: number }
 }
 
+/** "Lương của tôi": the locked line, or an estimate while the month is open. */
+export interface MyPay {
+  month: string
+  status: 'LOCKED' | 'ESTIMATE'
+  lockedAt: string | null
+  otMultiplier: number
+  /** Null when a locked payroll has no line for this person. */
+  line: (Omit<PayrollLine, 'id'> & { id: string | null }) | null
+}
+
 export interface PayrollLineUpdate {
   payType?: 'MONTHLY' | 'HOURLY'
   baseSalary?: number

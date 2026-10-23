@@ -43,7 +43,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     const staffNav = [
       { href: `/${lang}/orders`, label: t('nav.orders'), icon: ShoppingBag },
       { href: `/${lang}/checkins`, label: t('nav.checkins'), icon: MapPin },
-
+      { href: `/${lang}/my-pay`, label: 'Lương của tôi', icon: Wallet },
     ]
 
     if (user?.role === 'sales' || user?.role === 'florist') {

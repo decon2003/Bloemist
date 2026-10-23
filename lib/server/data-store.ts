@@ -189,13 +189,12 @@ const orderListWhere = async (
       where.AND = [{ OR: [{ receiveTime: { gte: scope.since } }, { status: { in: [...OPEN_ORDER_STATUSES] } }] }]
     }
   }
-  if (viewer.role === 'florist') where.tasks = { some: { assigneeId: viewer.id } }
   return where
 }
 
 /** Orders received in a Vietnam-day window or matching a search, optionally
  *  narrowed to one person in charge / salesperson ('none' = not set) or a
- *  status. Florists only see orders that have a task assigned to them. */
+ *  status. Every staff member sees every order (florists without phone numbers). */
 export const listOrders = async (scope: ListScope, viewer: ListViewer, filters: OrderListFilters = {}) => {
   const where = await orderListWhere(scope, viewer, filters, { withOverdue: true })
   const orders = await db.order.findMany({

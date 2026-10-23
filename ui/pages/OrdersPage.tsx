@@ -60,8 +60,7 @@ export default function OrdersPage() {
     }
   }, [dateFilterMode])
 
-  // Dates and search are applied by the server (florists only get orders with
-  // their tasks); only the status tabs filter locally.
+  // Dates, search, people and status are applied by the server.
   const listParams = useListParams({ mode: dateFilterMode, selectedDate, range: dateRange, query })
   // Person in charge / salesperson filters ('' = everyone, 'none' = not set),
   // applied by the server on top of the date or search.
@@ -206,7 +205,7 @@ export default function OrdersPage() {
         extraQuickOptions={quickRanges}
         minDate={isManager ? undefined : daysAgoKey(STAFF_HISTORY_DAYS)}
         extraFields={
-          user?.role !== 'florist' ? (
+          user ? (
             <>
               <label className="space-y-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 <span>Người phụ trách</span>

@@ -68,10 +68,34 @@ const parseRequiredDate = (value: string | Date, field: string) => {
 // Florists work from the bouquet and the deadline; they never need the
 // customer's or receiver's phone number, so it is not sent to them at all
 // (the UI already hid it, but the API used to return it to everyone).
-export const redactOrderFor = <T extends { customerPhone?: string; receiverPhone?: string }>(
-  viewer: { role: string },
-  order: T,
-): T => (viewer.role === 'florist' ? { ...order, customerPhone: '', receiverPhone: '' } : order)
+/** Florists see what they need to make the order - products, flower price,
+ *  delivery fee, card, special note, delivery time - but not who the customer
+ *  and receiver are, their phones and address, or the payment details. Sales
+ *  and managers see everything. */
+export const redactOrderFor = <T extends object>(viewer: { role: string }, order: T): T =>
+  viewer.role === 'florist'
+    ? {
+        ...order,
+        customerId: null,
+        customerName: '',
+        customerPhone: '',
+        receiverName: '',
+        receiverPhone: '',
+        deliveryAddress: null,
+        new_customer: false,
+        vatPercent: null,
+        sellingPrice: null,
+        deposit: null,
+        remainingBalance: null,
+        total: null,
+      }
+    : order
+
+/** The same for a task: florists don't get the customer's or receiver's name. */
+export const redactTaskFor = <T extends object>(viewer: { role: string }, task: T): T =>
+  viewer.role === 'florist'
+    ? { ...task, customerName: '', receiverName: '', customerPhone: '', receiverPhone: '', order: undefined }
+    : task
 
 // Photos saved before object storage existed are base64 data URLs inside the
 // row. Sending them in list responses blew through Vercel's 4.5 MB response
@@ -118,8 +142,8 @@ export const listTasks = async (
       { taskTitle: { contains: scope.q, mode: 'insensitive' } },
       { bouquetName: { contains: scope.q, mode: 'insensitive' } },
       { orderCode: { contains: scope.q, mode: 'insensitive' } },
-      // Florists never see phone numbers, so they don't search by them either.
-      { order: await orderSearchWhere(scope.q, { matchPhones: options.viewerRole !== 'florist' }) },
+      // Florists never see phones or names, so they don't search by them either.
+      { order: await orderSearchWhere(scope.q, { matchPhones: options.viewerRole !== 'florist', matchPeople: options.viewerRole !== 'florist' }) },
     ]
     if (scope.since) where.dueTime = { gte: scope.since }
   }
@@ -194,7 +218,7 @@ const orderListWhere = async (
       ? [window, { status: { in: [...OPEN_ORDER_STATUSES] }, receiveTime: { lt: scope.start } }]
       : [window]
   } else {
-    Object.assign(where, await orderSearchWhere(scope.q, { matchPhones: viewer.role !== 'florist' }))
+    Object.assign(where, await orderSearchWhere(scope.q, { matchPhones: viewer.role !== 'florist', matchPeople: viewer.role !== 'florist' }))
     // Staff history limit; their unfinished orders stay findable.
     if (scope.since) {
       and.push({ OR: [{ receiveTime: { gte: scope.since } }, { status: { in: [...OPEN_ORDER_STATUSES] } }] })
@@ -362,7 +386,8 @@ export const createOrder = async (input: CreateOrderInput) => {
         status,
         ...money,
         ...computeOrderTotals(money),
-        notes: input.notes,
+        notes: text(input.notes) || null,
+        cardMessage: text(input.cardMessage) || null,
         createdById: input.createdById,
         createdByName: input.createdByName,
         assigneeId: input.assigneeId,
@@ -387,7 +412,8 @@ export const createOrder = async (input: CreateOrderInput) => {
           assigneeId: input.assigneeId || null,
           assigneeName: input.assigneeId ? input.assigneeName ?? null : null,
           dueTime,
-          notes: [product.note, input.notes].filter(Boolean).join('\n'),
+          // The order's card and special note are shown on the order page itself.
+          notes: product.note,
           type: 'CAM_HOA',
           quantity: product.quantity,
           price: product.lineTotal,
@@ -413,7 +439,7 @@ export const createOrder = async (input: CreateOrderInput) => {
 const ORDER_UPDATABLE_FIELDS = [
   'customerName', 'customerPhone', 'receiverName', 'receiverPhone',
   'deliveryAddress', 'bouquetName', 'bouquetImage', 'deliveryType', 'status',
-  'notes', 'assigneeId', 'assigneeName', 'new_customer',
+  'notes', 'cardMessage', 'assigneeId', 'assigneeName', 'new_customer',
 ] as const
 
 // Price inputs; sellingPrice, total and remainingBalance are always derived.

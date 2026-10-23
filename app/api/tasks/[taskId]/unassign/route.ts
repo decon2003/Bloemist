@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getTask, unassignTask } from '@/lib/server/data-store'
+import { getTask, redactTaskFor, unassignTask } from '@/lib/server/data-store'
 import { handleRouteError } from '@/lib/server/route-helpers'
 import { requireUser } from '@/lib/server/session'
 import { audit, diff } from '@/lib/server/audit'
@@ -11,7 +11,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ tas
     const before = await getTask(taskId)
     const updated = await unassignTask(taskId, me)
     await audit(me, { action: 'task.unassign', entity: 'task', entityId: taskId, summary: updated.taskTitle, changes: diff(before, updated, ['assigneeName', 'status']) })
-    return NextResponse.json(updated)
+    return NextResponse.json(redactTaskFor(me, updated))
   } catch (error) {
     return handleRouteError(error)
   }

@@ -73,7 +73,8 @@ model Order {
   sellingPrice          Int?
   remainingBalance      Int?
   total                 Int
-  notes                 String?
+  notes                 String? // special note for the florists ("Ghi chú đặc biệt")
+  cardMessage           String? // text written on the card ("Nội dung thiệp")
   createdById           String?
   createdByName         String?
   assigneeId            String?

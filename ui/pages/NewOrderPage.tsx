@@ -47,6 +47,7 @@ export default function NewOrderPage() {
   const [deliveryAddress, setDeliveryAddress] = useState('')
   const [receiveTime, setReceiveTime] = useState(() => toDateTimeLocalValue(new Date()))
   const [notes, setNotes] = useState('')
+  const [cardMessage, setCardMessage] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   // Sample photos still uploading: the order waits for them.
@@ -278,6 +279,7 @@ export default function NewOrderPage() {
         deposit,
         // Selling price, total and remaining balance are recomputed by the server.
         notes,
+        cardMessage,
         createdById: user?.id,
         createdByName: user?.name,
         requestId,
@@ -458,16 +460,28 @@ export default function NewOrderPage() {
               </label>
             </div>
 
-            <label className="space-y-2 text-sm font-medium text-foreground">
-              <span>{t('orders.new.notes', 'Notes')}</span>
-              <textarea
-                value={notes}
-                onChange={(event) => setNotes(event.target.value)}
-                rows={4}
-                className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                placeholder={t('orders.new.notesPlaceholder', 'Delivery instructions, card message, etc.')}
-              />
-            </label>
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="space-y-2 text-sm font-medium text-foreground">
+                <span>Nội dung thiệp</span>
+                <textarea
+                  value={cardMessage}
+                  onChange={(event) => setCardMessage(event.target.value)}
+                  rows={4}
+                  className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="Lời chúc trên thiệp, ví dụ: Chúc mừng sinh nhật mẹ yêu!"
+                />
+              </label>
+              <label className="space-y-2 text-sm font-medium text-foreground">
+                <span>Ghi chú đặc biệt</span>
+                <textarea
+                  value={notes}
+                  onChange={(event) => setNotes(event.target.value)}
+                  rows={4}
+                  className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="Ví dụ: không dùng hoa ly, gói giấy trắng, giao trước 9h"
+                />
+              </label>
+            </div>
             <label className="space-y-2 text-sm font-medium text-foreground">
               <span>{t('orders.assignee', 'Thợ làm')} (tuỳ chọn, thợ cũng có thể tự nhận)</span>
               <select

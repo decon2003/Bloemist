@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { ArrowLeft, User, Truck, ClipboardList, Plus, Edit, Check, X, StickyNote, Trash2 } from "lucide-react"
+import { ArrowLeft, User, Truck, ClipboardList, Plus, Edit, Check, X, Trash2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useAppData } from "@/components/providers/app-data-provider"
 import { useLocale } from "@/components/providers/locale-provider"
@@ -13,7 +13,7 @@ import { ProductCard } from "@/components/orders/product-card"
 import { PhotoViewer } from "@/components/photo-viewer"
 import { fetchOrder, updateOrder, deleteOrder } from "@/lib/api"
 import type { CreateOrderInput, Order } from "@/lib/types"
-import { cn, formatCurrencyDisplay, formatDateTime, fromDateTimeLocalValue, lockedPayrollNotice, toDateTimeLocalValue } from "@/lib/utils"
+import { cn, formatCurrencyDisplay, formatDeliveryTime, fromDateTimeLocalValue, lockedPayrollNotice, toDateTimeLocalValue } from "@/lib/utils"
 import { thumbUrl } from "@/lib/image-compress"
 import { AuditTrail } from "@/components/audit-trail"
 
@@ -23,7 +23,7 @@ interface OrderDetailPageProps {
 
 /** Fields the edit form changes; only those that differ are sent on save, so
  *  a status changed meanwhile (e.g. "Đã huỷ") is never overwritten. */
-const EDITABLE_FIELDS = ['customerName', 'customerPhone', 'receiverName', 'receiverPhone', 'deliveryAddress', 'receiveTime'] as const
+const EDITABLE_FIELDS = ['customerName', 'customerPhone', 'receiverName', 'receiverPhone', 'deliveryAddress', 'receiveTime', 'cardMessage', 'notes'] as const
 
 const CANCEL_CONFIRM =
   'Huỷ đơn này? Doanh thu, hoa hồng sale và hoa hồng làm đơn của đơn sẽ không được tính nữa; các sản phẩm chưa làm sẽ dừng lại.'
@@ -207,6 +207,9 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
         : order.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800 border-blue-200'
           : 'bg-muted text-foreground border-transparent'
   const inputClass = "w-full rounded-lg border border-border bg-white px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+  const whenLabel = order.deliveryType === 'DELIVERY' ? 'Giờ giao' : 'Giờ khách nhận'
+  const shipLabel =
+    order.deliveryType !== 'DELIVERY' ? 'Không (nhận tại shop)' : order.deliveryCoveredByShop ? 'Freeship' : formatMoney(order.deliveryFee)
 
   return (
     <div className="space-y-6 p-4 md:p-8 pb-24 md:pb-12">
@@ -236,7 +239,9 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
             <p className="text-xs text-muted-foreground">Người tạo: {order.createdByName || '—'}</p>
           </div>
           <h1 className="text-3xl font-bold text-foreground">{order.bouquetName}</h1>
-          <p className="text-muted-foreground">{order.customerName || 'Chưa có tên khách'}</p>
+          <p className="text-muted-foreground">
+            {canSeeContacts ? order.customerName || 'Chưa có tên khách' : `${whenLabel} ${formatDeliveryTime(order.receiveTime)}`}
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {canEdit ? (
@@ -300,7 +305,65 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
         </div>
       </div>
 
+      <section className="rounded-2xl border border-primary/30 bg-primary/5 p-5">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-primary">Thông tin làm hoa</h2>
+        <dl className="grid grid-cols-2 gap-4 text-sm lg:grid-cols-4">
+          <div>
+            <dt className="text-muted-foreground">{whenLabel}</dt>
+            <dd className="text-lg font-bold text-foreground">{formatDeliveryTime(order.receiveTime)}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Hình thức</dt>
+            <dd className="font-semibold text-foreground">{getDeliveryLabel(order.deliveryType)}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Giá hoa</dt>
+            <dd className="text-lg font-semibold text-foreground">{formatMoney(order.listedPrice, '—')}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Phí ship</dt>
+            <dd className="font-semibold text-foreground">{shipLabel}</dd>
+          </div>
+        </dl>
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <div>
+            <p className="mb-1 text-sm font-medium text-muted-foreground">Nội dung thiệp</p>
+            {isEditMode ? (
+              <textarea
+                value={editForm.cardMessage || ''}
+                onChange={(e) => handleEditChange('cardMessage', e.target.value)}
+                rows={3}
+                placeholder="Lời chúc trên thiệp"
+                className={inputClass}
+              />
+            ) : (
+              <p className="whitespace-pre-wrap rounded-xl bg-white p-3 text-sm italic text-foreground">
+                {order.cardMessage || <span className="not-italic text-muted-foreground">Không có thiệp</span>}
+              </p>
+            )}
+          </div>
+          <div>
+            <p className="mb-1 text-sm font-medium text-muted-foreground">Ghi chú đặc biệt</p>
+            {isEditMode ? (
+              <textarea
+                value={editForm.notes || ''}
+                onChange={(e) => handleEditChange('notes', e.target.value)}
+                rows={3}
+                placeholder="Ví dụ: không dùng hoa ly, gói giấy trắng"
+                className={inputClass}
+              />
+            ) : (
+              <p className="whitespace-pre-wrap rounded-xl bg-white p-3 text-sm text-foreground">
+                {order.notes || <span className="text-muted-foreground">Không có</span>}
+              </p>
+            )}
+          </div>
+        </div>
+      </section>
+
       <div className="grid gap-6 md:grid-cols-[1.5fr_1fr]">
+        {/* Photo, total and status: the florists have all this above. */}
+        {canSeeContacts && (
         <section className="rounded-2xl border border-border bg-white p-6">
           <div className="flex flex-col gap-4 md:flex-row md:items-center">
             <Image
@@ -312,18 +375,12 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
               onClick={() => setViewer({ photos: [orderThumbnail], index: 0 })}
             />
             <dl className="grid flex-1 grid-cols-2 gap-4 text-sm">
-              <div>
-                <dt className="text-muted-foreground">{t("orders.detail.total")}</dt>
-                <dd className="text-2xl font-bold text-foreground">{formatMoney(order.total)}</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">{t("orders.detail.delivery")}</dt>
-                <dd className="text-lg font-semibold text-foreground">{getDeliveryLabel(order.deliveryType)}</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">Giờ nhận</dt>
-                <dd className="font-semibold text-foreground">{formatDateTime(order.receiveTime, lang)}</dd>
-              </div>
+              {canSeeContacts && (
+                <div>
+                  <dt className="text-muted-foreground">{t("orders.detail.total")}</dt>
+                  <dd className="text-2xl font-bold text-foreground">{formatMoney(order.total)}</dd>
+                </div>
+              )}
               <div>
                 <dt className="text-muted-foreground">Trạng thái</dt>
                 <dd className="font-semibold text-foreground">{getOrderStatusLabel(order.status)}</dd>
@@ -331,7 +388,9 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
             </dl>
           </div>
         </section>
+        )}
 
+        {canSeeContacts && (
         <section className="rounded-2xl border border-border bg-white p-6">
           <h2 className="text-base font-semibold text-foreground">{t('orders.detail.paymentSummary', 'Thanh toán')}</h2>
           <dl className="mt-4 grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
@@ -363,20 +422,10 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
             </div>
           </dl>
         </section>
+        )}
 
-        <section className="col-span-1 md:col-span-2 rounded-2xl border border-border bg-white p-6">
-          <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
-            <StickyNote className="h-4 w-4" /> {t("orders.detail.notes", "Ghi chú")}
-          </div>
-          <div className="rounded-xl bg-muted/30 p-4 text-sm text-foreground">
-            {order.notes ? (
-              <p className="whitespace-pre-wrap">{order.notes}</p>
-            ) : (
-              <p className="italic text-muted-foreground">Không có ghi chú</p>
-            )}
-          </div>
-        </section>
-
+        {/* Who the customer and receiver are, with phones and address: sales and managers only. */}
+        {canSeeContacts && (
         <section className="space-y-4">
           <div className="rounded-2xl border border-border bg-white p-5">
             <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
@@ -416,11 +465,7 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
                     </span>
                   )}
                 </div>
-                {canSeeContacts ? (
-                  <p className="text-sm text-muted-foreground">{order.customerPhone || 'Chưa có SĐT'}</p>
-                ) : (
-                  <p className="text-sm text-muted-foreground">SĐT chỉ sale và quản lý xem được</p>
-                )}
+                <p className="text-sm text-muted-foreground">{order.customerPhone || 'Chưa có SĐT'}</p>
               </>
             )}
           </div>
@@ -459,7 +504,7 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
             ) : (
               <>
                 <p className="mt-2 text-sm text-muted-foreground">{order.receiverName || 'Chưa có tên người nhận'}</p>
-                {canSeeContacts && <p className="text-sm text-muted-foreground">{order.receiverPhone || 'Chưa có SĐT'}</p>}
+                <p className="text-sm text-muted-foreground">{order.receiverPhone || 'Chưa có SĐT'}</p>
                 {order.deliveryType === 'DELIVERY' && (
                   <div className="mt-2 border-t border-dashed border-border pt-2">
                     <p className="mb-1 text-xs font-medium text-muted-foreground">Địa chỉ giao:</p>
@@ -470,6 +515,7 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
             )}
           </div>
         </section>
+        )}
       </div>
 
       {isEditMode && (

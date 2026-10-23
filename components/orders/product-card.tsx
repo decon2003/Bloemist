@@ -104,8 +104,8 @@ export function ProductCard({ task, user, florists, lang, onViewPhotos, onOrderC
             Hạn làm {formatDateTime(task.dueTime, lang)}
             {overdue ? ' · Quá hạn' : ''}
           </p>
-          {canManage && task.price != null && (
-            <p className="text-sm text-muted-foreground">Giá {formatCurrencyDisplay(task.price, '—')}</p>
+          {task.price != null && (
+            <p className="text-sm text-muted-foreground">Giá hoa {formatCurrencyDisplay(task.price, '—')}</p>
           )}
         </div>
         <span className={cn('rounded-full px-3 py-1 text-xs font-semibold', STATUS_STYLE[task.status] ?? 'bg-muted text-foreground')}>

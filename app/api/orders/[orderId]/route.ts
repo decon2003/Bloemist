@@ -5,7 +5,7 @@ import { handleRouteError, readJsonBody } from '@/lib/server/route-helpers'
 import { requireUser, MANAGER_ROLES, ORDER_WRITE_ROLES } from '@/lib/server/session'
 import { audit, diff } from '@/lib/server/audit'
 
-const ORDER_AUDIT_FIELDS = ['customerName', 'customerPhone', 'receiverName', 'receiverPhone', 'deliveryAddress', 'bouquetName', 'deliveryType', 'status', 'receiveTime', 'listedPrice', 'deliveryFee', 'deliveryCoveredByShop', 'vatPercent', 'deposit', 'sellingPrice', 'total', 'remainingBalance', 'notes', 'assigneeName']
+const ORDER_AUDIT_FIELDS = ['customerName', 'customerPhone', 'receiverName', 'receiverPhone', 'deliveryAddress', 'bouquetName', 'deliveryType', 'status', 'receiveTime', 'listedPrice', 'deliveryFee', 'deliveryCoveredByShop', 'vatPercent', 'deposit', 'sellingPrice', 'total', 'remainingBalance', 'notes', 'cardMessage', 'assigneeName']
 
 export async function GET(request: Request, { params }: { params: Promise<{ orderId: string }> }) {
   try {

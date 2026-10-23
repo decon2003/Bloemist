@@ -1,6 +1,18 @@
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 
+const VN_WEEKDAYS = ['Chủ nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy']
+
+/** "15:00 · Thứ Sáu 24/10" in Vietnam time: when an order is delivered or picked up. */
+export function formatDeliveryTime(value: string | Date | null | undefined) {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+  const vn = new Date(date.getTime() + 7 * 3_600_000)
+  const two = (n: number) => String(n).padStart(2, '0')
+  return `${two(vn.getUTCHours())}:${two(vn.getUTCMinutes())} · ${VN_WEEKDAYS[vn.getUTCDay()]} ${two(vn.getUTCDate())}/${two(vn.getUTCMonth() + 1)}`
+}
+
 /** Shown after cancelling, restoring or deleting an order whose commissions
  *  sit in a payroll that is already locked. */
 export function lockedPayrollNotice(months: string[] | undefined) {

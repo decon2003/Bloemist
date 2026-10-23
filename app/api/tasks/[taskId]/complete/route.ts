@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { completeTask, syncOrderStatusWithTasks } from '@/lib/server/data-store'
+import { completeTask, redactTaskFor, syncOrderStatusWithTasks } from '@/lib/server/data-store'
 import { handleRouteError } from '@/lib/server/route-helpers'
 import { requireUser } from '@/lib/server/session'
 import { audit } from '@/lib/server/audit'
@@ -15,7 +15,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ tas
     await audit(me, { action: 'task.complete', entity: 'task', entityId: taskId, summary: `${updated.taskTitle} · ${updated.assigneeName ?? ''}` })
     // Every product made: the order becomes "Sẵn sàng".
     await auditOrderStatus(me, await syncOrderStatusWithTasks(updated.orderId ?? null), updated.orderId)
-    return NextResponse.json(updated)
+    return NextResponse.json(redactTaskFor(me, updated))
   } catch (error) {
     return handleRouteError(error)
   }

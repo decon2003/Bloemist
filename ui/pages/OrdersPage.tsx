@@ -12,7 +12,7 @@ import { DateFilterSwitcher, DateRange } from '@/components/date-filter-switcher
 import { getDateKey } from '@/lib/date-utils'
 import { useListParams } from '@/lib/use-list-params'
 import type { Order } from '@/lib/types'
-import { formatCurrencyDisplay, formatDateTime, lockedPayrollNotice } from '@/lib/utils'
+import { formatCurrencyDisplay, formatDateTime, formatDeliveryTime, lockedPayrollNotice } from '@/lib/utils'
 import { useViewSettings } from '@/components/providers/view-settings-provider'
 import { thumbUrl } from '@/lib/image-compress'
 
@@ -268,7 +268,14 @@ export default function OrdersPage() {
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{order.code}</p>
                       <h2 className="text-lg font-semibold text-foreground">{order.bouquetName}</h2>
-                      <p className="text-sm text-muted-foreground">{order.customerName || <span className="italic">Chưa có tên khách</span>}</p>
+                      {user?.role === 'florist' ? (
+                        // Florists don't see who the customer is; when it is due matters.
+                        <p className="text-sm font-medium text-foreground">
+                          {order.deliveryType === 'DELIVERY' ? 'Giao' : 'Khách nhận'} {formatDeliveryTime(order.receiveTime)}
+                        </p>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">{order.customerName || <span className="italic">Chưa có tên khách</span>}</p>
+                      )}
                       {isOverdue(order) && (
                         <p className="mt-1 inline-block rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
                           Quá hạn · nhận {formatDateTime(order.receiveTime, lang)}
@@ -288,12 +295,22 @@ export default function OrdersPage() {
                       <p className="font-semibold text-foreground">{order.salespersonName || order.createdByName || '—'}</p>
                     </div>
                     <div className="text-left md:text-right">
-                      <p className="text-muted-foreground">{t('orders.detail.total')}</p>
-                      <p className="text-lg font-semibold text-foreground">{formatMoney(order.total)}</p>
+                      {user?.role === 'florist' ? (
+                        <>
+                          <p className="text-muted-foreground">Giá hoa</p>
+                          <p className="text-lg font-semibold text-foreground">{formatMoney(order.listedPrice)}</p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-muted-foreground">{t('orders.detail.total')}</p>
+                          <p className="text-lg font-semibold text-foreground">{formatMoney(order.total)}</p>
+                        </>
+                      )}
                     </div>
                     <div className="text-left md:text-right">
                       <p className="text-muted-foreground">{t('orders.detail.delivery')}</p>
                       <p className="font-semibold text-foreground">{getDeliveryLabel(order.deliveryType)}</p>
+                      <p className="text-xs text-muted-foreground">{formatDeliveryTime(order.receiveTime)}</p>
                     </div>
 
                     <div className="text-left md:text-right" onClick={(e) => e.stopPropagation()}>

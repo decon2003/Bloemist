@@ -74,7 +74,10 @@ export interface Order {
   sellingPrice?: number | null
   remainingBalance?: number | null
   total: number
+  /** Special note for the florists ("Ghi chú đặc biệt"). */
   notes?: string
+  /** Text written on the card ("Nội dung thiệp"). */
+  cardMessage?: string | null
   createdById?: string
   createdByName?: string
   assigneeId?: string
@@ -118,6 +121,7 @@ export interface CreateOrderInput {
   vatPercent?: number
   deposit?: number | string
   notes?: string
+  cardMessage?: string
   createdById?: string
   createdByName?: string
   new_customer?: boolean

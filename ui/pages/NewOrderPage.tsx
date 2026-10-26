@@ -13,6 +13,7 @@ import { fetchBouquets, lookupCustomer, uploadPhoto } from '@/lib/api'
 import type { BouquetSuggestion, CustomerLookup } from '@/lib/types'
 import { formatCurrencyFromNumber, formatCurrencyInput, parseCurrencyToNumber, toDateTimeLocalValue } from '@/lib/utils'
 import { thumbUrl } from '@/lib/image-compress'
+import { DateTimeInput24 } from '@/components/time-input-24'
 
 
 type ProductForm = {
@@ -451,10 +452,9 @@ export default function NewOrderPage() {
               )}
               <label className="space-y-2 text-sm font-medium text-foreground">
                 <span>{t('orders.new.receiveTime', 'Ready by')}</span>
-                <input
-                  type="datetime-local"
+                <DateTimeInput24
                   value={receiveTime}
-                  onChange={(event) => setReceiveTime(event.target.value)}
+                  onChange={setReceiveTime}
                   className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </label>

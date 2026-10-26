@@ -7,6 +7,7 @@ import { useAuth } from '@/components/providers/auth-provider'
 import { useAppData } from '@/components/providers/app-data-provider'
 import { User } from '@/lib/types'
 import { AuditTrail } from '@/components/audit-trail'
+import { TimeInput24 } from '@/components/time-input-24'
 
 interface UserFormData {
   name: string
@@ -429,10 +430,9 @@ export default function SettingsPage() {
             <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Giờ bắt đầu
             </label>
-            <input
-              type="time"
+            <TimeInput24
               value={workingHours.start}
-              onChange={(e) => handleWorkingHoursChange('start', e.target.value)}
+              onChange={(value) => handleWorkingHoursChange('start', value)}
               disabled={!canEditSettings}
               className="mt-1 w-full rounded-xl border border-border bg-white px-3 py-2 text-sm text-foreground disabled:bg-muted disabled:cursor-not-allowed"
             />
@@ -441,10 +441,9 @@ export default function SettingsPage() {
             <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Giờ kết thúc
             </label>
-            <input
-              type="time"
+            <TimeInput24
               value={workingHours.end}
-              onChange={(e) => handleWorkingHoursChange('end', e.target.value)}
+              onChange={(value) => handleWorkingHoursChange('end', value)}
               disabled={!canEditSettings}
               className="mt-1 w-full rounded-xl border border-border bg-white px-3 py-2 text-sm text-foreground disabled:bg-muted disabled:cursor-not-allowed"
             />

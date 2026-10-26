@@ -16,6 +16,7 @@ import type { CreateOrderInput, Order } from "@/lib/types"
 import { cn, formatCurrencyDisplay, formatDeliveryTime, fromDateTimeLocalValue, lockedPayrollNotice, toDateTimeLocalValue } from "@/lib/utils"
 import { thumbUrl } from "@/lib/image-compress"
 import { AuditTrail } from "@/components/audit-trail"
+import { DateTimeInput24 } from "@/components/time-input-24"
 
 interface OrderDetailPageProps {
   orderId: string
@@ -524,13 +525,12 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <label className="text-sm font-medium">Ngày giờ nhận</label>
-              {/* datetime-local is a LOCAL wall-clock control: convert to and
-                  from it explicitly, never by slicing an ISO (UTC) string. */}
-              <input
-                type="datetime-local"
+              {/* A LOCAL wall-clock value: convert to and from it explicitly,
+                  never by slicing an ISO (UTC) string. */}
+              <DateTimeInput24
                 value={toDateTimeLocalValue(editForm.receiveTime)}
-                onChange={(e) => {
-                  const iso = fromDateTimeLocalValue(e.target.value)
+                onChange={(value) => {
+                  const iso = fromDateTimeLocalValue(value)
                   // A cleared or partially typed value yields null; ignore it.
                   if (iso) handleEditChange("receiveTime", iso)
                 }}

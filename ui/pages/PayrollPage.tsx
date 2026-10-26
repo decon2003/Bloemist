@@ -28,9 +28,9 @@ const hours = (h: number) => {
   return `${Math.floor(minutes / 60)}h${String(minutes % 60).padStart(2, '0')}`
 }
 const time = (iso: string | null) =>
-  iso ? new Intl.DateTimeFormat('en-GB', { timeZone: VN, hour: '2-digit', minute: '2-digit' }).format(new Date(iso)) : '—'
+  iso ? new Intl.DateTimeFormat('en-GB', { timeZone: VN, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(iso)) : '—'
 const dateTime = (iso: string) =>
-  new Intl.DateTimeFormat('vi-VN', { timeZone: VN, hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }).format(new Date(iso))
+  new Intl.DateTimeFormat('vi-VN', { timeZone: VN, hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', hourCycle: 'h23' }).format(new Date(iso))
 const dayLabel = (date: string) => `${date.slice(8, 10)}/${date.slice(5, 7)}`
 const thisMonth = () => new Intl.DateTimeFormat('en-CA', { timeZone: VN }).format(new Date()).slice(0, 7)
 const digits = (text: string) => Number(text.replace(/\D/g, '') || 0)

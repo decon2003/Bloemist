@@ -8,6 +8,7 @@ import { useAppData } from '@/components/providers/app-data-provider'
 import { fetchRecentCheckIns } from '@/lib/api'
 import type { ShiftCorrectionInput, StaffCheckIn, User } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import { TimeInput24 } from '@/components/time-input-24'
 
 // Staff may fix their own shifts for today and the previous days below;
 // must match CORRECTION_DAYS in lib/server/attendance.ts.
@@ -21,7 +22,7 @@ const vnDay = (value: string | Date = new Date()) =>
   new Intl.DateTimeFormat('en-CA', { timeZone: VN }).format(new Date(value))
 /** HH:mm of an instant in Vietnam. */
 const vnTime = (value?: string | null) =>
-  value ? new Intl.DateTimeFormat('en-GB', { timeZone: VN, hour: '2-digit', minute: '2-digit' }).format(new Date(value)) : ''
+  value ? new Intl.DateTimeFormat('en-GB', { timeZone: VN, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(value)) : ''
 const shiftDay = (dayKey: string, days: number) =>
   new Date(Date.parse(`${dayKey}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10)
 const dayLabel = (dayKey: string) => {
@@ -123,11 +124,11 @@ function CorrectionModal({
         <div className="grid grid-cols-2 gap-3">
           <label className="block space-y-1 text-sm font-medium text-foreground">
             <span>Giờ vào</span>
-            <input type="time" value={checkIn} onChange={(e) => setCheckIn(e.target.value)} className={inputClass} />
+            <TimeInput24 value={checkIn} onChange={setCheckIn} className={inputClass} />
           </label>
           <label className="block space-y-1 text-sm font-medium text-foreground">
             <span>Giờ ra {workDate === today ? '(nếu đã về)' : ''}</span>
-            <input type="time" value={checkOut} onChange={(e) => setCheckOut(e.target.value)} className={inputClass} />
+            <TimeInput24 value={checkOut} onChange={setCheckOut} className={inputClass} />
           </label>
         </div>
         <label className="block space-y-1 text-sm font-medium text-foreground">

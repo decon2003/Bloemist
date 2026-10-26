@@ -12,6 +12,7 @@ import { Task, TaskStatus } from '@/lib/types'
 import { fetchTask, uploadPhoto } from '@/lib/api'
 import { formatCurrencyDisplay, formatDateTime, fromDateTimeLocalValue, toDateTimeLocalValue } from '@/lib/utils'
 import { thumbUrl } from '@/lib/image-compress'
+import { DateTimeInput24 } from '@/components/time-input-24'
 
 interface TaskDetailPageProps {
   taskId: string
@@ -577,10 +578,9 @@ export default function TaskDetailPage({ taskId }: TaskDetailPageProps) {
                 </label>
                 <label className="space-y-1 text-sm font-medium text-foreground">
                   <span>{t('addTask.fields.dueTime')}</span>
-                  <input
-                    type="datetime-local"
+                  <DateTimeInput24
                     value={editDueTime}
-                    onChange={(event) => setEditDueTime(event.target.value)}
+                    onChange={setEditDueTime}
                     className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                 </label>

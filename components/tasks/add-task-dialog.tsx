@@ -10,6 +10,7 @@ import { uploadPhoto } from '@/lib/api'
 import { PhotoViewer } from '@/components/photo-viewer'
 import { thumbUrl } from '@/lib/image-compress'
 import { toDateTimeLocalValue } from '@/lib/utils'
+import { DateTimeInput24 } from '@/components/time-input-24'
 
 interface AddTaskDialogProps {
   open: boolean
@@ -380,10 +381,9 @@ export default function AddTaskDialog({
 
           <div className="space-y-2">
             <label className="text-sm font-medium">{t('addTask.fields.dueTime')}</label>
-            <input
-              type="datetime-local"
+            <DateTimeInput24
               value={dueTime}
-              onChange={(event) => setDueTime(event.target.value)}
+              onChange={setDueTime}
               className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>

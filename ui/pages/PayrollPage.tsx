@@ -188,9 +188,9 @@ function LineEditor({
               <span className="text-muted-foreground">Đơn giá giờ (₫), cũng dùng cho OT</span>
               <input value={hourlyRate} disabled={locked} inputMode="numeric" onChange={(e) => setHourlyRate(e.target.value)} className={inputClass} />
             </label>
-            {(['makerRate', 'salesRate'] as const).map((field, i) => (
+            {((isSales ? ['salesRate'] : ['makerRate', 'salesRate']) as ('makerRate' | 'salesRate')[]).map((field) => (
               <label key={field} className="space-y-1 text-sm">
-                <span className="text-muted-foreground">% HH {['làm đơn', 'sale'][i]}</span>
+                <span className="text-muted-foreground">% HH {field === 'makerRate' ? 'làm đơn' : 'sale'}</span>
                 <input
                   type="number"
                   min={0}

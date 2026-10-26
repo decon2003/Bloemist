@@ -54,7 +54,8 @@ function SalaryConfigModal({ user, onClose, onSave }: { user: User, onClose: () 
         payType,
         baseSalary: Number(base.replace(/\D/g, '') || 0),
         hourlyRate: Number(hourly.replace(/\D/g, '') || 0),
-        commissionRate: Number(makerRate),
+        // Sales earn the sales commission only.
+        commissionRate: isSales ? 0 : Number(makerRate),
         salesCommissionRate: Number(salesRate),
         holidayHourlyRate: !isSales && holidayRate.trim() ? Number(holidayRate.replace(/\D/g, '') || 0) : null,
         onlineHourlyRate: isSales && onlineRate.trim() ? Number(onlineRate.replace(/\D/g, '') || 0) : null,
@@ -133,9 +134,9 @@ function SalaryConfigModal({ user, onClose, onSave }: { user: User, onClose: () 
         </p>
         <div className="grid grid-cols-2 gap-3">
           {([
-            ['% HH làm đơn', makerRate, setMakerRate],
-            ['% HH sale', salesRate, setSalesRate],
-          ] as const).map(([label, value, set]) => (
+            ...(isSales ? [] : [['% HH làm đơn', makerRate, setMakerRate] as const]),
+            ['% HH sale', salesRate, setSalesRate] as const,
+          ]).map(([label, value, set]) => (
             <label key={label} className="block text-sm font-medium">
               {label}
               <input type="number" min={0} max={100} step={0.5} value={value} onChange={(e) => set(e.target.value)} className={field} />

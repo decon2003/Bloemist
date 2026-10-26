@@ -182,7 +182,9 @@ export default function MyPayPage() {
               value={money(t.otPay)}
               hint={`${hours(t.otHours + t.rushHours)} × ${data!.otMultiplier}${t.pendingOtDays ? ` · ${t.pendingOtDays} ngày chờ duyệt` : ''}`}
             />
-            <Stat label="HH làm đơn" value={money(t.commissionByKind.MAKER)} hint={`${makerItems.length} sản phẩm · ${line.makerRate}%`} />
+            {line.role !== 'sales' && (
+              <Stat label="HH làm đơn" value={money(t.commissionByKind.MAKER)} hint={`${makerItems.length} sản phẩm · ${line.makerRate}%`} />
+            )}
             <Stat label="HH sale" value={money(t.commissionByKind.SALES)} hint={`${salesItems.length} đơn · ${line.salesRate}%`} />
             <Stat
               label="Thưởng / khấu trừ"

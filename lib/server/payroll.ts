@@ -21,7 +21,8 @@ import { parseVnMonth, vnDateKey } from './vn-time'
 //   HOURLY pay = hourly rate x regular hours, at the holiday rate on public
 //   holidays (Settings); overtime = rate x OT multiplier x OT hours;
 // - making commission = rate% of each completed product's price (before VAT);
-//   it goes in full to whoever the product's task is assigned to;
+//   it goes in full to whoever the product's task is assigned to - never to
+//   sales, who earn the sales commission only;
 // - sales commission = rate% of the listed price of each order created that
 //   month where the person is the salesperson (defaults to the creator);
 // - cancelled orders never earn commission;
@@ -237,8 +238,11 @@ async function collectFacts(month: { key: string; start: Date; end: Date }) {
     commissionsByUser.set(userId, list)
   }
 
+  const roleOf = new Map(users.map((u) => [u.id, u.role]))
   for (const task of tasks) {
     if (task.order?.status === 'CANCELLED') continue
+    // Sales earn the sales commission only, even if a product was put on them.
+    if (roleOf.get(task.assigneeId!) === 'sales') continue
     let base: number
     if (task.price !== null) {
       base = task.price
@@ -286,7 +290,7 @@ const profileRates = (user: ProfileUser) => ({
   payType: user.payType,
   baseSalary: user.baseSalary ?? 0,
   hourlyRate: user.hourlyRate,
-  makerRate: user.commissionRate ?? 0,
+  makerRate: user.role === 'sales' ? 0 : user.commissionRate ?? 0,
   salesRate: user.salesCommissionRate,
   // Sales get no holiday rate.
   holidayHourlyRate: user.role === 'sales' ? null : user.holidayHourlyRate,

@@ -8,6 +8,7 @@ import { useAppData } from '@/components/providers/app-data-provider'
 import { User } from '@/lib/types'
 import { AuditTrail } from '@/components/audit-trail'
 import { TimeInput24 } from '@/components/time-input-24'
+import { DateInputVN } from '@/components/date-input-vn'
 
 interface UserFormData {
   name: string
@@ -505,10 +506,9 @@ export default function SettingsPage() {
         )}
         {canEditSettings && (
           <div className="flex flex-col gap-2 sm:flex-row">
-            <input
-              type="date"
+            <DateInputVN
               value={newHoliday.date}
-              onChange={(e) => setNewHoliday((h) => ({ ...h, date: e.target.value }))}
+              onChange={(value) => setNewHoliday((h) => ({ ...h, date: value }))}
               className="rounded-xl border border-border bg-white px-3 py-2 text-sm"
             />
             <input

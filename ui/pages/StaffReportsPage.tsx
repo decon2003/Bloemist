@@ -1,13 +1,14 @@
 'use client'
 
 import { useMemo, useState, useCallback, useEffect } from 'react'
-import { Users, ShoppingBag, ClipboardList, Search, Filter, Calendar, Settings, X, Save } from 'lucide-react'
+import { Users, ShoppingBag, ClipboardList, Search, Filter, Settings, X, Save } from 'lucide-react'
 import { StaffProfile, User } from '@/lib/types'
 import { formatDateTime, parseCurrencyToNumber, formatCurrencyFromNumber, formatCurrencyInput } from '@/lib/utils'
 import { useLocale } from '@/components/providers/locale-provider'
 import { useAuth } from '@/components/providers/auth-provider'
 import { useAppData } from '@/components/providers/app-data-provider'
 import { fetchStaffReport } from '@/lib/api'
+import { DateInputVN } from '@/components/date-input-vn'
 
 const formatInputDate = (date: Date) => {
   const year = date.getFullYear()
@@ -298,15 +299,11 @@ export default function StaffReportsPage() {
                 className="w-40 bg-transparent text-sm focus:outline-none"
               />
             </div>
-            <label className="flex items-center gap-2 rounded-2xl border border-border bg-white px-3 py-2 text-sm text-muted-foreground cursor-pointer">
-              <Calendar className="h-4 w-4" />
-              <input
-                type="date"
-                value={dateInputValue}
-                onChange={(event) => handleDateChange(event.target.value)}
-                className="bg-transparent text-sm text-foreground focus:outline-none"
-              />
-            </label>
+            <DateInputVN
+              value={dateInputValue}
+              onChange={(value) => value && handleDateChange(value)}
+              className="w-40 rounded-2xl border border-border bg-white px-3 py-2 text-sm text-foreground focus:outline-none"
+            />
           </div>
         </div>
 

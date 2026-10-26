@@ -68,21 +68,17 @@ const parseRequiredDate = (value: string | Date, field: string) => {
 // Florists work from the bouquet and the deadline; they never need the
 // customer's or receiver's phone number, so it is not sent to them at all
 // (the UI already hid it, but the API used to return it to everyone).
-/** Florists see what they need to make the order - products, flower price,
- *  delivery fee, card, special note, delivery time - but not who the customer
- *  and receiver are, their phones and address, or the payment details. Sales
- *  and managers see everything. */
+/** Florists see what they need to make and hand over the order - products,
+ *  flower price, delivery fee, card, special note, delivery time, names and
+ *  address - but never phone numbers or the payment details. Sales and
+ *  managers see everything. */
 export const redactOrderFor = <T extends object>(viewer: { role: string }, order: T): T =>
   viewer.role === 'florist'
     ? {
         ...order,
         customerId: null,
-        customerName: '',
         customerPhone: '',
-        receiverName: '',
         receiverPhone: '',
-        deliveryAddress: null,
-        new_customer: false,
         vatPercent: null,
         sellingPrice: null,
         deposit: null,
@@ -91,11 +87,9 @@ export const redactOrderFor = <T extends object>(viewer: { role: string }, order
       }
     : order
 
-/** The same for a task: florists don't get the customer's or receiver's name. */
+/** The same for a task: florists never get phone numbers. */
 export const redactTaskFor = <T extends object>(viewer: { role: string }, task: T): T =>
-  viewer.role === 'florist'
-    ? { ...task, customerName: '', receiverName: '', customerPhone: '', receiverPhone: '', order: undefined }
-    : task
+  viewer.role === 'florist' ? { ...task, customerPhone: '', receiverPhone: '' } : task
 
 // Photos saved before object storage existed are base64 data URLs inside the
 // row. Sending them in list responses blew through Vercel's 4.5 MB response
@@ -142,8 +136,8 @@ export const listTasks = async (
       { taskTitle: { contains: scope.q, mode: 'insensitive' } },
       { bouquetName: { contains: scope.q, mode: 'insensitive' } },
       { orderCode: { contains: scope.q, mode: 'insensitive' } },
-      // Florists never see phones or names, so they don't search by them either.
-      { order: await orderSearchWhere(scope.q, { matchPhones: options.viewerRole !== 'florist', matchPeople: options.viewerRole !== 'florist' }) },
+      // Florists never see phone numbers, so they don't search by them either.
+      { order: await orderSearchWhere(scope.q, { matchPhones: options.viewerRole !== 'florist' }) },
     ]
     if (scope.since) where.dueTime = { gte: scope.since }
   }
@@ -218,7 +212,7 @@ const orderListWhere = async (
       ? [window, { status: { in: [...OPEN_ORDER_STATUSES] }, receiveTime: { lt: scope.start } }]
       : [window]
   } else {
-    Object.assign(where, await orderSearchWhere(scope.q, { matchPhones: viewer.role !== 'florist', matchPeople: viewer.role !== 'florist' }))
+    Object.assign(where, await orderSearchWhere(scope.q, { matchPhones: viewer.role !== 'florist' }))
     // Staff history limit; their unfinished orders stay findable.
     if (scope.since) {
       and.push({ OR: [{ receiveTime: { gte: scope.since } }, { status: { in: [...OPEN_ORDER_STATUSES] } }] })

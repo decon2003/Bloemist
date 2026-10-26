@@ -7,6 +7,7 @@ import { fetchMyPay } from '@/lib/api'
 import { useLocale } from '@/components/providers/locale-provider'
 import type { MyPay, OtDecision, PayrollCommission } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import { MonthInputVN } from '@/components/date-input-vn'
 
 const VN = 'Asia/Ho_Chi_Minh'
 const money = (n: number) => `${n.toLocaleString('vi-VN')} ₫`
@@ -125,11 +126,10 @@ export default function MyPayPage() {
         </div>
         <label className="flex items-center gap-2 text-sm font-medium text-foreground">
           Tháng
-          <input
-            type="month"
+          <MonthInputVN
             value={month}
             max={thisMonth()}
-            onChange={(e) => e.target.value && setMonth(e.target.value)}
+            onChange={setMonth}
             className="rounded-xl border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
           />
         </label>

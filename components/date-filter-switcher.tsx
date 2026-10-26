@@ -2,6 +2,7 @@
 
 import DateCarousel from './date-carousel'
 import { DAY_IN_MS, getDateKey, getStartOfDay } from '@/lib/date-utils'
+import { DateInputVN } from '@/components/date-input-vn'
 
 export type DateFilterMode = 'range' | 'carousel'
 export type DateRange = { from: string; to: string }
@@ -139,22 +140,20 @@ export function DateFilterSwitcher({
           <div className={`grid gap-3 md:grid-cols-2 ${extraFields ? 'lg:grid-cols-4' : ''}`}>
             <label className="space-y-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               <span>{rangeLabels.from}</span>
-              <input
-                type="date"
+              <DateInputVN
                 value={range.from}
                 min={minDate}
-                onChange={(event) => handleRangeChange({ from: event.target.value })}
-                className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                onChange={(value) => handleRangeChange({ from: value })}
+                className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm font-normal normal-case tracking-normal text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
               />
             </label>
             <label className="space-y-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               <span>{rangeLabels.to}</span>
-              <input
-                type="date"
+              <DateInputVN
                 value={range.to}
                 min={range.from || minDate || undefined}
-                onChange={(event) => handleRangeChange({ to: event.target.value })}
-                className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                onChange={(value) => handleRangeChange({ to: value })}
+                className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm font-normal normal-case tracking-normal text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
               />
             </label>
             {extraFields}

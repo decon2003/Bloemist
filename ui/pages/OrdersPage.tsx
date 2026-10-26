@@ -268,13 +268,11 @@ export default function OrdersPage() {
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{order.code}</p>
                       <h2 className="text-lg font-semibold text-foreground">{order.bouquetName}</h2>
-                      {user?.role === 'florist' ? (
-                        // Florists don't see who the customer is; when it is due matters.
+                      <p className="text-sm text-muted-foreground">{order.customerName || <span className="italic">Chưa có tên khách</span>}</p>
+                      {user?.role === 'florist' && (
                         <p className="text-sm font-medium text-foreground">
                           {order.deliveryType === 'DELIVERY' ? 'Giao' : 'Khách nhận'} {formatDeliveryTime(order.receiveTime)}
                         </p>
-                      ) : (
-                        <p className="text-sm text-muted-foreground">{order.customerName || <span className="italic">Chưa có tên khách</span>}</p>
                       )}
                       {isOverdue(order) && (
                         <p className="mt-1 inline-block rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">

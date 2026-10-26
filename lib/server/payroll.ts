@@ -14,7 +14,8 @@ import { parseVnMonth, vnDateKey } from './vn-time'
 //   EXCLUDE. Less than 15 minutes at either end of a shift is ignored;
 // - a "ca gấp" (RUSH) day is paid entirely as overtime;
 // - a shift nobody checked out of counts 0 hours until it is corrected;
-// - MONTHLY pay = base salary x days worked / (days in month - paid days off);
+// - MONTHLY pay = base salary x days worked / (days in month - paid days off),
+//   at most the full salary;
 //   HOURLY pay = hourly rate x regular hours, at the holiday rate on public
 //   holidays (Settings); overtime = rate x OT multiplier x OT hours;
 // - making commission = rate% of each completed product's price (before VAT);
@@ -116,7 +117,8 @@ export function computeLine(
   }
 
   const standardDays = Math.max(1, daysInMonth(monthKey) - (line.daysOffPerMonth ?? 0))
-  const basePay = monthly ? Math.round((line.baseSalary * daysWorked) / standardDays) : Math.round(hourlyPay)
+  // Working more days than the standard does not pay more than the full salary.
+  const basePay = monthly ? Math.round((line.baseSalary * Math.min(daysWorked, standardDays)) / standardDays) : Math.round(hourlyPay)
   const commissionByKind: Record<CommissionKind, number> = { MAKER: 0, SALES: 0 }
   for (const item of commissions) {
     // Unknown kinds (e.g. the retired REFERRAL in an old draft) are ignored.

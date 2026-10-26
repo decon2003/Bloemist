@@ -241,7 +241,7 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
           </div>
           <h1 className="text-3xl font-bold text-foreground">{order.bouquetName}</h1>
           <p className="text-muted-foreground">
-            {canSeeContacts ? order.customerName || 'Chưa có tên khách' : `${whenLabel} ${formatDeliveryTime(order.receiveTime)}`}
+            {order.customerName || 'Chưa có tên khách'}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -425,8 +425,7 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
         </section>
         )}
 
-        {/* Who the customer and receiver are, with phones and address: sales and managers only. */}
-        {canSeeContacts && (
+        {/* Customer and receiver: everyone; phone numbers for sales and managers only. */}
         <section className="space-y-4">
           <div className="rounded-2xl border border-border bg-white p-5">
             <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
@@ -466,7 +465,7 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-muted-foreground">{order.customerPhone || 'Chưa có SĐT'}</p>
+                {canSeeContacts && <p className="text-sm text-muted-foreground">{order.customerPhone || 'Chưa có SĐT'}</p>}
               </>
             )}
           </div>
@@ -505,7 +504,7 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
             ) : (
               <>
                 <p className="mt-2 text-sm text-muted-foreground">{order.receiverName || 'Chưa có tên người nhận'}</p>
-                <p className="text-sm text-muted-foreground">{order.receiverPhone || 'Chưa có SĐT'}</p>
+                {canSeeContacts && <p className="text-sm text-muted-foreground">{order.receiverPhone || 'Chưa có SĐT'}</p>}
                 {order.deliveryType === 'DELIVERY' && (
                   <div className="mt-2 border-t border-dashed border-border pt-2">
                     <p className="mb-1 text-xs font-medium text-muted-foreground">Địa chỉ giao:</p>
@@ -516,7 +515,6 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
             )}
           </div>
         </section>
-        )}
       </div>
 
       {isEditMode && (

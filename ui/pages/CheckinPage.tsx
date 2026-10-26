@@ -9,6 +9,7 @@ import { fetchRecentCheckIns } from '@/lib/api'
 import type { ShiftCorrectionInput, StaffCheckIn, User } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { TimeInput24 } from '@/components/time-input-24'
+import { DateInputVN } from '@/components/date-input-vn'
 
 // Staff may fix their own shifts for today and the previous days below;
 // must match CORRECTION_DAYS in lib/server/attendance.ts.
@@ -111,13 +112,12 @@ function CorrectionModal({
 
         <label className="block space-y-1 text-sm font-medium text-foreground">
           <span>Ngày</span>
-          <input
-            type="date"
+          <DateInputVN
             value={workDate}
             min={isManager ? undefined : shiftDay(today, -CORRECTION_DAYS)}
             max={today}
             disabled={Boolean(target.entry)}
-            onChange={(e) => setWorkDate(e.target.value)}
+            onChange={setWorkDate}
             className={inputClass}
           />
         </label>
@@ -223,11 +223,10 @@ export default function CheckinPage() {
               Giờ làm việc {openTime} – {closeTime}. Ca quên chấm ra quá {MAX_SHIFT_HOURS} tiếng tính 0 giờ cho tới khi được sửa.
             </p>
           </div>
-          <input
-            type="date"
+          <DateInputVN
             value={selectedDate}
             max={today}
-            onChange={(e) => e.target.value && setSelectedDate(e.target.value)}
+            onChange={(value) => value && setSelectedDate(value)}
             className="rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
           />
         </header>

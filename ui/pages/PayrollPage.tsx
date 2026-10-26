@@ -20,6 +20,7 @@ import type {
   PayrollShift,
 } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import { MonthInputVN } from '@/components/date-input-vn'
 
 const VN = 'Asia/Ho_Chi_Minh'
 const money = (n: number) => `${n.toLocaleString('vi-VN')} ₫`
@@ -474,11 +475,10 @@ export default function PayrollPage() {
             Bảng lương dự kiến từ chấm công và đơn hàng. Sửa từng người, duyệt OT, rồi chốt sau khi hết tháng.
           </p>
         </div>
-        <input
-          type="month"
+        <MonthInputVN
           value={month}
-          onChange={(e) => e.target.value && setMonth(e.target.value)}
-          className="rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          onChange={setMonth}
+          className="rounded-lg border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
         />
       </header>
 

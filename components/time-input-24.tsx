@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
+import { DateInputVN } from '@/components/date-input-vn'
 
 // The browser's own <input type="time"> / "datetime-local" follow the device
 // language, so a phone or PC set to English (US) shows 03:00 PM. These inputs
@@ -98,16 +99,17 @@ export function DateTimeInput24({
 
   return (
     <div className="flex gap-2">
-      <input
-        type="date"
-        value={date}
-        disabled={disabled}
-        onChange={(e) => {
-          setDate(e.target.value)
-          emit(e.target.value, time)
-        }}
-        className={cn(className, 'min-w-0 flex-1')}
-      />
+      <div className="min-w-0 flex-1">
+        <DateInputVN
+          value={date}
+          disabled={disabled}
+          onChange={(next) => {
+            setDate(next)
+            emit(next, time)
+          }}
+          className={cn(className, 'w-full')}
+        />
+      </div>
       <TimeInput24
         value={time}
         disabled={disabled}

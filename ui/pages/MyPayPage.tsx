@@ -174,7 +174,7 @@ export default function MyPayPage() {
               hint={
                 line.payType === 'MONTHLY'
                   ? `${t.daysWorked}/${t.standardDays} ngày công`
-                  : `${hours(t.regularHours)} giờ${t.holidayHours > 0 ? ` (${hours(t.holidayHours)} ngày lễ)` : ''}`
+                  : `${hours(t.regularHours)} giờ${t.onlineHours > 0 ? ` (${hours(t.onlineHours)} online)` : ''}${t.holidayHours > 0 ? ` (${hours(t.holidayHours)} ngày lễ)` : ''}`
               }
             />
             <Stat
@@ -253,7 +253,8 @@ export default function MyPayPage() {
                       <tr key={s.date} className="border-t border-border">
                         <td className="py-2 pr-3 whitespace-nowrap">
                           {dayLabel(s.date)}
-                          {s.holiday && <span className="ml-1 rounded bg-violet-100 px-1 text-xs text-violet-800">Lễ</span>}
+                          {s.holiday && s.mode !== 'ONLINE' && <span className="ml-1 rounded bg-violet-100 px-1 text-xs text-violet-800">Lễ</span>}
+                          {s.mode === 'ONLINE' && <span className="ml-1 rounded bg-violet-100 px-1 text-xs text-violet-800">Online</span>}
                         </td>
                         <td className="py-2 pr-3">{time(s.checkIn)}</td>
                         <td className="py-2 pr-3">

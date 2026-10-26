@@ -27,11 +27,13 @@ export async function GET(request: Request) {
     }
 }
 
-// Check in now. Always for the signed-in person; one shift per day.
+// Check in now, for the signed-in person: { workMode?: 'SHOP' | 'ONLINE' }
+// (online = sales working from home). One shift per day and mode.
 export async function POST(request: Request) {
     try {
         const me = await requireUser(request)
-        const created = await checkIn(me)
+        const body = await request.json().catch(() => ({}))
+        const created = await checkIn(me, new Date(), body?.workMode)
         return NextResponse.json(mapCheckIn(created), { status: 201 })
     } catch (error) {
         return handleRouteError(error)

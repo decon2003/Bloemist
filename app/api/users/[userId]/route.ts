@@ -78,6 +78,9 @@ export async function PATCH(request: Request, context: RouteContext) {
         if (body.holidayHourlyRate !== undefined) {
             data.holidayHourlyRate = body.holidayHourlyRate === null || body.holidayHourlyRate === '' ? null : toVnd(body.holidayHourlyRate, 'holidayHourlyRate')
         }
+        if (body.onlineHourlyRate !== undefined) {
+            data.onlineHourlyRate = body.onlineHourlyRate === null || body.onlineHourlyRate === '' ? null : toVnd(body.onlineHourlyRate, 'onlineHourlyRate')
+        }
         if (body.daysOffPerMonth !== undefined) {
             const days = Number(body.daysOffPerMonth)
             if (!Number.isInteger(days) || days < 0 || days > 15) throw new ApiError(400, 'Số ngày nghỉ phải từ 0 đến 15')
@@ -138,7 +141,7 @@ export async function PATCH(request: Request, context: RouteContext) {
             })
         }
 
-        const changes = diff(existing, user, ['name', 'email', 'phone', 'role', 'status', 'avatar', 'payType', 'baseSalary', 'hourlyRate', 'holidayHourlyRate', 'daysOffPerMonth', 'commissionRate', 'salesCommissionRate'])
+        const changes = diff(existing, user, ['name', 'email', 'phone', 'role', 'status', 'avatar', 'payType', 'baseSalary', 'hourlyRate', 'holidayHourlyRate', 'onlineHourlyRate', 'daysOffPerMonth', 'commissionRate', 'salesCommissionRate'])
         const passwordReset = data.passwordHash !== undefined
         if (changes || passwordReset) {
             await audit(me, {

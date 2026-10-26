@@ -4,8 +4,10 @@ import { audit, diff, type AuditActor } from './audit'
 import { addVnDays, parseVnDateKey, vnDateKey } from './vn-time'
 
 // Attendance rules. Hours feed pay, so a shift must be complete and plausible:
-// - one shift per person per Vietnam day (unique staffId + workDate, the day
-//   the shift started); a shift may run past midnight, up to MAX_SHIFT_HOURS;
+// - one shift per person per Vietnam day and work mode (unique staffId +
+//   workDate + workMode, the day the shift started): sales may add an ONLINE
+//   (at-home) shift to their SHOP shift, e.g. the evening from home; the two
+//   may not overlap. A shift may run past midnight, up to MAX_SHIFT_HOURS;
 // - a shift nobody checked out of within MAX_SHIFT_HOURS is closed with 0
 //   hours and flagged, and stays at 0 until someone enters the real time;
 // - staff may enter or fix their own times for today and the previous
@@ -117,22 +119,38 @@ async function openShiftOf(staffId: string, now: Date) {
 
 type Staff = { id: string; name: string; role: string }
 
-export async function checkIn(staff: Staff, now = new Date()) {
+export const WORK_MODES = ['SHOP', 'ONLINE'] as const
+export type WorkMode = (typeof WORK_MODES)[number]
+const MODE_LABEL: Record<WorkMode, string> = { SHOP: 'Tại cửa hàng', ONLINE: 'Online (tại nhà)' }
+
+/** SHOP unless given; only sales may work online. */
+function readWorkMode(value: unknown, role: string): WorkMode {
+  if (value === undefined || value === null || value === '') return 'SHOP'
+  if (value !== 'SHOP' && value !== 'ONLINE') throw new ApiError(400, 'Hình thức làm việc không hợp lệ')
+  if (value === 'ONLINE' && role !== 'sales') throw new ApiError(403, 'Chỉ sale được chấm công online')
+  return value
+}
+
+export async function checkIn(staff: Staff, now = new Date(), modeInput?: unknown) {
+  const workMode = readWorkMode(modeInput, staff.role)
   const workDate = vnDateKey(now)
   const open = await openShiftOf(staff.id, now)
   if (open) throw new ApiError(409, 'Bạn chưa chấm công ra ca trước. Chấm công ra trước khi vào ca mới.')
-  const existing = await db.staffCheckIn.findUnique({ where: { staffId_workDate: { staffId: staff.id, workDate } } })
-  if (existing) throw new ApiError(409, 'Bạn đã chấm công vào hôm nay. Nếu giờ vào chưa đúng, dùng "Sửa giờ".')
+  const existing = await db.staffCheckIn.findUnique({ where: { staffId_workDate_workMode: { staffId: staff.id, workDate, workMode } } })
+  if (existing) {
+    throw new ApiError(409, `Bạn đã có ca ${MODE_LABEL[workMode].toLowerCase()} hôm nay. Nếu giờ chưa đúng, dùng "Sửa giờ".`)
+  }
   return db.staffCheckIn.create({
     data: {
       staffId: staff.id,
       staffName: staff.name,
       discipline: staff.role === 'sales' ? 'sales' : 'florist',
       workDate,
+      workMode,
       timestamp: now,
       checkInAt: now,
-      locationLabel: 'Tại cửa hàng',
-      locationType: 'AT_OFFICE',
+      locationLabel: MODE_LABEL[workMode],
+      locationType: workMode === 'ONLINE' ? 'REMOTE' : 'AT_OFFICE',
       lat: 0,
       lng: 0,
       distanceFromOfficeKm: 0,
@@ -161,7 +179,7 @@ export async function checkOut(staffId: string, checkInId: string, now = new Dat
 export async function correctShift(
   actor: Staff,
   isManager: boolean,
-  input: { staffId?: unknown; workDate?: unknown; checkIn?: unknown; checkOut?: unknown; reason?: unknown },
+  input: { staffId?: unknown; workDate?: unknown; workMode?: unknown; checkIn?: unknown; checkOut?: unknown; reason?: unknown },
   now = new Date(),
 ) {
   const staffId = isManager && typeof input.staffId === 'string' && input.staffId ? input.staffId : actor.id
@@ -201,8 +219,19 @@ export async function correctShift(
 
   const staff = await db.user.findUnique({ where: { id: staffId }, select: { id: true, name: true, role: true } })
   if (!staff) throw new ApiError(404, 'Không tìm thấy nhân viên')
+  const workMode = readWorkMode(input.workMode, staff.role)
 
-  const existing = await db.staffCheckIn.findUnique({ where: { staffId_workDate: { staffId, workDate } } })
+  const existing = await db.staffCheckIn.findUnique({ where: { staffId_workDate_workMode: { staffId, workDate, workMode } } })
+  // The day's other shift (shop vs online) must not overlap this one.
+  const other = await db.staffCheckIn.findFirst({ where: { staffId, workDate, workMode: { not: workMode } } })
+  if (other) {
+    const otherIn = other.checkInAt ?? other.timestamp
+    const otherOut = other.checkOutAt ?? now
+    const thisOut = checkOutAt ?? now
+    if (checkInAt < otherOut && otherIn < thisOut) {
+      throw new ApiError(400, `Ca này trùng giờ với ca ${MODE_LABEL[other.workMode as WorkMode].toLowerCase()} cùng ngày`)
+    }
+  }
   const correction = {
     checkInAt,
     checkOutAt,
@@ -223,9 +252,10 @@ export async function correctShift(
           staffName: staff.name,
           discipline: staff.role === 'sales' ? 'sales' : 'florist',
           workDate,
+          workMode,
           timestamp: checkInAt,
-          locationLabel: 'Chấm công bù',
-          locationType: 'AT_OFFICE',
+          locationLabel: `Chấm công bù · ${MODE_LABEL[workMode]}`,
+          locationType: workMode === 'ONLINE' ? 'REMOTE' : 'AT_OFFICE',
           lat: 0,
           lng: 0,
           distanceFromOfficeKm: 0,
@@ -238,7 +268,7 @@ export async function correctShift(
       action: existing ? 'checkin.correct' : 'checkin.backfill',
       entity: 'checkin',
       entityId: saved.id,
-      summary: `${staff.name} ${workDate}: ${reason.slice(0, 120)}`,
+      summary: `${staff.name} ${workDate}${workMode === 'ONLINE' ? ' (online)' : ''}: ${reason.slice(0, 120)}`,
       changes: existing ? diff(existing, saved, ['checkInAt', 'checkOutAt', 'workingHours']) : null,
     },
   )

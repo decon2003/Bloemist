@@ -36,6 +36,16 @@ const hoursLabel = (hours?: number | null) => {
   return `${Math.floor(minutes / 60)}h${String(minutes % 60).padStart(2, '0')}`
 }
 
+/** "Online" for a sales shift worked from home. */
+function ModeBadge({ entry }: { entry?: StaffCheckIn }) {
+  if (entry?.workMode !== 'ONLINE') return null
+  return (
+    <span className="ml-2 inline-flex rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-xs font-semibold text-violet-700">
+      Online
+    </span>
+  )
+}
+
 function ShiftTag({ entry }: { entry: StaffCheckIn }) {
   const [label, tone] = entry.autoClosed
     ? ['Quên chấm ra – 0 giờ', 'bg-amber-50 text-amber-800 border-amber-200']
@@ -47,7 +57,15 @@ function ShiftTag({ entry }: { entry: StaffCheckIn }) {
   return <span className={cn('inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold', tone)}>{label}</span>
 }
 
-type CorrectionTarget = { staffId?: string; staffName?: string; workDate: string; entry?: StaffCheckIn }
+type CorrectionTarget = {
+  staffId?: string
+  staffName?: string
+  workDate: string
+  entry?: StaffCheckIn
+  /** Sales may enter an online (at-home) shift. */
+  canOnline?: boolean
+  mode?: 'SHOP' | 'ONLINE'
+}
 
 /** Enter or fix one shift's times. Staff: own shifts within CORRECTION_DAYS.
  *  Managers: anyone's (staff pre-selected from the row they clicked). */
@@ -73,6 +91,7 @@ function CorrectionModal({
   const [reason, setReason] = useState('')
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+  const [workMode, setWorkMode] = useState<'SHOP' | 'ONLINE'>(target.entry?.workMode ?? target.mode ?? 'SHOP')
 
   const save = async () => {
     setError('')
@@ -81,7 +100,7 @@ function CorrectionModal({
     if (!reason.trim()) return setError('Vui lòng ghi lý do')
     setSaving(true)
     try {
-      await onSave({ workDate, checkIn, checkOut: checkOut || null, reason: reason.trim(), staffId: target.staffId })
+      await onSave({ workDate, workMode, checkIn, checkOut: checkOut || null, reason: reason.trim(), staffId: target.staffId })
       onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Không lưu được')
@@ -98,6 +117,7 @@ function CorrectionModal({
           <h3 className="text-lg font-bold text-foreground">
             {target.entry ? 'Sửa giờ chấm công' : 'Chấm công bù'}
             {target.staffName ? ` · ${target.staffName}` : ''}
+            {target.entry?.workMode === 'ONLINE' ? ' · Online' : ''}
           </h3>
           <button type="button" onClick={onClose} aria-label="Đóng" className="text-muted-foreground hover:text-foreground">
             <X className="h-5 w-5" />
@@ -121,6 +141,15 @@ function CorrectionModal({
             className={inputClass}
           />
         </label>
+        {target.canOnline && !target.entry && (
+          <label className="block space-y-1 text-sm font-medium text-foreground">
+            <span>Hình thức</span>
+            <select value={workMode} onChange={(e) => setWorkMode(e.target.value as 'SHOP' | 'ONLINE')} className={inputClass}>
+              <option value="SHOP">Tại cửa hàng</option>
+              <option value="ONLINE">Online (tại nhà)</option>
+            </select>
+          </label>
+        )}
         <div className="grid grid-cols-2 gap-3">
           <label className="block space-y-1 text-sm font-medium text-foreground">
             <span>Giờ vào</span>
@@ -207,11 +236,18 @@ export default function CheckinPage() {
 
   // ---------------- Manager view ----------------
   if (isAdmin) {
-    const dayEntries = new Map(checkins.filter((entry) => entry.workDate === selectedDate).map((entry) => [entry.staffId, entry]))
+    const dayList = checkins.filter((entry) => entry.workDate === selectedDate)
     const activeStaff = (users as User[]).filter((u) => u.status === 'active')
+    // One row per shift (a sales day may have a shop and an online shift).
     const rows = activeStaff
-      .map((u) => ({ staff: u, entry: dayEntries.get(u.id) }))
+      .flatMap((u) => {
+        const shifts = dayList
+          .filter((entry) => entry.staffId === u.id)
+          .sort((a, b) => (a.checkInAt ?? a.timestamp).localeCompare(b.checkInAt ?? b.timestamp))
+        return shifts.length ? shifts.map((entry) => ({ staff: u, entry })) : [{ staff: u, entry: undefined as StaffCheckIn | undefined }]
+      })
       .sort((a, b) => Number(Boolean(b.entry)) - Number(Boolean(a.entry)) || a.staff.name.localeCompare(b.staff.name, 'vi'))
+    const hasOnline = (staffId: string) => dayList.some((entry) => entry.staffId === staffId && entry.workMode === 'ONLINE')
     const needsFix = checkins.filter((entry) => entry.autoClosed)
 
     return (
@@ -255,8 +291,11 @@ export default function CheckinPage() {
             </thead>
             <tbody className="divide-y divide-border">
               {rows.map(({ staff, entry }) => (
-                <tr key={staff.id}>
-                  <td className="py-3 pr-4 font-medium text-foreground">{staff.name}</td>
+                <tr key={entry?.id ?? staff.id}>
+                  <td className="py-3 pr-4 font-medium text-foreground">
+                    {staff.name}
+                    <ModeBadge entry={entry} />
+                  </td>
                   <td className="px-4 py-3 text-muted-foreground">{vnTime(entry?.checkInAt) || '—'}</td>
                   <td className="px-4 py-3 text-muted-foreground">{vnTime(entry?.checkOutAt) || '—'}</td>
                   <td className="px-4 py-3 text-muted-foreground">{hoursLabel(entry?.workingHours)}</td>
@@ -277,12 +316,21 @@ export default function CheckinPage() {
                   <td className="whitespace-nowrap px-4 py-3 text-right">
                     <button
                       type="button"
-                      onClick={() => setCorrecting({ staffId: staff.id, staffName: staff.name, workDate: selectedDate, entry })}
+                      onClick={() => setCorrecting({ staffId: staff.id, staffName: staff.name, workDate: selectedDate, entry, canOnline: staff.role === 'sales' })}
                       className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold hover:bg-muted"
                     >
                       {entry ? <Pencil className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
                       {entry ? 'Sửa' : 'Thêm'}
                     </button>
+                    {staff.role === 'sales' && entry && entry.workMode !== 'ONLINE' && !hasOnline(staff.id) && (
+                      <button
+                        type="button"
+                        onClick={() => setCorrecting({ staffId: staff.id, staffName: staff.name, workDate: selectedDate, canOnline: true, mode: 'ONLINE' })}
+                        className="ml-2 inline-flex items-center gap-1 rounded-lg border border-violet-200 px-2 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-50"
+                      >
+                        <Plus className="h-3.5 w-3.5" /> Ca online
+                      </button>
+                    )}
                     {entry && (
                       <button
                         type="button"
@@ -329,7 +377,16 @@ export default function CheckinPage() {
         !entry.checkOutAt &&
         Date.now() - new Date(entry.checkInAt ?? entry.timestamp).getTime() <= MAX_SHIFT_HOURS * 3_600_000,
     ) ?? null
-  const todayEntry = openEntry ?? recent.find((entry) => entry.workDate === today) ?? null
+  const isSales = user?.role === 'sales'
+  // Today's shifts: one at the shop and, for sales, one online (from home).
+  const todayEntries = recent
+    .filter((entry) => entry.workDate === today || entry.id === openEntry?.id)
+    .sort((a, b) => (a.checkInAt ?? a.timestamp).localeCompare(b.checkInAt ?? b.timestamp))
+  const todayEntry = openEntry ?? todayEntries[todayEntries.length - 1] ?? null
+  const hasShopToday = recent.some((entry) => entry.workDate === today && (entry.workMode ?? 'SHOP') === 'SHOP')
+  const hasOnlineToday = recent.some((entry) => entry.workDate === today && entry.workMode === 'ONLINE')
+  const canStartShop = !openEntry && !hasShopToday
+  const canStartOnline = isSales && !openEntry && !hasOnlineToday
   const earliestFixable = shiftDay(today, -CORRECTION_DAYS)
   const toFix = recent.filter((entry) => entry.autoClosed && entry.workDate >= earliestFixable)
   const monthEntries = [...checkins].sort((a, b) => b.workDate.localeCompare(a.workDate))
@@ -382,26 +439,38 @@ export default function CheckinPage() {
             {todayEntry ? <CheckCircle2 className="h-6 w-6 text-green-600" /> : <Clock className="h-6 w-6 text-muted-foreground" />}
             {!todayEntry
               ? 'Chưa chấm công hôm nay'
-              : todayEntry.checkOutAt
-                ? 'Đã xong ca hôm nay'
-                : todayEntry.workDate !== today
-                  ? `Đang trong ca (từ ${dayLabel(todayEntry.workDate)})`
-                  : 'Đang trong ca'}
+              : openEntry
+                ? `Đang trong ca${openEntry.workMode === 'ONLINE' ? ' online' : ''}${openEntry.workDate !== today ? ` (từ ${dayLabel(openEntry.workDate)})` : ''}`
+                : 'Đã chấm công hôm nay'}
           </h2>
-          {!todayEntry ? (
-            <button
-              type="button"
-              onClick={() => run(() => createCheckIn({}), 'Đã chấm công vào')}
-              disabled={isSubmitting}
-              className="h-12 rounded-full bg-primary px-8 text-base font-semibold text-primary-foreground shadow-lg hover:bg-primary/90 disabled:opacity-60"
-            >
-              {isSubmitting ? '...' : 'Chấm công vào'}
-            </button>
-          ) : !todayEntry.checkOutAt ? (
+          {!openEntry && (canStartShop || canStartOnline) ? (
+            <div className="flex flex-wrap gap-2">
+              {canStartShop && (
+                <button
+                  type="button"
+                  onClick={() => run(() => createCheckIn({ workMode: 'SHOP' }), 'Đã chấm công vào')}
+                  disabled={isSubmitting}
+                  className="h-12 rounded-full bg-primary px-8 text-base font-semibold text-primary-foreground shadow-lg hover:bg-primary/90 disabled:opacity-60"
+                >
+                  {isSubmitting ? '...' : isSales ? 'Chấm công tại cửa hàng' : 'Chấm công vào'}
+                </button>
+              )}
+              {canStartOnline && (
+                <button
+                  type="button"
+                  onClick={() => run(() => createCheckIn({ workMode: 'ONLINE' }), 'Đã chấm công online')}
+                  disabled={isSubmitting}
+                  className="h-12 rounded-full border-2 border-violet-500 bg-white px-6 text-base font-semibold text-violet-700 shadow-sm hover:bg-violet-50 disabled:opacity-60"
+                >
+                  {isSubmitting ? '...' : 'Chấm công online (tại nhà)'}
+                </button>
+              )}
+            </div>
+          ) : openEntry ? (
             <button
               type="button"
               onClick={() => {
-                if (window.confirm('Chấm công ra, kết thúc ca làm?')) run(() => checkOut(todayEntry.id), 'Đã chấm công ra')
+                if (window.confirm('Chấm công ra, kết thúc ca làm?')) run(() => checkOut(openEntry.id), 'Đã chấm công ra')
               }}
               disabled={isSubmitting}
               className="h-12 rounded-full bg-amber-500 px-8 text-base font-semibold text-white shadow-lg hover:bg-amber-600 disabled:opacity-60"
@@ -411,22 +480,24 @@ export default function CheckinPage() {
           ) : null}
         </div>
 
-        {todayEntry && (
-          <div className="grid grid-cols-3 gap-4 border-t border-border pt-4 text-sm">
+        {todayEntries.map((entry) => (
+          <div key={entry.id} className="grid grid-cols-3 gap-4 border-t border-border pt-4 text-sm">
             <div>
-              <p className="text-xs uppercase text-muted-foreground">Vào</p>
-              <p className="text-lg font-semibold">{vnTime(todayEntry.checkInAt)}</p>
+              <p className="text-xs uppercase text-muted-foreground">
+                Vào{entry.workMode === 'ONLINE' ? ' · online' : todayEntries.length > 1 ? ' · tại cửa hàng' : ''}
+              </p>
+              <p className="text-lg font-semibold">{vnTime(entry.checkInAt)}</p>
             </div>
             <div>
               <p className="text-xs uppercase text-muted-foreground">Ra</p>
-              <p className="text-lg font-semibold">{vnTime(todayEntry.checkOutAt) || '--:--'}</p>
+              <p className="text-lg font-semibold">{vnTime(entry.checkOutAt) || '--:--'}</p>
             </div>
             <div>
               <p className="text-xs uppercase text-muted-foreground">Số giờ</p>
-              <p className="text-lg font-semibold">{hoursLabel(todayEntry.workingHours)}</p>
+              <p className="text-lg font-semibold">{hoursLabel(entry.workingHours)}</p>
             </div>
           </div>
-        )}
+        ))}
 
         {actionError && <p className="text-sm text-red-700">{actionError}</p>}
         {actionMessage && !actionError && <p className="text-sm font-medium text-green-700">{actionMessage}</p>}
@@ -443,7 +514,7 @@ export default function CheckinPage() {
           )}
           <button
             type="button"
-            onClick={() => setCorrecting({ workDate: todayEntry ? shiftDay(today, -1) : today })}
+            onClick={() => setCorrecting({ workDate: todayEntry ? shiftDay(today, -1) : today, canOnline: isSales })}
             className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-2 text-sm hover:bg-muted"
           >
             <Plus className="h-4 w-4" /> Quên chấm công? Chấm công bù
@@ -471,7 +542,10 @@ export default function CheckinPage() {
               <tbody className="divide-y divide-border">
                 {monthEntries.map((entry) => (
                   <tr key={entry.id}>
-                    <td className="py-3 pr-4 text-foreground">{dayLabel(entry.workDate)}</td>
+                    <td className="whitespace-nowrap py-3 pr-4 text-foreground">
+                      {dayLabel(entry.workDate)}
+                      <ModeBadge entry={entry} />
+                    </td>
                     <td className="px-4 py-3 text-muted-foreground">{vnTime(entry.checkInAt) || '—'}</td>
                     <td className="px-4 py-3 text-muted-foreground">{vnTime(entry.checkOutAt) || '—'}</td>
                     <td className="px-4 py-3 text-muted-foreground">{hoursLabel(entry.workingHours)}</td>

@@ -204,6 +204,8 @@ export interface StaffCheckIn {
   workDate: string
   /** Closed at closing time by the nightly job because nobody checked out. */
   autoClosed?: boolean
+  /** SHOP, or ONLINE = sales working from home (own hourly rate, no overtime). */
+  workMode?: 'SHOP' | 'ONLINE'
   correctedAt?: string | null
   correctedByName?: string | null
   correctionReason?: string | null
@@ -227,6 +229,8 @@ export interface PayrollShift {
   corrected?: boolean
   /** A public holiday (Settings). */
   holiday?: boolean
+  /** ONLINE = sales working from home (online rate, no overtime). */
+  mode?: 'SHOP' | 'ONLINE'
 }
 
 export type CommissionKind = 'MAKER' | 'SALES'
@@ -259,6 +263,8 @@ export interface PayrollLine {
   salesRate: number
   /** Hourly rate on public holidays; null = the normal hourly rate. */
   holidayHourlyRate?: number | null
+  /** Sales: hourly rate for online shifts; null = the normal hourly rate. */
+  onlineHourlyRate?: number | null
   /** MONTHLY: paid days off per month. */
   daysOffPerMonth?: number
   /** This month's rates were set by hand (a refresh keeps them). */
@@ -274,6 +280,8 @@ export interface PayrollLine {
     rushHours: number
     /** Regular hours on public holidays (hourly staff). */
     holidayHours: number
+    /** Hours of online (at-home) shifts. */
+    onlineHours: number
     pendingOtDays: number
     /** Shifts nobody checked out of (0 hours until corrected). */
     autoClosedDays: number
@@ -319,6 +327,7 @@ export interface PayrollLineUpdate {
   makerRate?: number
   salesRate?: number
   holidayHourlyRate?: number | null
+  onlineHourlyRate?: number | null
   daysOffPerMonth?: number
   shiftDecisions?: { date: string; otDecision: OtDecision }[]
   commissionChanges?: { key: string; included?: boolean; rate?: number }[]
@@ -328,6 +337,8 @@ export interface PayrollLineUpdate {
 
 export interface ShiftCorrectionInput {
   workDate: string
+  /** Sales only: an online (at-home) shift. */
+  workMode?: 'SHOP' | 'ONLINE'
   /** HH:mm, Vietnam time */
   checkIn: string
   checkOut?: string | null
@@ -378,6 +389,8 @@ export interface User {
   salesCommissionRate?: number
   /** Hourly rate on public holidays; null = the normal hourly rate. */
   holidayHourlyRate?: number | null
+  /** Sales: hourly rate for online (at-home) shifts; null = the normal hourly rate. */
+  onlineHourlyRate?: number | null
   /** MONTHLY: paid days off per month (base is paid per day worked). */
   daysOffPerMonth?: number
   mustChangePassword?: boolean

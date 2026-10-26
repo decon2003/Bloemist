@@ -37,6 +37,7 @@ export const PRIVILEGED_USER_SELECT = {
   commissionRate: true,
   salesCommissionRate: true,
   holidayHourlyRate: true,
+  onlineHourlyRate: true,
   daysOffPerMonth: true,
 } as const
 

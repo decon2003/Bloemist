@@ -14,6 +14,8 @@ import { parseVnMonth, vnDateKey } from './vn-time'
 //   EXCLUDE. Less than 15 minutes at either end of a shift is ignored;
 // - a "ca gấp" (RUSH) day is paid entirely as overtime;
 // - a shift nobody checked out of counts 0 hours until it is corrected;
+// - an ONLINE shift (sales working from home) is paid at the online hourly
+//   rate for all its hours: no overtime, no holiday rate;
 // - MONTHLY pay = base salary x days worked / (days in month - paid days off),
 //   at most the full salary;
 //   HOURLY pay = hourly rate x regular hours, at the holiday rate on public
@@ -44,7 +46,12 @@ export type ShiftItem = {
   corrected?: boolean
   /** A public holiday from Settings. */
   holiday?: boolean
+  /** ONLINE = sales working from home; missing on older drafts = SHOP. */
+  mode?: 'SHOP' | 'ONLINE'
 }
+
+/** Decisions and previous values are matched per day and mode. */
+export const shiftKey = (s: Pick<ShiftItem, 'date' | 'mode'>) => `${s.date}:${s.mode ?? 'SHOP'}`
 
 export type CommissionKind = 'MAKER' | 'SALES'
 export type CommissionItem = {
@@ -61,7 +68,7 @@ export type CommissionItem = {
 export type Adjustment = { label: string; amount: number }
 
 type LineRow = Prisma.PayrollLineGetPayload<object>
-type LineRates = Pick<LineRow, 'payType' | 'baseSalary' | 'hourlyRate' | 'makerRate' | 'salesRate' | 'holidayHourlyRate' | 'daysOffPerMonth'>
+type LineRates = Pick<LineRow, 'payType' | 'baseSalary' | 'hourlyRate' | 'makerRate' | 'salesRate' | 'holidayHourlyRate' | 'onlineHourlyRate' | 'daysOffPerMonth'>
 
 const round2 = (n: number) => Math.round(n * 100) / 100
 const hoursBetween = (a: Date, b: Date) => Math.max(0, (b.getTime() - a.getTime()) / 3_600_000)
@@ -76,7 +83,7 @@ export const daysInMonth = (monthKey: string) => {
  *  overtime is counted as OT in the estimate until a manager decides. */
 export function computeLine(
   line: Pick<LineRates, 'payType' | 'baseSalary' | 'hourlyRate'> &
-    Partial<Pick<LineRates, 'holidayHourlyRate' | 'daysOffPerMonth'>> & {
+    Partial<Pick<LineRates, 'holidayHourlyRate' | 'onlineHourlyRate' | 'daysOffPerMonth'>> & {
       shifts: unknown
       commissions: unknown
       adjustments: unknown
@@ -96,10 +103,19 @@ export function computeLine(
   let otHours = 0
   let rushHours = 0
   let holidayHours = 0
+  let onlineHours = 0
   let hourlyPay = 0
   let otPay = 0
-  let daysWorked = 0
+  const workedDays = new Set<string>()
   for (const s of shifts) {
+    if (s.mode === 'ONLINE') {
+      // Every online hour at the online rate: no overtime, no holiday rate.
+      onlineHours += s.hours
+      regularHours += s.hours
+      hourlyPay += s.hours * (line.onlineHourlyRate ?? line.hourlyRate)
+      if (s.hours > 0) workedDays.add(s.date)
+      continue
+    }
     const rate = rateFor(s)
     if (s.otDecision === 'RUSH') {
       rushHours += s.hours
@@ -110,11 +126,12 @@ export function computeLine(
     const ot = s.otDecision === 'OT' || s.otDecision === 'PENDING' ? s.otHours : 0
     regularHours += regular
     otHours += ot
-    if (s.holiday && !monthly) holidayHours += regular
+    if (s.holiday && !monthly && line.holidayHourlyRate != null) holidayHours += regular
     hourlyPay += regular * rate
     otPay += ot * rate * otMultiplier
-    if (s.hours > 0) daysWorked += 1
+    if (s.hours > 0) workedDays.add(s.date)
   }
+  const daysWorked = workedDays.size
 
   const standardDays = Math.max(1, daysInMonth(monthKey) - (line.daysOffPerMonth ?? 0))
   // Working more days than the standard does not pay more than the full salary.
@@ -133,6 +150,7 @@ export function computeLine(
     otHours: round2(otHours),
     rushHours: round2(rushHours),
     holidayHours: round2(holidayHours),
+    onlineHours: round2(onlineHours),
     pendingOtDays: shifts.filter((s) => s.otDecision === 'PENDING').length,
     autoClosedDays: shifts.filter((s) => s.autoClosed).length,
     daysWorked,
@@ -181,7 +199,11 @@ async function collectFacts(month: { key: string; start: Date; end: Date }) {
     let hours = 0
     let regular = 0
     let ot = 0
-    if (!s.autoClosed) {
+    const online = s.workMode === 'ONLINE'
+    if (!s.autoClosed && online) {
+      hours = round2(hoursBetween(checkIn, checkOut))
+      regular = hours
+    } else if (!s.autoClosed) {
       const open = atVnTime(s.workDate, settings.openTime)
       const close = atVnTime(s.workDate, settings.closeTime)
       hours = round2(hoursBetween(checkIn, checkOut))
@@ -203,6 +225,7 @@ async function collectFacts(month: { key: string; start: Date; end: Date }) {
       autoClosed: s.autoClosed,
       corrected: s.correctedAt !== null,
       holiday: holidays.has(s.workDate),
+      mode: online ? 'ONLINE' : 'SHOP',
     })
     shiftsByUser.set(s.staffId, list)
   }
@@ -265,7 +288,9 @@ const profileRates = (user: ProfileUser) => ({
   hourlyRate: user.hourlyRate,
   makerRate: user.commissionRate ?? 0,
   salesRate: user.salesCommissionRate,
-  holidayHourlyRate: user.holidayHourlyRate,
+  // Sales get no holiday rate.
+  holidayHourlyRate: user.role === 'sales' ? null : user.holidayHourlyRate,
+  onlineHourlyRate: user.role === 'sales' ? user.onlineHourlyRate : null,
   daysOffPerMonth: user.daysOffPerMonth,
 })
 
@@ -300,14 +325,15 @@ export async function generatePayroll(monthKey: string, actor: AuditActor) {
           makerRate: before.makerRate,
           salesRate: before.salesRate,
           holidayHourlyRate: before.holidayHourlyRate,
+          onlineHourlyRate: before.onlineHourlyRate,
           daysOffPerMonth: before.daysOffPerMonth,
         }
       : profileRates(user)
 
     // A decision is kept only for the same shift times: an edited shift is reviewed again.
-    const oldShifts = new Map(((before?.shifts as ShiftItem[] | undefined) ?? []).map((s) => [s.date, s]))
+    const oldShifts = new Map(((before?.shifts as ShiftItem[] | undefined) ?? []).map((s) => [shiftKey(s), s]))
     const shifts = (shiftsByUser.get(user.id) ?? []).map((s) => {
-      const old = oldShifts.get(s.date)
+      const old = oldShifts.get(shiftKey(s))
       if (!old || old.checkIn !== s.checkIn || old.checkOut !== s.checkOut) return s
       if (old.otDecision === 'RUSH') return { ...s, otDecision: old.otDecision }
       if (s.otHours > 0 && ['OT', 'REGULAR', 'EXCLUDE'].includes(old.otDecision)) return { ...s, otDecision: old.otDecision }
@@ -487,6 +513,7 @@ export async function updatePayrollLine(lineId: string, body: Record<string, unk
     makerRate: line.makerRate,
     salesRate: line.salesRate,
     holidayHourlyRate: line.holidayHourlyRate,
+    onlineHourlyRate: line.onlineHourlyRate,
     daysOffPerMonth: line.daysOffPerMonth,
     ratesOverridden: line.ratesOverridden,
     shifts: line.shifts as ShiftItem[],
@@ -504,6 +531,9 @@ export async function updatePayrollLine(lineId: string, body: Record<string, unk
   if (body.holidayHourlyRate !== undefined) {
     next.holidayHourlyRate = body.holidayHourlyRate === null || body.holidayHourlyRate === '' ? null : asMoney(body.holidayHourlyRate, 'Đơn giá giờ ngày lễ')
   }
+  if (body.onlineHourlyRate !== undefined) {
+    next.onlineHourlyRate = body.onlineHourlyRate === null || body.onlineHourlyRate === '' ? null : asMoney(body.onlineHourlyRate, 'Đơn giá giờ online')
+  }
   if (body.daysOffPerMonth !== undefined) {
     const n = Number(body.daysOffPerMonth)
     if (!Number.isInteger(n) || n < 0 || n > 15) throw new ApiError(400, 'Số ngày nghỉ phải từ 0 đến 15')
@@ -518,7 +548,7 @@ export async function updatePayrollLine(lineId: string, body: Record<string, unk
     next.commissions = next.commissions.map((c) => (c.kind === kind ? { ...c, rate } : c))
   }
   // Rates set by hand for this month are kept on refresh instead of re-reading the profile.
-  if (['payType', 'baseSalary', 'hourlyRate', 'holidayHourlyRate', 'daysOffPerMonth', 'makerRate', 'salesRate'].some((f) => body[f] !== undefined)) {
+  if (['payType', 'baseSalary', 'hourlyRate', 'holidayHourlyRate', 'onlineHourlyRate', 'daysOffPerMonth', 'makerRate', 'salesRate'].some((f) => body[f] !== undefined)) {
     next.ratesOverridden = true
   }
 
@@ -529,7 +559,8 @@ export async function updatePayrollLine(lineId: string, body: Record<string, unk
       decisions.set(d.date, d.otDecision as OtDecision)
     }
     next.shifts = next.shifts.map((s) => {
-      const d = decisions.get(s.date)
+      // Online shifts have no overtime decisions.
+      const d = s.mode === 'ONLINE' ? undefined : decisions.get(s.date)
       if (!d || d === s.otDecision) return s
       const hasOt = s.otHours > 0.01
       const ok =

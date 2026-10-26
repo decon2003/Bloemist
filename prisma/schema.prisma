@@ -31,6 +31,7 @@ model User {
   hourlyRate          Int            @default(0) // also the base for overtime pay
   commissionRate      Float?         @default(0) // % of the products this person made
   salesCommissionRate Float          @default(0) // % of orders this person sold
+  onlineHourlyRate    Int? // sales: hourly rate for online (at-home) shifts; null = hourlyRate
   holidayHourlyRate   Int? // hourly rate on public holidays; null = hourlyRate
   daysOffPerMonth     Int            @default(4) // MONTHLY: paid days off; base = salary x days worked / (days in month - this)
 
@@ -178,9 +179,12 @@ model StaffCheckIn {
   correctedByName      String?
   correctionReason     String?
 
+  // SHOP (at the shop) or ONLINE (sales working from home, own hourly rate, no OT).
+  workMode String @default("SHOP")
+
   staff User @relation(fields: [staffId], references: [id])
 
-  @@unique([staffId, workDate])
+  @@unique([staffId, workDate, workMode])
 }
 
 // Shop-wide settings (single row, id = 1).
@@ -265,6 +269,7 @@ model PayrollLine {
   hourlyRate        Int     @default(0)
   makerRate         Float   @default(0)
   salesRate         Float   @default(0)
+  onlineHourlyRate  Int?
   holidayHourlyRate Int?
   daysOffPerMonth   Int     @default(4)
   // Set when a manager changed this month's rates; otherwise a refresh re-copies the pay profile.

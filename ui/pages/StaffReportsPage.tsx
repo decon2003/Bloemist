@@ -40,6 +40,8 @@ function SalaryConfigModal({ user, onClose, onSave }: { user: User, onClose: () 
   const [makerRate, setMakerRate] = useState(String(user.commissionRate ?? 0))
   const [salesRate, setSalesRate] = useState(String(user.salesCommissionRate ?? 0))
   const [holidayRate, setHolidayRate] = useState(user.holidayHourlyRate == null ? '' : String(user.holidayHourlyRate))
+  const [onlineRate, setOnlineRate] = useState(user.onlineHourlyRate == null ? '' : String(user.onlineHourlyRate))
+  const isSales = user.role === 'sales'
   const [daysOff, setDaysOff] = useState(String(user.daysOffPerMonth ?? 4))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -54,7 +56,8 @@ function SalaryConfigModal({ user, onClose, onSave }: { user: User, onClose: () 
         hourlyRate: Number(hourly.replace(/\D/g, '') || 0),
         commissionRate: Number(makerRate),
         salesCommissionRate: Number(salesRate),
-        holidayHourlyRate: holidayRate.trim() ? Number(holidayRate.replace(/\D/g, '') || 0) : null,
+        holidayHourlyRate: !isSales && holidayRate.trim() ? Number(holidayRate.replace(/\D/g, '') || 0) : null,
+        onlineHourlyRate: isSales && onlineRate.trim() ? Number(onlineRate.replace(/\D/g, '') || 0) : null,
         daysOffPerMonth: Number(daysOff),
       })
       onClose()
@@ -99,20 +102,34 @@ function SalaryConfigModal({ user, onClose, onSave }: { user: User, onClose: () 
             Ngày nghỉ được hưởng / tháng
             <input type="number" min={0} max={15} value={daysOff} disabled={payType !== 'MONTHLY'} onChange={(e) => setDaysOff(e.target.value)} className={field} />
           </label>
-          <label className="block text-sm font-medium">
-            Đơn giá giờ ngày lễ
-            <input
-              value={formatCurrencyInput(holidayRate)}
-              disabled={payType !== 'HOURLY'}
-              placeholder="Như ngày thường"
-              onChange={(e) => setHolidayRate(e.target.value.replace(/\D/g, ''))}
-              className={field}
-            />
-          </label>
+          {isSales ? (
+            <label className="block text-sm font-medium">
+              Đơn giá giờ online (tại nhà)
+              <input
+                value={formatCurrencyInput(onlineRate)}
+                disabled={payType !== 'HOURLY'}
+                placeholder="Như tại cửa hàng"
+                onChange={(e) => setOnlineRate(e.target.value.replace(/\D/g, ''))}
+                className={field}
+              />
+            </label>
+          ) : (
+            <label className="block text-sm font-medium">
+              Đơn giá giờ ngày lễ
+              <input
+                value={formatCurrencyInput(holidayRate)}
+                disabled={payType !== 'HOURLY'}
+                placeholder="Như ngày thường"
+                onChange={(e) => setHolidayRate(e.target.value.replace(/\D/g, ''))}
+                className={field}
+              />
+            </label>
+          )}
         </div>
         <p className="text-xs text-muted-foreground">
           Lương cứng chia theo ngày công: lương × số ngày đi làm ÷ (số ngày trong tháng − ngày nghỉ được hưởng).
-          Ngày lễ khai báo ở Cài đặt; người lương cứng ngày lễ tính như ngày thường.
+          Ngày lễ khai báo ở Cài đặt; người lương cứng và sale ngày lễ tính như ngày thường. Ca online của sale tính đơn giá
+          online cho mọi giờ, không tính OT.
         </p>
         <div className="grid grid-cols-2 gap-3">
           {([

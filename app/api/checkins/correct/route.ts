@@ -4,7 +4,7 @@ import { handleRouteError, readJsonBody } from '@/lib/server/route-helpers'
 import { isManager, requireUser } from '@/lib/server/session'
 import { correctShift } from '@/lib/server/attendance'
 
-// Enter or fix a shift: { workDate: 'YYYY-MM-DD', checkIn: 'HH:mm', checkOut?: 'HH:mm', reason, staffId? }.
+// Enter or fix a shift: { workDate: 'YYYY-MM-DD', workMode?: 'SHOP' | 'ONLINE', checkIn: 'HH:mm', checkOut?: 'HH:mm', reason, staffId? }.
 // Staff: own shifts, last few days. Managers: anyone (staffId), longer window.
 export async function POST(request: Request) {
     try {

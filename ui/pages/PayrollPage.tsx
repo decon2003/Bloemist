@@ -80,10 +80,12 @@ function LineEditor({
   const [baseSalary, setBaseSalary] = useState(String(line.baseSalary))
   const [hourlyRate, setHourlyRate] = useState(String(line.hourlyRate))
   const [holidayRate, setHolidayRate] = useState(line.holidayHourlyRate == null ? '' : String(line.holidayHourlyRate))
+  const [onlineRate, setOnlineRate] = useState(line.onlineHourlyRate == null ? '' : String(line.onlineHourlyRate))
+  const isSales = line.role === 'sales'
   const [daysOff, setDaysOff] = useState(String(line.daysOffPerMonth ?? 4))
   const [rates, setRates] = useState({ makerRate: line.makerRate, salesRate: line.salesRate })
   const [decisions, setDecisions] = useState<Record<string, OtDecision>>(
-    Object.fromEntries(line.shifts.map((s) => [s.date, s.otDecision])),
+    Object.fromEntries(line.shifts.filter((s) => s.mode !== 'ONLINE').map((s) => [s.date, s.otDecision])),
   )
   const [items, setItems] = useState<PayrollCommission[]>(line.commissions)
   const [adjustments, setAdjustments] = useState<AdjustmentDraft[]>(
@@ -105,7 +107,7 @@ function LineEditor({
     setSaving(true)
     const input: PayrollLineUpdate = {
       shiftDecisions: line.shifts
-        .filter((s) => decisions[s.date] !== s.otDecision)
+        .filter((s) => s.mode !== 'ONLINE' && decisions[s.date] !== s.otDecision)
         .map((s) => ({ date: s.date, otDecision: decisions[s.date] })),
       adjustments: adjustments
         .filter((a) => a.label.trim())
@@ -119,6 +121,8 @@ function LineEditor({
     if (digits(hourlyRate) !== line.hourlyRate) input.hourlyRate = digits(hourlyRate)
     const holiday = holidayRate.trim() ? digits(holidayRate) : null
     if (holiday !== (line.holidayHourlyRate ?? null)) input.holidayHourlyRate = holiday
+    const online = onlineRate.trim() ? digits(onlineRate) : null
+    if (online !== (line.onlineHourlyRate ?? null)) input.onlineHourlyRate = online
     if (Number(daysOff) !== (line.daysOffPerMonth ?? 4)) input.daysOffPerMonth = Number(daysOff)
     // A changed line rate resets every item of that kind; otherwise send per-item edits.
     if (ratesChanged) Object.assign(input, rates)
@@ -169,6 +173,11 @@ function LineEditor({
                   <input type="number" min={0} max={15} value={daysOff} disabled={locked} onChange={(e) => setDaysOff(e.target.value)} className={inputClass} />
                 </label>
               </>
+            ) : isSales ? (
+              <label className="space-y-1 text-sm">
+                <span className="text-muted-foreground">Đơn giá giờ online (₫, trống = như tại cửa hàng)</span>
+                <input value={onlineRate} disabled={locked} inputMode="numeric" onChange={(e) => setOnlineRate(e.target.value)} className={inputClass} />
+              </label>
             ) : (
               <label className="space-y-1 text-sm">
                 <span className="text-muted-foreground">Đơn giá giờ ngày lễ (₫, trống = như ngày thường)</span>
@@ -242,9 +251,13 @@ function LineEditor({
                 </thead>
                 <tbody className="divide-y divide-border">
                   {line.shifts.map((s) => (
-                    <tr key={s.date} className={cn(decisions[s.date] === 'PENDING' && 'bg-amber-50', s.autoClosed && 'bg-red-50/60')}>
+                    <tr
+                      key={`${s.date}:${s.mode ?? 'SHOP'}`}
+                      className={cn(s.mode !== 'ONLINE' && decisions[s.date] === 'PENDING' && 'bg-amber-50', s.autoClosed && 'bg-red-50/60')}
+                    >
                       <td className="py-2 pr-3 whitespace-nowrap">
                         {dayLabel(s.date)}
+                        {s.mode === 'ONLINE' && <span className="ml-1 rounded bg-violet-100 px-1 text-xs text-violet-800">Online</span>}
                         {s.holiday && <span className="ml-1 rounded bg-violet-100 px-1 text-xs text-violet-800">Lễ</span>}
                         {s.corrected && <span className="ml-1 rounded bg-sky-100 px-1 text-xs text-sky-800">Sửa tay</span>}
                       </td>
@@ -256,6 +269,8 @@ function LineEditor({
                       <td className="px-3 py-2">
                         {s.autoClosed ? (
                           <span className="text-xs font-medium text-red-700">Quên chấm ra – 0 giờ</span>
+                        ) : s.mode === 'ONLINE' ? (
+                          <span className="text-xs text-muted-foreground">Giờ online, không tính OT</span>
                         ) : (
                           <select
                             value={decisions[s.date]}
@@ -278,7 +293,8 @@ function LineEditor({
           <p className="text-xs text-muted-foreground">
             {hours(line.totals.regularHours)} giờ thường, {hours(line.totals.otHours)} OT
             {line.totals.rushHours > 0 ? `, ${hours(line.totals.rushHours)} ca gấp` : ''}
-            {line.totals.holidayHours > 0 ? `, ${hours(line.totals.holidayHours)} ngày lễ` : ''}. Lệch dưới 15 phút ngoài khung được bỏ qua;
+            {line.totals.holidayHours > 0 ? `, ${hours(line.totals.holidayHours)} ngày lễ` : ''}
+            {line.totals.onlineHours > 0 ? ` (trong đó ${hours(line.totals.onlineHours)} online)` : ''}. Lệch dưới 15 phút ngoài khung được bỏ qua;
             ngày chờ duyệt tạm tính như OT.
           </p>
         </section>

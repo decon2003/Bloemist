@@ -1,0 +1,14 @@
+# Never upload local secrets or tooling when deploying with the Vercel CLI.
+.env
+.env.*
+!.env.example
+node_modules
+.next
+_bmad
+_bmad-output
+design-artifacts
+.claude
+*.log
+output*.txt
+server_log.txt
+tsconfig.tsbuildinfo

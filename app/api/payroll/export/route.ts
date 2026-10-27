@@ -9,7 +9,7 @@ export async function GET(request: Request) {
     try {
         await requireUser(request, MANAGER_ROLES)
         const month = parseVnMonth(new URL(request.url).searchParams.get('month'))
-        if (!month) throw new ApiError(400, 'month must be YYYY-MM')
+        if (!month) throw new ApiError(400, 'Tháng không hợp lệ')
         const csv = await exportPayrollCsv(month.key)
         return new Response(csv, {
             headers: {

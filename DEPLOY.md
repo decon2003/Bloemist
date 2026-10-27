@@ -5,7 +5,7 @@
 | | Devtest (hiện có) | Production (sẽ dựng) |
 |---|---|---|
 | Mục đích | Thử nghiệm, được sửa hoặc xoá dữ liệu | Dữ liệu thật của cửa hàng |
-| Domain | `devtest.bloemistflorals.com` (chuyển từ `noibo`, xem [mục 3](#3-chuyển-devtest-sang-domain-mới)) | `noibo.bloemistflorals.com` |
+| Domain | `devtest.bloemistflorals.com` (từ 27/10/2026, xem [mục 3](#3-chuyển-devtest-sang-domain-mới)) | `noibo.bloemistflorals.com` (gắn khi dựng production) |
 | Vercel project | project hiện tại | project mới, cùng repo |
 | Neon | project `bloemist` (Singapore) | project mới, Singapore |
 | R2 bucket | `bloemist-photos` | bucket mới, token mới |
@@ -80,15 +80,17 @@ Migration tự chạy khi build production (`scripts/migrate-if-production.mjs`,
 
 ## 3. Chuyển devtest sang domain mới
 
-Code không gắn cứng domain nào, nên chỉ cần thao tác trên Vercel và DNS.
+**Đã làm ngày 27/10/2026.** Devtest chạy ở `https://devtest.bloemistflorals.com`. Code không gắn cứng domain nào, nên chỉ cần thao tác trên Vercel và DNS.
 
-1. **Vercel → project devtest → Settings → Domains → Add**, nhập `devtest.bloemistflorals.com`.
-2. Ở nơi quản lý DNS của `bloemistflorals.com`, thêm bản ghi mà Vercel hiện ra. Thường đó là `CNAME devtest → cname.vercel-dns.com`.
-3. Chờ Vercel báo *Valid Configuration* (vài phút), rồi mở `https://devtest.bloemistflorals.com/api/health` để kiểm tra.
-4. **Gỡ `noibo.bloemistflorals.com` khỏi project devtest khi bản production đã sẵn sàng**, rồi gắn domain này sang project production (mục 5). Nếu gỡ sớm, nhân viên đang dùng `noibo` sẽ mất địa chỉ.
+1. Vào **Vercel → project devtest → Settings → Domains → Add**, nhập `devtest.bloemistflorals.com`.
+2. Ở nơi quản lý DNS của `bloemistflorals.com`, thêm bản ghi mà Vercel hiện ra.
+3. Mở `https://devtest.bloemistflorals.com/api/health` để kiểm tra.
+4. **Gỡ `noibo`:** vào **Settings → Domains**, ở dòng `noibo.bloemistflorals.com` chọn **Remove**.
+   - Chỉ gỡ domain khỏi project. **Không** xoá `bloemistflorals.com` ở trang Domains của team.
+   - Từ lúc này `noibo` ngừng chạy cho tới khi gắn sang project production (mục 5, bước 7).
 
 - Cookie đăng nhập gắn theo từng domain, nên mọi người phải đăng nhập lại trên domain mới.
-- Nhớ đổi lại link đã lưu trên điện thoại của nhân viên.
+- Đổi lại link đã lưu trên điện thoại của nhân viên sang domain devtest.
 
 ---
 
@@ -136,7 +138,7 @@ Làm khi bản devtest đã ổn. **Mọi thứ đều mới, không dùng lại
    ```
 
    Sau đó đăng nhập, đổi email/tên admin cho đúng người thật, rồi tạo tài khoản cho nhân viên ở **Cài đặt**.
-7. **Domain:** gỡ `noibo.bloemistflorals.com` khỏi project devtest, rồi thêm vào project production (**Settings → Domains**). DNS không đổi nếu vẫn là `CNAME` tới Vercel.
+7. **Domain:** thêm `noibo.bloemistflorals.com` vào project production (**Settings → Domains**). Kiểm tra trước rằng nó đã được gỡ khỏi project devtest (mục 3). Nếu Vercel yêu cầu thêm bản ghi DNS thì làm theo hướng dẫn trên màn hình.
 8. **Kiểm tra:**
    - `https://noibo.bloemistflorals.com/api/health?db=1` trả về ok.
    - Đăng nhập được.
@@ -200,7 +202,7 @@ node scripts/restore-backup.mjs --date 2026-10-21 --apply  # khôi phục thật
 
 **Trang còn sống không:** tạo monitor HTTP(s) miễn phí trên [UptimeRobot](https://uptimerobot.com) cho từng môi trường, ít nhất là production:
 
-- URL: `https://noibo.bloemistflorals.com/api/health`
+- URL: `https://devtest.bloemistflorals.com/api/health` (devtest), và `https://noibo.bloemistflorals.com/api/health` khi đã có production
 - Chu kỳ: 5 phút, cảnh báo qua email hoặc app điện thoại.
 
 `/api/health` **không** chạm vào database, để Neon được ngủ khi không có ai dùng. Một monitor gọi database mỗi 5 phút sẽ làm hết giờ chạy miễn phí. Khi cần kiểm tra database, mở tay `/api/health?db=1`.

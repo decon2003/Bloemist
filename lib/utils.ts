@@ -54,25 +54,6 @@ export function formatDateTime(value: string | number | Date | null | undefined,
   return dateTimeFormatterCache[key].format(dateValue)
 }
 
-/** Split formatDateTime output into date and time parts without relying on a
- *  locale-specific comma - vi-VN emits no comma, which silently blanked the
- *  check-in/check-out columns. */
-export function formatDateTimeParts(
-  value: string | number | Date | null | undefined,
-  lang: string = 'en',
-  fallback = '--',
-) {
-  const formatted = formatDateTime(value, lang, '')
-  if (!formatted) return { date: fallback, time: fallback }
-
-  const match = formatted.match(/(\d{1,2}:\d{2}(?::\d{2})?)/)
-  if (!match) return { date: formatted, time: fallback }
-
-  const time = match[1]
-  const date = formatted.replace(time, '').replace(/[,\s]+$/, '').replace(/^[,\s]+/, '').trim()
-  return { date: date || fallback, time }
-}
-
 /** True when a value can be turned into a usable Date. */
 export function isValidDate(value: string | number | Date | null | undefined) {
   if (value === null || value === undefined || value === '') return false
@@ -98,23 +79,6 @@ export function fromDateTimeLocalValue(value: string): string | null {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return null
   return date.toISOString()
-}
-
-export function calculateDistanceKm(
-  a: { lat: number; lng: number },
-  b: { lat: number; lng: number },
-) {
-  const toRadians = (degrees: number) => (degrees * Math.PI) / 180
-  const earthRadiusKm = 6371
-  const dLat = toRadians(b.lat - a.lat)
-  const dLon = toRadians(b.lng - a.lng)
-  const lat1 = toRadians(a.lat)
-  const lat2 = toRadians(b.lat)
-
-  const haversine =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.sin(dLon / 2) * Math.sin(dLon / 2) * Math.cos(lat1) * Math.cos(lat2)
-  const c = 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine))
-  return earthRadiusKm * c
 }
 
 export function formatCurrencyInput(value: string) {

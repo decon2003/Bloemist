@@ -82,15 +82,14 @@ const AppDataContextProvider = ({ children }: { children: React.ReactNode }) => 
   const dataNeeds = useMemo(() => {
     const route = pathname ?? ''
     const isOrdersRoute = route.includes('/orders')
-    const isTasksRoute = route.includes('/tasks')
     const isCheckinsRoute = route.includes('/checkins')
     const isStaffRoute = route.includes('/staff')
     const isSettingsRoute = route.includes('/settings')
 
     return {
       orders: canLoad && isOrdersRoute,
-      tasks: canLoad && (isOrdersRoute || isTasksRoute),
-      florists: canLoad && (isOrdersRoute || isTasksRoute),
+      tasks: canLoad && isOrdersRoute,
+      florists: canLoad && isOrdersRoute,
       checkins: canLoad && isCheckinsRoute,
       settings: canLoad && (isCheckinsRoute || isSettingsRoute),
       users: canLoad && (isStaffRoute || isSettingsRoute || isCheckinsRoute || isOrdersRoute),

@@ -10,7 +10,7 @@ export async function POST(request: Request) {
     try {
         await requireUser(request)
         const formData = await request.formData().catch(() => {
-            throw new ApiError(400, 'Expected multipart form data')
+            throw new ApiError(400, 'Vui lòng chọn một file ảnh')
         })
         const url = await storePhoto(formData.get('photo'), 'samples', formData.get('thumb'))
         return NextResponse.json({ url }, { status: 201 })

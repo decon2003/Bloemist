@@ -152,7 +152,7 @@ export async function putObject(key: string, body: Buffer, contentType: string) 
 /** A GET URL for a private object, valid for `expiresIn` seconds. */
 export async function signedPhotoUrl(key: string, expiresIn = 300): Promise<string> {
   const r2 = getR2()
-  if (!r2) throw new ApiError(404, 'Photo storage is not configured')
+  if (!r2) throw new ApiError(404, 'Chưa cấu hình nơi lưu ảnh')
   const url = new URL(objectUrl(r2, key))
   url.searchParams.set('X-Amz-Expires', String(expiresIn))
   const signed = await r2.client.sign(new Request(url, { method: 'GET' }), { aws: { signQuery: true } })

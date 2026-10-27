@@ -38,7 +38,7 @@ export async function GET(request: Request) {
             value = order?.bouquetImage
         }
 
-        if (!value) throw new ApiError(404, 'Photo not found')
+        if (!value) throw new ApiError(404, 'Không tìm thấy ảnh')
 
         // Only images: a stored "data:text/html" must never be served as a page
         // from this site, and links only lead to our photos or to https.
@@ -56,7 +56,7 @@ export async function GET(request: Request) {
         if (value.startsWith('/api/photos/') || /^https:\/\//i.test(value)) {
             return NextResponse.redirect(new URL(value, request.url), 302)
         }
-        throw new ApiError(404, 'Photo not found')
+        throw new ApiError(404, 'Không tìm thấy ảnh')
     } catch (error) {
         return handleRouteError(error)
     }

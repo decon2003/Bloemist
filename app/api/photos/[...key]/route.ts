@@ -19,7 +19,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ key:
         await requireUser(request)
         const { key } = await params
         const path = key?.join('/') ?? ''
-        if (!PHOTO_KEY.test(path)) throw new ApiError(404, 'Photo not found')
+        if (!PHOTO_KEY.test(path)) throw new ApiError(404, 'Không tìm thấy ảnh')
 
         const response = NextResponse.redirect(await signedPhotoUrl(path, 300), 302)
         // Shorter than the signature lifetime so the browser never reuses an expired URL.

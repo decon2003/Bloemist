@@ -174,7 +174,7 @@ export const getTask = async (taskId: string) => {
       }
     }
   })
-  if (!task) throw new ApiError(404, 'Task not found')
+  if (!task) throw new ApiError(404, 'Không tìm thấy sản phẩm')
   return slimTaskPhotos(mapTask(task), { samples: false })
 }
 
@@ -242,7 +242,7 @@ export const getOrder = async (orderId: string) => {
   const order = await db.order.findUnique({
     where: { id: orderId }
   })
-  if (!order) throw new ApiError(404, 'Order not found')
+  if (!order) throw new ApiError(404, 'Không tìm thấy đơn hàng')
   return {
     ...mapOrder(order),
     receiveTime: order.receiveTime.toISOString()
@@ -300,7 +300,7 @@ type ProductInput = { name: string; quantity: number; note: string; samplePhotoU
  *  price (unit price x quantity) is what the maker earns commission on. */
 const readProducts = (value: unknown): ProductInput[] => {
   if (value === undefined || value === null) return []
-  if (!Array.isArray(value)) throw new ApiError(400, 'products must be a list')
+  if (!Array.isArray(value)) throw new ApiError(400, 'Danh sách sản phẩm không hợp lệ')
   return value.map((raw, index) => {
     const item = (raw ?? {}) as Record<string, unknown>
     const label = `Sản phẩm ${index + 1}`
@@ -477,7 +477,7 @@ export const updateOrder = async (orderId: string, input: Partial<CreateOrderInp
   // Changing any price input recomputes the derived amounts from the merged values.
   if (ORDER_MONEY_FIELDS.some((field) => input[field] !== undefined)) {
     const current = await db.order.findUnique({ where: { id: orderId } })
-    if (!current) throw new ApiError(404, 'Order not found')
+    if (!current) throw new ApiError(404, 'Không tìm thấy đơn hàng')
     const money = readOrderMoney(input, {
       listedPrice: current.listedPrice,
       deliveryFee: current.deliveryFee,
@@ -497,7 +497,7 @@ export const updateOrder = async (orderId: string, input: Partial<CreateOrderInp
   }
 
   if (Object.keys(data).length === 0) {
-    throw new ApiError(400, 'No updatable fields supplied')
+    throw new ApiError(400, 'Không có gì để cập nhật')
   }
 
   const order = await db.$transaction(async (tx) => {
@@ -535,7 +535,7 @@ export const deleteOrder = async (orderId: string) => {
   try {
     await db.order.delete({ where: { id: orderId } })
   } catch (e) {
-    throw new ApiError(404, 'Order not found')
+    throw new ApiError(404, 'Không tìm thấy đơn hàng')
   }
 }
 

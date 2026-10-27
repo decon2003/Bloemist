@@ -10,9 +10,8 @@ export const protectedRoutes: ProtectedRoute[] = [
   { path: '/settings', allowedRoles: ['boss', 'admin', 'sales', 'florist'] },
   { path: '/customers', allowedRoles: ['boss', 'admin'] },
 
-  // Orders, tasks, and check-ins - shared workspace tools
+  // Orders and check-ins - shared workspace tools
   { path: '/orders', allowedRoles: ['boss', 'sales', 'florist', 'admin'] },
-  { path: '/tasks', allowedRoles: ['boss', 'sales', 'florist', 'admin'] },
   { path: '/checkins', allowedRoles: ['boss', 'sales', 'florist', 'admin'] },
 
   // Dashboard - bosses and admins only

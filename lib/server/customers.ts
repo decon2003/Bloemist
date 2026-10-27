@@ -232,10 +232,10 @@ export async function updateCustomer(id: string, body: Record<string, unknown>) 
     data.source = body.source
   }
   if (body.marketingConsent !== undefined) {
-    if (typeof body.marketingConsent !== 'boolean') throw new ApiError(400, 'marketingConsent must be true or false')
+    if (typeof body.marketingConsent !== 'boolean') throw new ApiError(400, 'Đồng ý nhận tin không hợp lệ')
     data.marketingConsent = body.marketingConsent
   }
-  if (Object.keys(data).length === 0) throw new ApiError(400, 'No updatable fields supplied')
+  if (Object.keys(data).length === 0) throw new ApiError(400, 'Không có gì để cập nhật')
 
   const updated = await db.customer.update({ where: { id }, data, include: { orders: ORDER_SUMMARY_SELECT } })
   return summarise(updated)

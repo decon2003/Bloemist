@@ -1,4 +1,4 @@
-import { ApiError } from './api-error'
+import { ApiError, fieldLabel } from './api-error'
 
 export const USER_ROLES = ['boss', 'admin', 'sales', 'florist'] as const
 export type UserRole = (typeof USER_ROLES)[number]
@@ -59,7 +59,7 @@ export function assertOneOf<T extends readonly string[]>(
   field: string,
 ): T[number] {
   if (typeof value !== 'string' || !allowed.includes(value)) {
-    throw new ApiError(400, `Invalid ${field}. Expected one of: ${allowed.join(', ')}`)
+    throw new ApiError(400, `${fieldLabel(field)} không hợp lệ`)
   }
   return value as T[number]
 }
@@ -68,11 +68,11 @@ export function assertOneOf<T extends readonly string[]>(
  *  every `!value` guard in the codebase. */
 export function requireNonBlank(value: unknown, field: string, maxLength = 500): string {
   if (typeof value !== 'string' || value.trim() === '') {
-    throw new ApiError(400, `Field "${field}" is required`)
+    throw new ApiError(400, `Vui lòng nhập ${fieldLabel(field)}`)
   }
   const trimmed = value.trim()
   if (trimmed.length > maxLength) {
-    throw new ApiError(400, `Field "${field}" exceeds ${maxLength} characters`)
+    throw new ApiError(400, `${fieldLabel(field)} dài quá ${maxLength} ký tự`)
   }
   return trimmed
 }
@@ -82,10 +82,10 @@ export function requireNonBlank(value: unknown, field: string, maxLength = 500):
 export function parseCommissionRate(value: unknown, field = 'commissionRate'): number {
   const numeric = typeof value === 'string' ? Number(value) : value
   if (typeof numeric !== 'number' || !Number.isFinite(numeric)) {
-    throw new ApiError(400, `Field "${field}" must be a finite number`)
+    throw new ApiError(400, `${fieldLabel(field)} phải là một số`)
   }
   if (numeric < 0 || numeric > 100) {
-    throw new ApiError(400, `Field "${field}" must be between 0 and 100`)
+    throw new ApiError(400, `${fieldLabel(field)} phải từ 0 đến 100`)
   }
   return numeric
 }
@@ -94,19 +94,19 @@ export function parseCommissionRate(value: unknown, field = 'commissionRate'): n
  *  well-formed non-negative amount before it is persisted. */
 export function parseMoneyString(value: unknown, field: string, { allowNegative = false } = {}): string {
   if (typeof value === 'number') {
-    if (!Number.isFinite(value)) throw new ApiError(400, `Field "${field}" is not a valid amount`)
-    if (!allowNegative && value < 0) throw new ApiError(400, `Field "${field}" must not be negative`)
+    if (!Number.isFinite(value)) throw new ApiError(400, `${fieldLabel(field)} không phải số tiền hợp lệ`)
+    if (!allowNegative && value < 0) throw new ApiError(400, `${fieldLabel(field)} không được âm`)
     return String(value)
   }
   if (typeof value !== 'string' || value.trim() === '') {
-    throw new ApiError(400, `Field "${field}" is required`)
+    throw new ApiError(400, `Vui lòng nhập ${fieldLabel(field)}`)
   }
   const cleaned = value.trim()
   if (!/^-?[\d.,\s]+$/.test(cleaned)) {
-    throw new ApiError(400, `Field "${field}" is not a valid amount`)
+    throw new ApiError(400, `${fieldLabel(field)} không phải số tiền hợp lệ`)
   }
   if (!allowNegative && cleaned.startsWith('-')) {
-    throw new ApiError(400, `Field "${field}" must not be negative`)
+    throw new ApiError(400, `${fieldLabel(field)} không được âm`)
   }
   return cleaned
 }
@@ -114,11 +114,11 @@ export function parseMoneyString(value: unknown, field: string, { allowNegative 
 export function parseNonNegativeInt(value: unknown, field: string, fallback?: number): number {
   if (value === undefined || value === null) {
     if (fallback !== undefined) return fallback
-    throw new ApiError(400, `Field "${field}" is required`)
+    throw new ApiError(400, `Vui lòng nhập ${fieldLabel(field)}`)
   }
   const numeric = typeof value === 'string' ? Number(value) : value
   if (typeof numeric !== 'number' || !Number.isInteger(numeric) || numeric < 0) {
-    throw new ApiError(400, `Field "${field}" must be a non-negative integer`)
+    throw new ApiError(400, `${fieldLabel(field)} phải là số nguyên không âm`)
   }
   return numeric
 }
@@ -126,7 +126,7 @@ export function parseNonNegativeInt(value: unknown, field: string, fallback?: nu
 export function normalizeEmail(value: unknown, field = 'email'): string {
   const email = requireNonBlank(value, field, 254).toLowerCase()
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    throw new ApiError(400, `Field "${field}" is not a valid email address`)
+    throw new ApiError(400, `${fieldLabel(field)} không đúng định dạng email`)
   }
   return email
 }

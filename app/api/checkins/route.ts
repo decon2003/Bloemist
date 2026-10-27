@@ -16,7 +16,7 @@ export async function GET(request: Request) {
         const month = days > 0 && days <= 31
             ? { start: addVnDays(new Date(), -(days - 1)), end: addVnDays(new Date(), 1) }
             : parseVnMonth(params.get('month'))
-        if (!month) throw new ApiError(400, 'month must be YYYY-MM')
+        if (!month) throw new ApiError(400, 'Tháng không hợp lệ')
         // Close forgotten shifts even if the nightly job did not run.
         await closeOpenShifts()
         // Staff see only their own attendance; managers see everyone's.

@@ -1,4 +1,4 @@
-import { ApiError } from './api-error'
+import { ApiError, fieldLabel } from './api-error'
 
 // Money arrives as free-form strings ("1.500.000 d", "-50000", "1 234,56").
 // Strip grouping separators and currency decoration but preserve the sign and
@@ -38,22 +38,22 @@ const MAX_VND = 2_000_000_000
 
 export function toVnd(value: unknown, field: string, { required = false } = {}): number | null {
   if (value === null || value === undefined || value === '') {
-    if (required) throw new ApiError(400, `Field "${field}" is required`)
+    if (required) throw new ApiError(400, `Vui lòng nhập ${fieldLabel(field)}`)
     return null
   }
   let amount: number
   if (typeof value === 'number') {
     amount = Math.round(value)
   } else if (typeof value === 'string') {
-    if (value.includes('-')) throw new ApiError(400, `Field "${field}" must not be negative`)
+    if (value.includes('-')) throw new ApiError(400, `${fieldLabel(field)} không được âm`)
     const digits = value.replace(/\D/g, '')
-    if (!digits) throw new ApiError(400, `Field "${field}" is not a valid amount`)
+    if (!digits) throw new ApiError(400, `${fieldLabel(field)} không phải số tiền hợp lệ`)
     amount = Number(digits)
   } else {
-    throw new ApiError(400, `Field "${field}" is not a valid amount`)
+    throw new ApiError(400, `${fieldLabel(field)} không phải số tiền hợp lệ`)
   }
-  if (!Number.isFinite(amount) || amount < 0) throw new ApiError(400, `Field "${field}" must not be negative`)
-  if (amount > MAX_VND) throw new ApiError(400, `Field "${field}" is too large`)
+  if (!Number.isFinite(amount) || amount < 0) throw new ApiError(400, `${fieldLabel(field)} không được âm`)
+  if (amount > MAX_VND) throw new ApiError(400, `${fieldLabel(field)} quá lớn`)
   return amount
 }
 
@@ -83,7 +83,7 @@ export function toVatPercent(value: unknown): number | null {
   if (value === null || value === undefined || value === '') return null
   const numeric = typeof value === 'string' ? Number(value) : value
   if (typeof numeric !== 'number' || !Number.isFinite(numeric) || numeric < 0 || numeric > 100) {
-    throw new ApiError(400, 'Field "vatPercent" must be between 0 and 100')
+    throw new ApiError(400, 'VAT phải từ 0 đến 100%')
   }
   return numeric
 }

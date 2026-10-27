@@ -40,12 +40,12 @@ export function parseListScope(params: URLSearchParams, viewer?: Viewer): ListSc
   const limitParam = params.get('limit')
   const limit = limitParam ? Number(limitParam) : undefined
   if (limit !== undefined && !(Number.isInteger(limit) && limit > 0 && limit <= LIST_LIMIT)) {
-    throw new ApiError(400, `limit must be 1-${LIST_LIMIT}`)
+    throw new ApiError(400, `Số dòng phải từ 1 đến ${LIST_LIMIT}`)
   }
 
   const q = params.get('q')?.trim()
   if (q) {
-    if (q.length > 100) throw new ApiError(400, 'Search text is too long')
+    if (q.length > 100) throw new ApiError(400, 'Từ khoá tìm kiếm quá dài')
     return { kind: 'search', q, since, limit }
   }
 
@@ -53,16 +53,16 @@ export function parseListScope(params: URLSearchParams, viewer?: Viewer): ListSc
   const toParam = params.get('to')
   const from = parseVnDateKey(fromParam)
   const to = parseVnDateKey(toParam)
-  if ((fromParam && !from) || (toParam && !to)) throw new ApiError(400, 'Dates must be YYYY-MM-DD')
+  if ((fromParam && !from) || (toParam && !to)) throw new ApiError(400, 'Ngày không hợp lệ')
 
   let start = from ?? (to ? to : addVnDays(now, -DEFAULT_DAYS_BACK))
   // `to` is inclusive, so the window ends at the start of the following day.
   // A start date alone (an open-ended range in the UI) covers the next month.
   const end = to ? addVnDays(to, 1) : from ? addVnDays(from, OPEN_RANGE_DAYS) : addVnDays(now, DEFAULT_DAYS_AHEAD + 1)
 
-  if (end <= start) throw new ApiError(400, '"to" must not be before "from"')
+  if (end <= start) throw new ApiError(400, 'Ngày kết thúc phải sau ngày bắt đầu')
   const days = Math.round((end.getTime() - startOfVnDay(start).getTime()) / 86_400_000)
-  if (days > MAX_RANGE_DAYS) throw new ApiError(400, `Date range is limited to ${MAX_RANGE_DAYS} days`)
+  if (days > MAX_RANGE_DAYS) throw new ApiError(400, `Chỉ xem được tối đa ${MAX_RANGE_DAYS} ngày một lần`)
 
   if (since && start < since) {
     if (end <= since) throw new ApiError(403, `Chỉ xem được ${STAFF_HISTORY_DAYS} ngày gần nhất`)

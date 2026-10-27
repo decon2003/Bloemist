@@ -4,8 +4,8 @@ Hệ thống quản lý vận hành nội bộ của tiệm hoa Bloemist.
 
 | Môi trường | Địa chỉ | Trạng thái |
 |---|---|---|
-| **Devtest** | `devtest.bloemistflorals.com` | Đang dùng để thử nghiệm, được sửa dữ liệu |
-| **Production** | `noibo.bloemistflorals.com` | Dựng khi bản devtest đã ổn (xem [DEPLOY.md](DEPLOY.md#5-dựng-bản-production)) |
+| **Devtest** | https://devtest.bloemistflorals.com | Đang chạy (từ 27/10/2026); dùng để thử nghiệm, được sửa dữ liệu |
+| **Production** | `noibo.bloemistflorals.com` | Chưa dựng; domain này chỉ bật lại khi lên production (xem [DEPLOY.md](DEPLOY.md#5-dựng-bản-production)) |
 
 ## Chức năng
 

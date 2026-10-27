@@ -13,7 +13,7 @@ export async function POST(request: Request) {
         const body = await readJsonBody(request)
 
         const user = await db.user.findUnique({ where: { id: session.id } })
-        if (!user) throw new ApiError(401, 'User not found')
+        if (!user) throw new ApiError(401, 'Không tìm thấy nhân viên')
 
         if (typeof body.currentPassword !== 'string' || !(await verifyPassword(body.currentPassword, user.passwordHash))) {
             throw new ApiError(400, 'Mật khẩu hiện tại không đúng')

@@ -1,6 +1,6 @@
 import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'crypto'
 import { promisify } from 'util'
-import { ApiError } from './api-error'
+import { ApiError, fieldLabel } from './api-error'
 
 const scrypt = promisify(scryptCallback) as (
   password: string,
@@ -47,7 +47,7 @@ export function validateNewPassword(value: unknown, field = 'password'): string 
     throw new ApiError(400, `Mật khẩu phải có ít nhất ${MIN_PASSWORD_LENGTH} ký tự`)
   }
   if (value.length > 200) {
-    throw new ApiError(400, `Field "${field}" is too long`)
+    throw new ApiError(400, `${fieldLabel(field)} dài quá 200 ký tự`)
   }
   return value
 }

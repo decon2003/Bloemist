@@ -12,13 +12,13 @@ export default function AccessDeniedPage() {
 
   const handleGoBack = () => {
     if (user?.role === 'florist' || user?.role === 'sales') {
-      router.push(`/${lang}/tasks`)
+      router.push(`/${lang}/orders`)
     } else {
       router.push(`/${lang}/dashboard`)
     }
   }
 
-  const destinationLabel = user?.role === 'florist' || user?.role === 'sales' ? t('nav.tasks') : t('nav.dashboard')
+  const destinationLabel = user?.role === 'florist' || user?.role === 'sales' ? t('nav.orders') : t('nav.dashboard')
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-muted/40 p-4">

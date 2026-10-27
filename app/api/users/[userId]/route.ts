@@ -38,7 +38,7 @@ export async function GET(request: Request, context: RouteContext) {
         })
 
         if (!user) {
-            return NextResponse.json({ error: 'User not found' }, { status: 404 })
+            return NextResponse.json({ error: 'Không tìm thấy nhân viên' }, { status: 404 })
         }
 
         return NextResponse.json({

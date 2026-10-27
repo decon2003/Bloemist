@@ -16,3 +16,8 @@ tsconfig.tsbuildinfo
 _bmad/
 _bmad-output/
 .env*.local
+
+# Local logs and command output
+*.log
+server_log.txt
+output*.txt

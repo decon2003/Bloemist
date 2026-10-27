@@ -3,9 +3,8 @@ import db from '@/lib/server/db'
 async function main() {
     console.log('Seeding database...')
 
-    // Create Admin User
+    // Create Admin User (random id: a fixed one would be guessable)
     const adminUser = {
-        id: 'admin-1',
         name: 'Admin',
         email: 'admin@bloemist.com',
         role: 'admin',

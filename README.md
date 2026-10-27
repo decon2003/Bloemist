@@ -1,32 +1,63 @@
 # Bloemist Ops
 
-Hệ thống quản lý vận hành nội bộ của tiệm hoa Bloemist: https://noibo.bloemistflorals.com
+Hệ thống quản lý vận hành nội bộ của tiệm hoa Bloemist.
+
+| Môi trường | Địa chỉ | Trạng thái |
+|---|---|---|
+| **Devtest** | `devtest.bloemistflorals.com` | Đang dùng để thử nghiệm, được sửa dữ liệu |
+| **Production** | `noibo.bloemistflorals.com` | Dựng khi bản devtest đã ổn (xem [DEPLOY.md](DEPLOY.md#5-dựng-bản-production)) |
 
 ## Chức năng
 
-- **Đơn hàng**: tạo đơn (thông tin khách có thể bổ sung sau), tính tiền (phí ship/freeship, VAT khi có, tiền cọc), huỷ đơn (không tính doanh thu và hoa hồng), chỉ quản lý được xoá đơn.
-- **Sản phẩm của đơn**: mỗi sản phẩm là một việc; thợ "Nhận làm" và "Hoàn tất" kèm ảnh thành phẩm ngay trên trang đơn; làm xong hết thì đơn tự chuyển "Sẵn sàng".
-- **Khách hàng**: tự nhận khách cũ theo SĐT người đặt, ghi chú, nguồn khách, lịch sử đơn và người nhận (chỉ quản lý xem).
-- **Chấm công**: vào/ra (ca qua nửa đêm, tối đa 16 tiếng); quên chấm ra tính 0 giờ cho tới khi sửa; nhân viên tự sửa trong 3 ngày.
-- **Bảng lương**: lương cứng chia theo ngày công, lương giờ (đơn giá riêng ngày lễ), OT ngoài giờ (bỏ qua lệch dưới 15 phút, quản lý duyệt), ca gấp, hoa hồng sale và làm đơn; chốt sau khi hết tháng. Nhân viên xem mục "Thu nhập".
-- **Dashboard**: doanh thu tháng/tuần theo ngày đặt, đơn đang xử lý.
+- **Đơn hàng**
+  - Tạo đơn: thông tin khách có thể bổ sung sau; có ô "người nhận là khách".
+  - Tính tiền: phí ship hoặc freeship, VAT chỉ khi nhập (mặc định 0%), tiền cọc.
+  - Lời thiệp và ghi chú đặc biệt nhập riêng.
+  - Huỷ đơn: đơn huỷ không tính doanh thu và hoa hồng. Chỉ quản lý được xoá đơn.
+- **Sản phẩm của đơn**
+  - Mỗi sản phẩm là một việc. Thợ bấm "Nhận làm", rồi "Hoàn tất" kèm ảnh thành phẩm, ngay trên trang đơn.
+  - Làm xong hết sản phẩm thì đơn tự chuyển "Sẵn sàng".
+- **Ai thấy gì**
+  - Sale và quản lý thấy toàn bộ đơn.
+  - Thợ (florist) thấy thông tin để làm hoa: giá hoa, ship, thiệp, ghi chú, ngày giờ giao, tên và địa chỉ. **Số điện thoại và chi tiết thanh toán bị ẩn ngay từ máy chủ.**
+- **Khách hàng** (chỉ quản lý)
+  - Tự nhận khách cũ theo SĐT người đặt.
+  - Ghi chú, nguồn khách, lịch sử đơn và người nhận.
+  - Tìm theo tên hoặc SĐT của người đặt, người nhận, người tặng.
+- **Chấm công**
+  - Vào/ra tại cửa hàng; sale có thêm ca **Online** (làm tại nhà, không tính OT).
+  - Ca qua nửa đêm được, tối đa 16 tiếng.
+  - Quên chấm ra thì tính 0 giờ cho tới khi sửa. Nhân viên tự sửa trong 3 ngày.
+- **Bảng lương**
+  - Lương cứng chia theo ngày công, không vượt lương đủ tháng (mặc định nghỉ 4 ngày/tháng).
+  - Lương giờ: đơn giá riêng cho ngày lễ (không áp dụng cho sale) và cho giờ online.
+  - OT ngoài giờ: bỏ qua lệch dưới 15 phút, quản lý duyệt. Ca gấp tính toàn bộ là OT.
+  - Hoa hồng: hoa hồng sale; hoa hồng làm đơn chỉ cho thợ.
+  - Chỉ chốt được sau khi hết tháng. Nhân viên xem lương của mình ở mục "Thu nhập".
+- **Dashboard** (quản lý): doanh thu tháng/tuần theo ngày đặt, đơn đang xử lý.
+- **Hiển thị**: giờ theo chuẩn 24h, ngày dạng dd/mm/yyyy, múi giờ Việt Nam (+07:00).
 
-Vai trò: `boss`, `admin` (quản lý), `sales`, `florist`. Quyền được kiểm tra ở máy chủ (`lib/server/session.ts`).
+Vai trò: `boss` và `admin` (quản lý), `sales`, `florist`. Mọi quyền đều được kiểm tra ở máy chủ (`lib/server/session.ts`); danh sách API và quyền nằm ở [docs/api-endpoints.md](docs/api-endpoints.md).
 
 ## Công nghệ
 
-Next.js 16 · Prisma 5 + Postgres (Neon) · ảnh trên Cloudflare R2 · triển khai trên Vercel.
+Next.js 16 (App Router), Prisma 5 với Postgres (Neon, Singapore), ảnh và bản sao lưu trên Cloudflare R2 (bucket riêng tư), triển khai trên Vercel (`sin1`).
 
 ## Chạy trên máy
 
+**Không trỏ `.env` vào database của devtest hay production.** Dùng một database riêng: Postgres cài trên máy, hoặc một branch Neon tạo riêng cho việc này.
+
 ```bash
-cp .env.example .env   # điền DATABASE_URL (một database thử, không dùng database thật)
+cp .env.example .env   # điền DATABASE_URL của database thử; để trống các biến R2_*
 npm install
 npx prisma migrate deploy
 npx tsx --env-file=.env prisma/seed.ts
-node scripts/set-password.mjs admin@bloemist.com 'MatKhau123'
-npm run dev
+node scripts/set-password.mjs admin@bloemist.com '<mat-khau>'
+npm run dev            # http://localhost:3000 (chỉ máy này truy cập được)
 ```
+
+- Không có `AUTH_SECRET` thì khi chạy dev, app tự tạo một khoá ngẫu nhiên. Khởi động lại server sẽ phải đăng nhập lại.
+- Để trống `R2_*` thì ảnh được lưu thẳng trong database.
 
 ## Triển khai, sao lưu, khôi phục
 

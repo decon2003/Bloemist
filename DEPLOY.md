@@ -1,162 +1,219 @@
 # Triển khai Bloemist Ops
 
-Hạ tầng (toàn bộ gói miễn phí):
+## Môi trường
+
+| | Devtest (hiện có) | Production (sẽ dựng) |
+|---|---|---|
+| Mục đích | Thử nghiệm, được sửa hoặc xoá dữ liệu | Dữ liệu thật của cửa hàng |
+| Domain | `devtest.bloemistflorals.com` (chuyển từ `noibo`, xem [mục 3](#3-chuyển-devtest-sang-domain-mới)) | `noibo.bloemistflorals.com` |
+| Vercel project | project hiện tại | project mới, cùng repo |
+| Neon | project `bloemist` (Singapore) | project mới, Singapore |
+| R2 bucket | `bloemist-photos` | bucket mới, token mới |
+| Secret | bộ hiện tại | **bộ mới hoàn toàn**, không dùng lại của devtest |
+
+Cả hai đều dùng gói miễn phí:
 
 | Thành phần | Dịch vụ | Ghi chú |
 |---|---|---|
-| Chạy app | Vercel Hobby | `noibo.bloemistflorals.com` |
+| Chạy app | Vercel Hobby | region `sin1` (`vercel.json`) |
 | Cơ sở dữ liệu | Neon Postgres Free | 0.5 GB, chỉ chứa dữ liệu chữ |
-| Ảnh + bản sao lưu | Cloudflare R2 Free | 10 GB, bucket riêng tư |
-| Sao lưu tự động | GitHub Actions | 02:00 mỗi đêm |
+| Ảnh và bản sao lưu | Cloudflare R2 Free | 10 GB, bucket riêng tư |
+| Việc chạy hằng đêm | Vercel Cron | 02:00 giờ VN: đóng ca quên chấm ra, rồi sao lưu |
 
 ---
 
 ## 1. Biến môi trường
 
-Đặt trong **Vercel → Project → Settings → Environment Variables** (môi trường *Production* và *Preview*):
+Đặt trong **Vercel → Project → Settings → Environment Variables**:
 
 | Biến | Bắt buộc | Giá trị |
 |---|---|---|
-| `DATABASE_URL` | ✅ | Chuỗi kết nối Neon **loại pooled** (host có chữ `-pooler`) |
-| `AUTH_SECRET` | ✅ | Chuỗi ngẫu nhiên ≥ 32 ký tự (cách tạo ở dưới). **Thiếu biến này app sẽ không đăng nhập được.** |
-| `R2_ACCOUNT_ID` | khi bật R2 | Account ID của Cloudflare |
-| `R2_ACCESS_KEY_ID` | khi bật R2 | Từ API token R2 |
-| `R2_SECRET_ACCESS_KEY` | khi bật R2 | Từ API token R2 |
-| `R2_BUCKET` | khi bật R2 | Ví dụ `bloemist-photos` |
+| `DATABASE_URL` | ✅ | Chuỗi kết nối Neon **loại pooled** (host có chữ `-pooler`). Migration tự đổi sang chuỗi direct. |
+| `AUTH_SECRET` | ✅ | Chuỗi ngẫu nhiên ≥ 32 ký tự. Thiếu biến này, bản production không đăng nhập được. |
+| `CRON_SECRET` | ✅ | Chuỗi ngẫu nhiên. Vercel gửi kèm khi gọi cron; thiếu biến này thì việc chạy hằng đêm bị từ chối. |
+| `R2_ACCOUNT_ID` | ✅ | Account ID của Cloudflare |
+| `R2_ACCESS_KEY_ID` | ✅ | Từ API token R2 |
+| `R2_SECRET_ACCESS_KEY` | ✅ | Từ API token R2 |
+| `R2_BUCKET` | ✅ | Tên bucket của môi trường đó |
 
-Tạo `AUTH_SECRET`:
+Tạo chuỗi ngẫu nhiên:
 
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
 ```
 
-Đổi `AUTH_SECRET` sẽ đăng xuất tất cả mọi người, nên chỉ đổi khi nghi bị lộ.
+- Đổi `AUTH_SECRET` sẽ đăng xuất tất cả mọi người.
+- Nếu chưa cấu hình R2, ảnh được lưu thẳng trong database. App vẫn chạy, nhưng database sẽ đầy nhanh.
+- **Không dán secret vào chat, tài liệu hay commit.** Secret chỉ nằm trên Vercel và (nếu cần chạy script) trong biến môi trường của terminal.
 
-Khi chưa cấu hình R2, ảnh mới vẫn được lưu vào cơ sở dữ liệu như cũ, nên app vẫn chạy. Tuy vậy, nên bật R2 sớm.
+**Đổi mật khẩu database:**
+1. Vào Neon, chọn **Branches → main → Roles → `neondb_owner` → Reset password**.
+2. Cập nhật `DATABASE_URL` trên Vercel.
+3. Bấm Redeploy.
+
+**Đổi khoá R2:**
+1. Vào Cloudflare, chọn **R2 → Manage API Tokens**, chọn token, bấm **Roll**.
+2. Cập nhật hai biến `R2_ACCESS_KEY_ID` và `R2_SECRET_ACCESS_KEY` trên Vercel.
+3. Bấm Redeploy.
+
+> **Việc cần làm ngay trên devtest:** mật khẩu Neon và khoá R2 hiện tại từng bị dán vào chat. Hãy đổi cả hai theo hai bước trên.
 
 ---
 
-## 2. Hiện trạng và dựng lại từ đầu
+## 2. Hiện trạng devtest
 
-**Đã dựng ngày 05/10/2026:**
+Dựng ngày 05/10/2026:
 
-- Neon project `bloemist`, region AWS ap-southeast-1 (Singapore), Postgres 17. Đã chạy toàn bộ migration và seed.
-- Vercel đặt functions ở `sin1` (file `vercel.json`) và đã có đủ biến môi trường ở mục 1.
+- Neon project `bloemist`: AWS ap-southeast-1 (Singapore), Postgres 17.
 - R2 bucket `bloemist-photos`, riêng tư.
+- Vercel: functions ở `sin1`, đủ biến môi trường ở mục 1.
 
-Nếu phải dựng lại trên một database **trống** (chạy trên máy, `.env` dùng chuỗi Neon **direct**):
+Migration tự chạy khi build production (`scripts/migrate-if-production.mjs`, chỉ khi `VERCEL_ENV=production`), nên database luôn khớp với code đã deploy.
 
-```bash
-npm install
-npx prisma migrate deploy                                   # tạo toàn bộ bảng
-npx tsx --env-file=.env prisma/seed.ts                      # tài khoản admin@bloemist.com + địa điểm cửa hàng
-node scripts/set-password.mjs admin@bloemist.com 'MatKhauTam123' --temporary
-```
-
-Kiểm tra database khớp với code. Lệnh phải in ra "No difference detected.":
-
-```bash
-npx prisma migrate diff --from-schema-datasource prisma/schema.prisma --to-schema-datamodel prisma/schema.prisma --exit-code
-```
-
-**Cấp mật khẩu cho nhân viên:** vào **Cài đặt → Quản lý nhân sự**. Khi thêm hoặc sửa một nhân viên, điền mật khẩu tạm rồi đưa trực tiếp cho người đó. Nhân viên phải đổi mật khẩu ở lần đăng nhập đầu tiên.
-
+**Cấp tài khoản nhân viên:** vào **Cài đặt → Quản lý nhân sự**.
+- Khi thêm hoặc sửa nhân viên, điền mật khẩu tạm rồi đưa trực tiếp cho người đó. Nhân viên phải đổi mật khẩu ở lần đăng nhập đầu.
 - Quên mật khẩu: quản lý cấp lại mật khẩu tạm theo cách trên.
 - Sai mật khẩu 5 lần thì tài khoản bị khoá 15 phút.
-
-**Đổi mật khẩu database:** vào Neon, chọn **Branches → main → Roles → `neondb_owner` → Reset password**. Sau đó cập nhật `DATABASE_URL` ở ba nơi: Vercel (Production và Preview, dùng chuỗi pooled), GitHub secret (dùng chuỗi direct), và file `.env`. Cuối cùng bấm Redeploy trên Vercel.
-
-**Đổi khoá R2:** vào Cloudflare, chọn **R2 → Manage API Tokens → `bloemist-app` → Roll**. Sau đó cập nhật `R2_ACCESS_KEY_ID` và `R2_SECRET_ACCESS_KEY` trên Vercel, GitHub secret và file `.env`.
+- Khoá một nhân viên thì người đó bị đăng xuất ngay, và các việc chưa xong của họ được trả về chưa giao.
 
 ---
 
-## 3. Bật Cloudflare R2 (lưu ảnh)
+## 3. Chuyển devtest sang domain mới
 
-1. Vào Cloudflare, mở **R2 → Create bucket**, đặt tên `bloemist-photos`, location *Asia-Pacific*. **Không** bật public access.
+Code không gắn cứng domain nào, nên chỉ cần thao tác trên Vercel và DNS.
+
+1. **Vercel → project devtest → Settings → Domains → Add**, nhập `devtest.bloemistflorals.com`.
+2. Ở nơi quản lý DNS của `bloemistflorals.com`, thêm bản ghi mà Vercel hiện ra. Thường đó là `CNAME devtest → cname.vercel-dns.com`.
+3. Chờ Vercel báo *Valid Configuration* (vài phút), rồi mở `https://devtest.bloemistflorals.com/api/health` để kiểm tra.
+4. **Gỡ `noibo.bloemistflorals.com` khỏi project devtest khi bản production đã sẵn sàng**, rồi gắn domain này sang project production (mục 5). Nếu gỡ sớm, nhân viên đang dùng `noibo` sẽ mất địa chỉ.
+
+- Cookie đăng nhập gắn theo từng domain, nên mọi người phải đăng nhập lại trên domain mới.
+- Nhớ đổi lại link đã lưu trên điện thoại của nhân viên.
+
+---
+
+## 4. Cloudflare R2 (ảnh và sao lưu)
+
+1. Vào **R2 → Create bucket**, location *Asia-Pacific*. **Không** bật public access.
 2. Vào **R2 → Manage API tokens → Create API token**:
-   - Quyền: *Object Read & Write*
-   - Phạm vi: chỉ bucket `bloemist-photos`
+   - Quyền: *Object Read & Write*.
+   - Phạm vi: **chỉ bucket đó**.
    - Ghi lại *Access Key ID* và *Secret Access Key*. Secret chỉ hiện một lần.
-3. Điền 4 biến `R2_*` trên Vercel (mục 1), rồi **Redeploy**.
-4. Chỉ khi database đã có ảnh lưu kiểu cũ (base64), chuyển chúng sang R2. Chạy trên máy, với 4 biến `R2_*` trong `.env`:
+3. Điền 4 biến `R2_*` trên Vercel, rồi bấm **Redeploy**.
+4. Thêm quy tắc tự xoá bản sao lưu cũ: vào bucket, chọn **Settings → Object lifecycle rules → Add rule**, prefix `backups/`, xoá sau **60 ngày**.
 
-   ```bash
-   node scripts/migrate-photos-to-r2.mjs          # chạy thử: chỉ đếm, không ghi gì
-   node scripts/migrate-photos-to-r2.mjs --apply  # chuyển thật
+Ảnh được đọc qua `/api/photos/...`. Route này yêu cầu đăng nhập, chỉ chấp nhận key ảnh hợp lệ (không đọc được `backups/`) và trả về link ký sống 5 phút.
+
+Chuyển ảnh base64 kiểu cũ sang R2 (chỉ khi còn ảnh kiểu cũ):
+
+```bash
+node scripts/migrate-photos-to-r2.mjs          # chạy thử: chỉ đếm
+node scripts/migrate-photos-to-r2.mjs --apply  # chuyển thật, chạy lại nhiều lần vẫn an toàn
+```
+
+---
+
+## 5. Dựng bản production
+
+Làm khi bản devtest đã ổn. **Mọi thứ đều mới, không dùng lại secret, database hay bucket của devtest.**
+
+1. **Neon:** tạo project mới, region Singapore, Postgres 17. Lấy cả chuỗi pooled và chuỗi direct.
+2. **R2:** tạo bucket mới (ví dụ `bloemist-prod-photos`) và token mới chỉ có quyền trên bucket này (mục 4), kèm lifecycle rule cho `backups/`.
+3. **Vercel:** chọn **Add New → Project**, import cùng repo.
+   - Điền đủ biến ở mục 1, với giá trị mới. Chỉ chọn môi trường **Production**, không chọn *Preview*, để link preview không bao giờ chạm vào dữ liệu thật.
+   - Bật **Settings → Deployment Protection** cho các bản preview.
+4. **Nhánh deploy** (để thử trên devtest trước khi lên production):
+   - Project production lấy nhánh `main`.
+   - Project devtest đổi *Production Branch* sang nhánh `devtest` (**Settings → Git**).
+   - Quy trình: push lên `devtest`, thử trên devtest, rồi merge vào `main`.
+5. **Deploy lần đầu.** Bước build tự chạy migration lên database mới.
+6. **Tạo tài khoản quản lý đầu tiên.** Chạy trên máy; chuỗi direct của production chỉ đặt trong terminal, **không ghi vào `.env`**, và đóng terminal khi xong. Ví dụ với PowerShell:
+
+   ```powershell
+   $env:DATABASE_URL = "<chuỗi direct của production>"
+   npx tsx prisma/seed.ts                     # admin@bloemist.com (id ngẫu nhiên) + địa điểm cửa hàng
+   node scripts/set-password.mjs admin@bloemist.com '<mat-khau-tam>' --temporary
    ```
 
-   Chạy lại nhiều lần cũng an toàn.
-5. Tạo quy tắc tự xoá bản sao lưu cũ: vào bucket, mở **Settings → Object lifecycle rules → Add rule**:
-   - Prefix: `backups/`
-   - Hành động: xoá sau **60 ngày**
+   Sau đó đăng nhập, đổi email/tên admin cho đúng người thật, rồi tạo tài khoản cho nhân viên ở **Cài đặt**.
+7. **Domain:** gỡ `noibo.bloemistflorals.com` khỏi project devtest, rồi thêm vào project production (**Settings → Domains**). DNS không đổi nếu vẫn là `CNAME` tới Vercel.
+8. **Kiểm tra:**
+   - `https://noibo.bloemistflorals.com/api/health?db=1` trả về ok.
+   - Đăng nhập được.
+   - Thử tạo một đơn, rồi huỷ nó.
+   - Ngày hôm sau, tìm `Backup written` trong Logs.
+9. **Cài đặt cửa hàng:** giờ mở cửa, ngày lễ, hồ sơ lương từng người (lương cứng, đơn giá giờ, giờ lễ, giờ online, % hoa hồng).
+
+**Nếu muốn mang dữ liệu devtest sang:**
+- Khôi phục bản sao lưu devtest vào database production đang trống (mục 6).
+- Copy thêm các thư mục `proofs/` và `samples/` từ bucket devtest sang bucket production, ví dụ bằng `rclone`. Nếu không copy, ảnh cũ sẽ không hiện.
+
+Thường thì nên bắt đầu production với dữ liệu trống.
 
 ---
 
-## 4. Sao lưu tự động (Vercel Cron → R2)
+## 6. Sao lưu và khôi phục
 
-Mỗi đêm khoảng **02:00 giờ Việt Nam** (gói Hobby có thể lệch trong vòng 1 tiếng), Vercel gọi `/api/cron/backup`. API này xuất toàn bộ bảng ra JSON, nén lại và lưu vào R2 tại `backups/bloemist-YYYY-MM-DD.json.gz`. Lịch chạy nằm trong `vercel.json`.
+Mỗi đêm khoảng **02:00 giờ Việt Nam**, Vercel gọi `/api/cron/nightly` (lịch nằm trong `vercel.json`; gói Hobby có thể lệch trong vòng 1 tiếng). Việc này:
 
-- Cần biến `CRON_SECRET` trên Vercel (môi trường Production). Vercel tự gửi khoá này khi gọi; ai gọi mà không có khoá sẽ bị từ chối.
-- Bản cũ hơn 60 ngày tự xoá nhờ quy tắc lifecycle trên bucket (prefix `backups/`, xem mục 3).
-- Kiểm tra lần chạy gần nhất: vào **Vercel → Project → Settings → Cron Jobs**, hoặc xem Logs, tìm dòng `Backup written`.
-- Chạy ngay một lần: vào Settings → Cron Jobs → **Run**.
+1. Đóng các ca quên chấm ra. Những ca này tính 0 giờ cho tới khi được sửa.
+2. Xuất toàn bộ bảng ra JSON, nén lại, rồi lưu vào R2 tại `backups/bloemist-YYYY-MM-DD.json.gz`.
 
-Workflow `.github/workflows/db-backup.yml` (dùng `pg_dump`) chỉ còn chạy thủ công, vì tài khoản GitHub Actions đang bị khoá do thanh toán.
+Ghi chú:
+- Kiểm tra lần chạy gần nhất ở **Vercel → Settings → Cron Jobs**, hoặc tìm dòng `Backup written` trong Logs.
+- Muốn chạy ngay một lần: vào **Cron Jobs → Run**.
+- `/api/cron/backup` chỉ sao lưu, không đóng ca.
+- Workflow `.github/workflows/db-backup.yml` (dùng `pg_dump`) chỉ chạy thủ công, vì GitHub Actions của tài khoản đang bị khoá do thanh toán.
 
 ### Khôi phục
 
-Khôi phục vào một database **trống**, đã chạy migration. Script từ chối ghi vào database đã có dữ liệu.
+Chỉ khôi phục vào một database **trống** đã chạy migration; script từ chối ghi vào database đã có dữ liệu. Các biến môi trường đặt trong terminal, giống bước 6 ở mục 5:
 
 ```bash
-# .env: DATABASE_URL trỏ tới database đích (ví dụ một branch Neon mới) + các biến R2_*
+# DATABASE_URL = database đích (ví dụ một branch Neon mới); R2_* = bucket chứa bản sao lưu
 npx prisma migrate deploy
 node scripts/restore-backup.mjs --list                     # xem các bản sao lưu
 node scripts/restore-backup.mjs --latest                   # chạy thử: chỉ in số dòng
 node scripts/restore-backup.mjs --date 2026-10-21 --apply  # khôi phục thật
 ```
 
-Database đích phải ở **cùng migration** với lúc sao lưu. Script kiểm tra điều này và báo nếu lệch.
-
-Nên thử khôi phục mỗi vài tháng một lần, và bắt buộc làm trước mỗi đợt cao điểm.
-
----
-
-## 5. Giảm độ trễ: đặt máy chủ cùng khu vực với Neon
-
-1. Xem region của Neon trong **Project settings**, ví dụ `aws-ap-southeast-1` (Singapore).
-2. Trên Vercel, vào **Settings → Functions → Function Region**, chọn region tương ứng (Singapore là `sin1`).
+- Database đích phải ở **cùng migration** với lúc sao lưu. Script sẽ kiểm tra và báo nếu lệch.
+- Nên thử khôi phục mỗi vài tháng một lần, và bắt buộc làm trước mỗi đợt cao điểm.
 
 ---
 
-## 6. Các bản cập nhật sau
+## 7. Các bản cập nhật sau
 
-- **Đổi cấu trúc bảng:** sửa `prisma/schema.prisma`, tạo migration bằng `npx prisma migrate dev --name ten-thay-doi` trên một database thử, rồi commit thư mục `prisma/migrations/`.
-- Khi push lên `main`, bản build production tự chạy `prisma migrate deploy`. Bản Preview (các nhánh khác) **không bao giờ** đụng vào database.
-- **Migration chạy ở đầu bước build**, trước khi code mới thay code cũ (khoảng 1 phút). Vì vậy:
-  - **Thêm** cột/bảng: làm thẳng được.
-  - **Đổi kiểu** hoặc **xoá** cột: chia làm 2 lần deploy. Lần 1 thêm cột mới và cho code ghi cả hai cột. Lần 2 mới bỏ cột cũ. Nếu bắt buộc đổi trực tiếp (như `4_money_integers`), làm ngoài giờ bán và chạy `/api/cron/backup` trước.
-  - Kiểm tra migration trên database thử có dữ liệu giống thật trước khi push. Lệnh Prisma tự sinh có thể xoá cột thay vì chuyển đổi dữ liệu.
-- **Lưu ý:** Preview dùng chung database với bản thật (gói Neon miễn phí). Thao tác trên link preview là sửa dữ liệu thật.
+- **Đổi cấu trúc bảng:** sửa `prisma/schema.prisma`, viết migration SQL trong `prisma/migrations/<số>_<tên>/migration.sql`, thử trên database local, rồi commit.
+  - **Không chạy `prisma migrate dev` khi `DATABASE_URL` trỏ tới devtest hay production**, vì lệnh này có thể đề nghị xoá sạch database.
+- Bản build production tự chạy `prisma migrate deploy` **trước khi** code mới thay code cũ (khoảng 1 phút). Vì vậy:
+  - **Thêm** cột hoặc bảng: làm thẳng được.
+  - **Đổi kiểu** hoặc **xoá** cột: chia làm hai lần deploy. Lần 1 thêm cột mới và cho code ghi vào cả hai cột; lần 2 mới bỏ cột cũ.
+  - Nếu bắt buộc đổi trực tiếp, làm ngoài giờ bán và chạy sao lưu trước.
+- Bản Preview không bao giờ chạy migration.
+  - Trên devtest, Preview dùng chung database devtest: thao tác trên link preview là sửa dữ liệu devtest.
+  - Trên production, Preview không có biến môi trường (mục 5, bước 3).
 
 ---
 
-## 7. Giám sát
+## 8. Giám sát
 
-**Trang còn sống không:** tạo tài khoản miễn phí ở [UptimeRobot](https://uptimerobot.com) (hoặc Better Stack). Thêm monitor kiểu HTTP(s):
+**Trang còn sống không:** tạo monitor HTTP(s) miễn phí trên [UptimeRobot](https://uptimerobot.com) cho từng môi trường, ít nhất là production:
 
 - URL: `https://noibo.bloemistflorals.com/api/health`
-- Chu kỳ: 5 phút
-- Bật cảnh báo qua email hoặc app điện thoại của người phụ trách.
+- Chu kỳ: 5 phút, cảnh báo qua email hoặc app điện thoại.
 
-`/api/health` **không** chạm vào database, để Neon được ngủ khi không có ai dùng. Nếu một monitor gọi database mỗi 5 phút, Neon thức suốt ngày đêm và hết giờ chạy miễn phí. Khi cần kiểm tra database thì mở tay `/api/health?db=1`.
+`/api/health` **không** chạm vào database, để Neon được ngủ khi không có ai dùng. Một monitor gọi database mỗi 5 phút sẽ làm hết giờ chạy miễn phí. Khi cần kiểm tra database, mở tay `/api/health?db=1`.
 
-**Ai làm gì:** quản lý xem ở **Cài đặt → Hoạt động gần đây**, và ở cuối trang chi tiết từng đơn (**Lịch sử thay đổi**). Nhật ký ghi tạo/sửa/xoá đơn, việc, nhân viên, khách hàng, và mọi lần đăng nhập (kể cả đăng nhập sai).
+**Ai làm gì:** quản lý xem ở **Cài đặt → Hoạt động gần đây** và ở cuối trang chi tiết từng đơn (**Lịch sử thay đổi**). Nhật ký ghi lại:
+- tạo, sửa, xoá đơn, việc, nhân viên, khách hàng;
+- mọi lần đăng nhập, kể cả đăng nhập sai.
 
-**Lỗi máy chủ:** xem ở **Vercel → Project → Logs**. Gói Hobby chỉ giữ log trong thời gian ngắn, nên khi có lỗi thì xem ngay.
+**Lỗi máy chủ:** xem ở **Vercel → Project → Logs**. Gói Hobby chỉ giữ log trong thời gian ngắn, nên khi có lỗi hãy xem ngay.
 
 ---
 
-## 8. Theo dõi giới hạn miễn phí
+## 9. Theo dõi giới hạn miễn phí
 
 | Dịch vụ | Xem ở đâu | Ngưỡng cần chú ý |
 |---|---|---|
@@ -164,4 +221,4 @@ Nên thử khôi phục mỗi vài tháng một lần, và bắt buộc làm tr�
 | R2 | Cloudflare → R2 → Overview | Dung lượng > 8 GB |
 | Vercel | Usage | Băng thông, lượt gọi hoặc thời gian chạy hàm > 80% |
 
-Khi chạm ngưỡng, chuyển sang phương án A (Vercel Pro + Neon trả phí).
+Khi chạm ngưỡng, chuyển sang phương án A: Vercel Pro và Neon trả phí.

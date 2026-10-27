@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "build": "node scripts/migrate-if-production.mjs && prisma generate && next build",
-    "dev": "next dev",
+    "dev": "next dev -H 127.0.0.1",
     "lint": "eslint .",
     "postinstall": "prisma generate",
     "start": "next start"

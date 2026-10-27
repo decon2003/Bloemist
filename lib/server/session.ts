@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from 'crypto'
+import { createHmac, randomBytes, timingSafeEqual } from 'crypto'
 import type { NextResponse } from 'next/server'
 import db from './db'
 import { ApiError } from './api-error'
@@ -24,7 +24,14 @@ const BLOCKED_STATUSES = ['inactive', 'disabled']
 function getSecret(): string {
   const secret = process.env.AUTH_SECRET
   if (secret && secret.length >= 32) return secret
-  if (process.env.NODE_ENV !== 'production') return 'dev-only-insecure-secret-change-me-0000'
+  if (process.env.NODE_ENV !== 'production') {
+    // Local dev without AUTH_SECRET: a random key for this server process, never
+    // a fixed one (the repo is readable, so a fixed key would let anyone forge
+    // a session). Kept on globalThis so hot reloads don't log everyone out.
+    const dev = globalThis as { bloemistDevSecret?: string }
+    dev.bloemistDevSecret ??= randomBytes(32).toString('base64url')
+    return dev.bloemistDevSecret
+  }
   // Refuse to sign or accept anything rather than fall back to a guessable key.
   throw new Error('AUTH_SECRET must be set (at least 32 characters)')
 }

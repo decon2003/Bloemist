@@ -47,7 +47,7 @@ export function ProductCard({ task, user, florists, lang, onViewPhotos, onOrderC
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview) }, [preview])
 
   const role = user?.role ?? ''
-  const isManager = role === 'boss' || role === 'admin'
+  const isManager = role === 'admin'
   const canManage = isManager || role === 'sales'
   const mine = !!user && task.assigneeId === user.id
   const done = task.status === 'COMPLETED'

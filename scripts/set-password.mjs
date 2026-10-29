@@ -1,5 +1,5 @@
 // Set a user's password from the command line. Used once to give the first
-// boss/admin a password; after that, managers issue temporary passwords from
+// admin a password; after that, managers issue temporary passwords from
 // Settings.
 //
 //   node scripts/set-password.mjs <email> <password> [--temporary]

@@ -160,7 +160,7 @@ export interface Florist {
   name: string
 }
 
-export type UserRole = 'boss' | 'sales' | 'florist' | 'admin'
+export type UserRole = 'admin' | 'sales' | 'florist'
 
 export type StaffDiscipline = 'sales' | 'florist' | 'hybrid'
 

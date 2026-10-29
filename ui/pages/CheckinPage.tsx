@@ -205,7 +205,7 @@ export default function CheckinPage() {
   const { t } = useLocale()
   const { checkins, settings, users, createCheckIn, checkOut, correctCheckIn, deleteCheckIn, setCheckinMonth } = useAppData()
   const today = vnDay()
-  const isAdmin = user?.role === 'admin' || user?.role === 'boss'
+  const isAdmin = user?.role === 'admin'
 
   const [selectedDate, setSelectedDate] = useState<string>(today)
   const [isSubmitting, setIsSubmitting] = useState(false)

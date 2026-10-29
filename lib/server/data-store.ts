@@ -666,7 +666,7 @@ export const createTask = async (input: CreateTaskInput) => {
 }
 
 type TaskActor = { id: string; name: string; role: string }
-const isManagerRole = (role: string) => role === 'boss' || role === 'admin'
+const isManagerRole = (role: string) => role === 'admin'
 /** Sales and managers run orders: they assign, edit and complete on someone's behalf. */
 const canManageTasks = (role: string) => isManagerRole(role) || role === 'sales'
 

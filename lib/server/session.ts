@@ -7,8 +7,8 @@ import type { UserRole } from './validation'
 export const SESSION_COOKIE = 'bloemist_session'
 const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60
 
-export const MANAGER_ROLES: UserRole[] = ['boss', 'admin']
-export const ORDER_WRITE_ROLES: UserRole[] = ['boss', 'admin', 'sales']
+export const MANAGER_ROLES: UserRole[] = ['admin']
+export const ORDER_WRITE_ROLES: UserRole[] = ['admin', 'sales']
 
 export type SessionUser = {
   id: string

@@ -113,7 +113,7 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
     [florists, order?.assigneeId, order?.assigneeName],
   )
   // Sales edit orders; only managers delete them.
-  const isManager = user?.role === 'boss' || user?.role === 'admin'
+  const isManager = user?.role === 'admin'
 
   const formatMoney = (value?: string | number | null, fallback?: string) =>
     formatCurrencyDisplay(value, fallback ?? '₫0')

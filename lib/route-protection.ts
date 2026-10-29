@@ -6,25 +6,25 @@ export type ProtectedRoute = {
 }
 
 export const protectedRoutes: ProtectedRoute[] = [
-  // Settings are viewable by all roles; edits are limited in the UI to bosses/admins
-  { path: '/settings', allowedRoles: ['boss', 'admin', 'sales', 'florist'] },
-  { path: '/customers', allowedRoles: ['boss', 'admin'] },
+  // Settings are viewable by all roles; edits are limited in the UI to admins
+  { path: '/settings', allowedRoles: ['admin', 'sales', 'florist'] },
+  { path: '/customers', allowedRoles: ['admin'] },
 
   // Orders and check-ins - shared workspace tools
-  { path: '/orders', allowedRoles: ['boss', 'sales', 'florist', 'admin'] },
-  { path: '/checkins', allowedRoles: ['boss', 'sales', 'florist', 'admin'] },
+  { path: '/orders', allowedRoles: ['admin', 'sales', 'florist'] },
+  { path: '/checkins', allowedRoles: ['admin', 'sales', 'florist'] },
 
-  // Dashboard - bosses and admins only
-  { path: '/dashboard', allowedRoles: ['boss', 'admin'] },
+  // Dashboard - admins only
+  { path: '/dashboard', allowedRoles: ['admin'] },
 
-  // Payroll - bosses and admins only
-  { path: '/payroll', allowedRoles: ['boss', 'admin'] },
+  // Payroll - admins only
+  { path: '/payroll', allowedRoles: ['admin'] },
 
   // Own pay - everyone sees only their own
-  { path: '/my-pay', allowedRoles: ['boss', 'admin', 'sales', 'florist'] },
+  { path: '/my-pay', allowedRoles: ['admin', 'sales', 'florist'] },
 
-  // Staff performance reporting - bosses and admins only
-  { path: '/staff', allowedRoles: ['boss', 'admin'] },
+  // Staff performance reporting - admins only
+  { path: '/staff', allowedRoles: ['admin'] },
 ]
 
 export function canAccessRoute(pathname: string, userRole: User['role'] | null): boolean {

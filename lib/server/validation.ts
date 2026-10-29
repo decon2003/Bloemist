@@ -1,6 +1,6 @@
 import { ApiError, fieldLabel } from './api-error'
 
-export const USER_ROLES = ['boss', 'admin', 'sales', 'florist'] as const
+export const USER_ROLES = ['admin', 'sales', 'florist'] as const
 export type UserRole = (typeof USER_ROLES)[number]
 
 export const USER_STATUSES = ['active', 'inactive'] as const
@@ -16,7 +16,7 @@ export const TASK_STATUSES = [
   'CANCELLED',
 ] as const
 
-/** Columns that must never be returned to a client that is not a boss/admin.
+/** Columns that must never be returned to a client that is not an admin.
  *  baseSalary and commissionRate are the most sensitive fields in the schema. */
 export const PUBLIC_USER_SELECT = {
   id: true,

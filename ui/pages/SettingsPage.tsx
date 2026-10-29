@@ -20,7 +20,6 @@ interface UserFormData {
 }
 
 const ROLE_LABEL: Record<User['role'], string> = {
-  boss: 'Chủ shop',
   admin: 'Quản trị viên',
   sales: 'Sale',
   florist: 'Thợ hoa',
@@ -221,7 +220,7 @@ export default function SettingsPage() {
     }
   }
 
-  const canManageUsers = user?.role === 'boss' || user?.role === 'admin'
+  const canManageUsers = user?.role === 'admin'
   const canEditSettings = canManageUsers
   const workingHoursLabel =
     workingHours.start && workingHours.end
@@ -383,8 +382,6 @@ export default function SettingsPage() {
 
   const getRoleColor = (role: User['role']) => {
     switch (role) {
-      case 'boss':
-        return 'bg-amber-100 text-amber-800'
       case 'admin':
         return 'bg-violet-100 text-violet-800'
       case 'sales':

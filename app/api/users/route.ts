@@ -17,7 +17,7 @@ import {
     requireNonBlank,
 } from '@/lib/server/validation'
 
-// GET: List all users. Salary and contact columns only go to bosses/admins;
+// GET: List all users. Salary and contact columns only go to admins;
 // password and lockout columns never leave the server.
 export async function GET(request: Request) {
     try {

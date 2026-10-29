@@ -22,7 +22,7 @@ export default function ChangePasswordPage() {
   const [isSaving, setIsSaving] = useState(false)
 
   const forced = !!user?.mustChangePassword
-  const homePath = user?.role === 'boss' || user?.role === 'admin' ? 'dashboard' : 'orders'
+  const homePath = user?.role === 'admin' ? 'dashboard' : 'orders'
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

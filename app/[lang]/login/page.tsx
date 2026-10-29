@@ -22,7 +22,7 @@ export default function LoginPage() {
       const signedIn = await login(email, password)
       const destination = signedIn.mustChangePassword
         ? 'change-password'
-        : signedIn.role === 'boss' || signedIn.role === 'admin'
+        : signedIn.role === 'admin'
           ? 'dashboard'
           : 'orders'
       // Full navigation so data queries that failed while signed out start fresh.

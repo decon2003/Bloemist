@@ -116,12 +116,12 @@ export async function PATCH(request: Request, context: RouteContext) {
             throw new ApiError(403, 'Không tự đổi vai trò hoặc ngừng tài khoản của chính mình')
         }
         // Never leave the shop without an active manager.
-        const isManagerRole = (role: string) => role === 'boss' || role === 'admin'
+        const isManagerRole = (role: string) => role === 'admin'
         const losesManager =
             isManagerRole(existing.role) && existing.status === 'active' &&
             ((roleChanges && !isManagerRole(data.role as string)) || (statusChanges && data.status !== 'active'))
         if (losesManager) {
-            const others = await db.user.count({ where: { id: { not: userId }, status: 'active', role: { in: ['boss', 'admin'] } } })
+            const others = await db.user.count({ where: { id: { not: userId }, status: 'active', role: 'admin' } })
             if (others === 0) throw new ApiError(409, 'Cần giữ ít nhất một quản lý đang làm việc')
         }
         const deactivating = statusChanges && data.status !== 'active'

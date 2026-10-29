@@ -92,7 +92,7 @@ export default function OrdersPage() {
   const scope = useMemo(() => ({ ...baseScope, limit }), [baseScope, limit])
   useEffect(() => setOrderScope(scope), [scope, setOrderScope])
 
-  const isManager = user?.role === 'boss' || user?.role === 'admin'
+  const isManager = user?.role === 'admin'
   const staff = useMemo(() => users.filter((u) => u.status === 'active'), [users])
 
   const filteredOrders = useMemo(

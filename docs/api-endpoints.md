@@ -6,8 +6,8 @@ Every route except `auth/login`, `auth/logout`, `health` and the cron routes req
 
 Who can call a route:
 - **any**: any signed-in user.
-- **writers**: `boss`, `admin` and `sales` (`ORDER_WRITE_ROLES`).
-- **managers**: `boss` and `admin` (`MANAGER_ROLES`).
+- **writers**: `admin` and `sales` (`ORDER_WRITE_ROLES`).
+- **managers**: `admin` (`MANAGER_ROLES`).
 
 Data returned to florists is redacted on the server. `redactOrderFor` and `redactTaskFor` blank phone numbers, `customerId` and payment fields (VAT, selling price, deposit, remaining balance, total). Searches made by a florist do not match phone numbers.
 

@@ -15,7 +15,6 @@ import {
   Settings,
   LogOut,
   User,
-  Briefcase,
   Award,
   Zap,
   MapPin,
@@ -59,7 +58,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       { href: `/${lang}/settings`, label: t('nav.settings'), icon: Settings },
     ]
 
-    if (user?.role === 'boss' || user?.role === 'admin') {
+    if (user?.role === 'admin') {
       return [
         ...managerBase,
 
@@ -103,8 +102,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const getRoleBadge = () => {
     switch (user?.role) {
-      case 'boss':
-        return { label: t('role.boss'), color: 'bg-amber-100 text-amber-800', icon: Briefcase }
       case 'admin':
         return { label: t('role.admin'), color: 'bg-violet-100 text-violet-800', icon: Award }
       case 'sales':

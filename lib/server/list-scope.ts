@@ -27,7 +27,7 @@ export type ListScope =
   | { kind: 'search'; q: string; since?: Date; limit?: number }
 
 type Viewer = { role: string }
-const MANAGER_ROLES = ['boss', 'admin']
+const MANAGER_ROLES = ['admin']
 
 /** Read ?from=YYYY-MM-DD&to=YYYY-MM-DD (inclusive Vietnam days) or ?q=text,
  *  plus ?limit=. Without a manager viewer, history is cut at 30 days. */

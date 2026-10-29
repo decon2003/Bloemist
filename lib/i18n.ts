@@ -88,7 +88,7 @@ const dictionaries: Record<SupportedLocale, Record<string, string>> = {
     'orders.detail.paymentSummary': 'Tổng quan thanh toán',
     'orders.detail.listedPrice': 'Giá niêm yết',
     'orders.detail.deliveryFee': 'Phí giao hàng',
-    'orders.detail.deposit': 'Tiền cọc',
+    'orders.detail.deposit': 'Đã thu',
     'orders.detail.remainingBalance': 'Còn phải thu',
     'orders.detail.delete': 'Xóa đơn hàng',
     'orders.detail.deleteConfirmation': 'Bạn có chắc chắn muốn xóa đơn hàng này? Hành động này không thể hoàn tác.',

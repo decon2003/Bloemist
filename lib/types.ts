@@ -251,6 +251,50 @@ export interface PayrollAdjustment {
   amount: number
 }
 
+/** A fixed monthly allowance (meals, fuel...), paid in full. */
+export interface PayrollAllowance {
+  label: string
+  amount: number
+}
+
+/** A sales KPI bonus for one shift: flower money paid in it while the
+ *  salesperson was at work, and the tier reached. */
+export interface PayrollKpiItem {
+  key: string
+  date: string
+  shift: string
+  revenue: number
+  bonus: number
+  payments: number
+  included: boolean
+}
+
+export interface KpiShift {
+  name: string
+  /** HH:mm */
+  start: string
+  end: string
+}
+
+export interface KpiTier {
+  revenue: number
+  bonus: number
+}
+
+/** Money a customer transferred for an order. */
+export interface OrderPayment {
+  id: string
+  amount: number
+  paidAt: string
+  recordedByName: string | null
+  note: string | null
+}
+
+export interface OrderPaymentsResult {
+  order: Order
+  payments: OrderPayment[]
+}
+
 export interface PayrollLine {
   id: string
   userId: string
@@ -265,12 +309,17 @@ export interface PayrollLine {
   holidayHourlyRate?: number | null
   /** Sales: hourly rate for online shifts; null = the normal hourly rate. */
   onlineHourlyRate?: number | null
+  /** Overtime and "ca gấp" per hour; null = hourly rate x the OT multiplier. */
+  otHourlyRate?: number | null
+  allowances?: PayrollAllowance[]
   /** MONTHLY: paid days off per month. */
   daysOffPerMonth?: number
   /** This month's rates were set by hand (a refresh keeps them). */
   ratesOverridden?: boolean
   shifts: PayrollShift[]
   commissions: PayrollCommission[]
+  /** Sales only. */
+  kpi?: PayrollKpiItem[]
   adjustments: PayrollAdjustment[]
   note: string | null
   totals: {
@@ -292,6 +341,8 @@ export interface PayrollLine {
     otPay: number
     commissionByKind: Record<CommissionKind, number>
     commission: number
+    kpiTotal: number
+    allowancesTotal: number
     adjustmentsTotal: number
     total: number
   }
@@ -328,9 +379,12 @@ export interface PayrollLineUpdate {
   salesRate?: number
   holidayHourlyRate?: number | null
   onlineHourlyRate?: number | null
+  otHourlyRate?: number | null
+  allowances?: PayrollAllowance[]
   daysOffPerMonth?: number
   shiftDecisions?: { date: string; otDecision: OtDecision }[]
   commissionChanges?: { key: string; included?: boolean; rate?: number }[]
+  kpiChanges?: { key: string; included: boolean }[]
   adjustments?: PayrollAdjustment[]
   note?: string | null
 }
@@ -365,6 +419,9 @@ export interface WorkspaceSettings {
   }
   /** Public holidays: hourly staff are paid their holiday rate on these days. */
   holidays: { date: string; name: string }[]
+  /** Sales KPI shifts and bonus tiers. */
+  kpiShifts?: KpiShift[]
+  kpiTiers?: KpiTier[]
 }
 
 export interface User {
@@ -391,6 +448,10 @@ export interface User {
   holidayHourlyRate?: number | null
   /** Sales: hourly rate for online (at-home) shifts; null = the normal hourly rate. */
   onlineHourlyRate?: number | null
+  /** Overtime and "ca gấp" per hour; null = hourly rate x the OT multiplier. */
+  otHourlyRate?: number | null
+  /** Fixed monthly allowances, paid in full. */
+  allowances?: PayrollAllowance[]
   /** MONTHLY: paid days off per month (base is paid per day worked). */
   daysOffPerMonth?: number
   mustChangePassword?: boolean

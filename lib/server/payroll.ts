@@ -3,6 +3,7 @@ import db from './db'
 import { ApiError } from './api-error'
 import { audit, type AuditActor } from './audit'
 import { closeOpenShifts, getShopSettings, parseHolidays } from './attendance'
+import { collectKpi, type KpiItem } from './kpi'
 import { parseVnMonth, vnDateKey } from './vn-time'
 
 // Monthly payroll. The system pre-fills a draft from facts recorded during the
@@ -11,27 +12,32 @@ import { parseVnMonth, vnDateKey } from './vn-time'
 //
 // - regular hours = the part of each shift inside opening hours; time outside
 //   them is overtime, PENDING until a manager marks the day OT, REGULAR or
-//   EXCLUDE. Less than 15 minutes at either end of a shift is ignored;
-// - a "ca gấp" (RUSH) day is paid entirely as overtime;
+//   EXCLUDE. Overtime is paid only once approved (staff do not come early
+//   unless asked). Less than 10 minutes at either end of a shift is ignored;
+//   from 10 minutes it counts to the minute;
+// - overtime and "ca gấp" (RUSH, the whole day paid as overtime) are paid at
+//   the person's OT rate, or hourly rate x the payroll's OT multiplier;
 // - a shift nobody checked out of counts 0 hours until it is corrected;
 // - an ONLINE shift (sales working from home) is paid at the online hourly
 //   rate for all its hours: no overtime, no holiday rate;
 // - MONTHLY pay = base salary x days worked / (days in month - paid days off),
 //   at most the full salary;
 //   HOURLY pay = hourly rate x regular hours, at the holiday rate on public
-//   holidays (Settings); overtime = rate x OT multiplier x OT hours;
+//   holidays (Settings);
 // - making commission = rate% of each completed product's price (before VAT);
 //   it goes in full to whoever the product's task is assigned to - never to
 //   sales, who earn the sales commission only;
 // - sales commission = rate% of the listed price of each order created that
 //   month where the person is the salesperson (defaults to the creator);
 // - cancelled orders never earn commission;
+// - sales KPI: a bonus per shift from the money paid in it (lib/server/kpi.ts);
+// - fixed monthly allowances (meals, fuel...) from the pay profile, paid in full;
 // - free-form adjustments (bonus, deduction, advance...).
 
 export const OT_DECISIONS = ['PENDING', 'OT', 'REGULAR', 'EXCLUDE', 'NONE', 'RUSH'] as const
 export type OtDecision = (typeof OT_DECISIONS)[number]
-/** Time outside opening hours shorter than this, at either end of a shift, is ignored. */
-export const OT_GRACE_HOURS = 0.25
+/** Time outside opening hours shorter than this (10 minutes), at either end of a shift, is ignored. */
+export const OT_GRACE_HOURS = 10 / 60
 
 export type ShiftItem = {
   date: string
@@ -67,11 +73,34 @@ export type CommissionItem = {
 }
 
 export type Adjustment = { label: string; amount: number }
+export type Allowance = { label: string; amount: number }
+
+/** Allowances as stored (JSON): anything malformed is dropped. */
+const storedAllowances = (value: unknown): Allowance[] =>
+  Array.isArray(value)
+    ? value.filter((a): a is Allowance => typeof a?.label === 'string' && Number.isFinite(a?.amount))
+    : []
+
+/** Allowances sent by a manager: at most 10, each with a label and a whole-VND amount. */
+export function parseAllowances(value: unknown): Allowance[] {
+  if (!Array.isArray(value) || value.length > 10) throw new ApiError(400, 'Danh sách phụ cấp không hợp lệ')
+  return value.map((a, i) => {
+    const label = typeof a?.label === 'string' ? a.label.trim().slice(0, 100) : ''
+    if (!label) throw new ApiError(400, `Phụ cấp ${i + 1}: thiếu nội dung`)
+    const amount = typeof a?.amount === 'string' ? Number(a.amount.replace(/\D/g, '')) : a?.amount
+    if (typeof amount !== 'number' || !Number.isInteger(amount) || amount < 0 || amount > 100_000_000) {
+      throw new ApiError(400, `Phụ cấp ${i + 1}: số tiền không hợp lệ`)
+    }
+    return { label, amount }
+  })
+}
 
 type LineRow = Prisma.PayrollLineGetPayload<object>
-type LineRates = Pick<LineRow, 'payType' | 'baseSalary' | 'hourlyRate' | 'makerRate' | 'salesRate' | 'holidayHourlyRate' | 'onlineHourlyRate' | 'daysOffPerMonth'>
+type LineRates = Pick<LineRow, 'payType' | 'baseSalary' | 'hourlyRate' | 'makerRate' | 'salesRate' | 'holidayHourlyRate' | 'onlineHourlyRate' | 'otHourlyRate' | 'daysOffPerMonth'>
 
 const round2 = (n: number) => Math.round(n * 100) / 100
+/** Shift hours are kept to the whole minute: overtime is paid minute by minute. */
+const toMinute = (hours: number) => Math.round(hours * 60) / 60
 const hoursBetween = (a: Date, b: Date) => Math.max(0, (b.getTime() - a.getTime()) / 3_600_000)
 const atVnTime = (date: string, time: string) => new Date(`${date}T${time}:00+07:00`)
 
@@ -81,13 +110,15 @@ export const daysInMonth = (monthKey: string) => {
 }
 
 /** Totals for one line in a month under the payroll's OT multiplier. PENDING
- *  overtime is counted as OT in the estimate until a manager decides. */
+ *  overtime is not paid until a manager approves it. */
 export function computeLine(
   line: Pick<LineRates, 'payType' | 'baseSalary' | 'hourlyRate'> &
-    Partial<Pick<LineRates, 'holidayHourlyRate' | 'onlineHourlyRate' | 'daysOffPerMonth'>> & {
+    Partial<Pick<LineRates, 'holidayHourlyRate' | 'onlineHourlyRate' | 'otHourlyRate' | 'daysOffPerMonth'>> & {
       shifts: unknown
       commissions: unknown
       adjustments: unknown
+      allowances?: unknown
+      kpi?: unknown
     },
   otMultiplier: number,
   monthKey: string,
@@ -99,6 +130,7 @@ export function computeLine(
   // Holidays change the rate of hourly staff only; monthly staff are paid as usual.
   const rateFor = (s: ShiftItem) =>
     !monthly && s.holiday && line.holidayHourlyRate != null ? line.holidayHourlyRate : line.hourlyRate
+  const otRateFor = (s: ShiftItem) => line.otHourlyRate ?? rateFor(s) * otMultiplier
 
   let regularHours = 0
   let otHours = 0
@@ -120,16 +152,16 @@ export function computeLine(
     const rate = rateFor(s)
     if (s.otDecision === 'RUSH') {
       rushHours += s.hours
-      otPay += s.hours * rate * otMultiplier
+      otPay += s.hours * otRateFor(s)
       continue
     }
     const regular = s.regularHours + (s.otDecision === 'REGULAR' ? s.otHours : 0)
-    const ot = s.otDecision === 'OT' || s.otDecision === 'PENDING' ? s.otHours : 0
+    const ot = s.otDecision === 'OT' ? s.otHours : 0
     regularHours += regular
     otHours += ot
     if (s.holiday && !monthly && line.holidayHourlyRate != null) holidayHours += regular
     hourlyPay += regular * rate
-    otPay += ot * rate * otMultiplier
+    otPay += ot * otRateFor(s)
     if (s.hours > 0) workedDays.add(s.date)
   }
   const daysWorked = workedDays.size
@@ -144,6 +176,8 @@ export function computeLine(
   }
   const commission = commissionByKind.MAKER + commissionByKind.SALES
   const adjustmentsTotal = adjustments.reduce((sum, a) => sum + a.amount, 0)
+  const allowancesTotal = storedAllowances(line.allowances).reduce((sum, a) => sum + a.amount, 0)
+  const kpiTotal = ((line.kpi as KpiItem[] | undefined) ?? []).reduce((sum, k) => sum + (k.included ? k.bonus : 0), 0)
   const roundedOtPay = Math.round(otPay)
 
   return {
@@ -160,8 +194,10 @@ export function computeLine(
     otPay: roundedOtPay,
     commissionByKind,
     commission,
+    kpiTotal,
+    allowancesTotal,
     adjustmentsTotal,
-    total: basePay + roundedOtPay + commission + adjustmentsTotal,
+    total: basePay + roundedOtPay + commission + kpiTotal + allowancesTotal + adjustmentsTotal,
   }
 }
 
@@ -202,17 +238,17 @@ async function collectFacts(month: { key: string; start: Date; end: Date }) {
     let ot = 0
     const online = s.workMode === 'ONLINE'
     if (!s.autoClosed && online) {
-      hours = round2(hoursBetween(checkIn, checkOut))
+      hours = toMinute(hoursBetween(checkIn, checkOut))
       regular = hours
     } else if (!s.autoClosed) {
       const open = atVnTime(s.workDate, settings.openTime)
       const close = atVnTime(s.workDate, settings.closeTime)
-      hours = round2(hoursBetween(checkIn, checkOut))
-      regular = round2(overlap(checkIn, checkOut, open, close))
+      hours = toMinute(hoursBetween(checkIn, checkOut))
+      regular = toMinute(overlap(checkIn, checkOut, open, close))
       // A shift may run past midnight; everything after closing is overtime.
       const before = checkIn < open ? hoursBetween(checkIn, new Date(Math.min(checkOut.getTime(), open.getTime()))) : 0
       const after = checkOut > close ? hoursBetween(new Date(Math.max(checkIn.getTime(), close.getTime())), checkOut) : 0
-      ot = round2((before >= OT_GRACE_HOURS ? before : 0) + (after >= OT_GRACE_HOURS ? after : 0))
+      ot = toMinute((before >= OT_GRACE_HOURS ? before : 0) + (after >= OT_GRACE_HOURS ? after : 0))
     }
     const list = shiftsByUser.get(s.staffId) ?? []
     list.push({
@@ -278,7 +314,9 @@ async function collectFacts(month: { key: string; start: Date; end: Date }) {
     }
   }
 
-  return { settings, users, shiftsByUser, commissionsByUser }
+  const kpiByUser = await collectKpi(month, settings)
+
+  return { settings, users, shiftsByUser, commissionsByUser, kpiByUser }
 }
 
 const rateFor = (line: { makerRate: number; salesRate: number }, kind: CommissionKind) =>
@@ -295,6 +333,8 @@ const profileRates = (user: ProfileUser) => ({
   // Sales get no holiday rate.
   holidayHourlyRate: user.role === 'sales' ? null : user.holidayHourlyRate,
   onlineHourlyRate: user.role === 'sales' ? user.onlineHourlyRate : null,
+  otHourlyRate: user.otHourlyRate,
+  allowances: storedAllowances(user.allowances),
   daysOffPerMonth: user.daysOffPerMonth,
 })
 
@@ -310,7 +350,7 @@ export async function generatePayroll(monthKey: string, actor: AuditActor) {
   const existing = await db.payroll.findUnique({ where: { month: month.key }, include: { lines: true } })
   if (existing?.status === 'LOCKED') throw new ApiError(409, 'Bảng lương tháng này đã chốt. Mở khoá trước khi cập nhật.')
 
-  const { settings, users, shiftsByUser, commissionsByUser } = await collectFacts(month)
+  const { settings, users, shiftsByUser, commissionsByUser, kpiByUser } = await collectFacts(month)
   const payroll =
     existing ??
     (await db.payroll.create({ data: { month: month.key, otMultiplier: settings.otMultiplier }, include: { lines: true } }))
@@ -318,7 +358,7 @@ export async function generatePayroll(monthKey: string, actor: AuditActor) {
 
   for (const user of users) {
     const before = previous.get(user.id)
-    const hasActivity = shiftsByUser.has(user.id) || commissionsByUser.has(user.id)
+    const hasActivity = shiftsByUser.has(user.id) || commissionsByUser.has(user.id) || kpiByUser.has(user.id)
     if (!before && !hasActivity && user.status !== 'active') continue
 
     const rates = before?.ratesOverridden
@@ -330,6 +370,8 @@ export async function generatePayroll(monthKey: string, actor: AuditActor) {
           salesRate: before.salesRate,
           holidayHourlyRate: before.holidayHourlyRate,
           onlineHourlyRate: before.onlineHourlyRate,
+          otHourlyRate: before.otHourlyRate,
+          allowances: storedAllowances(before.allowances),
           daysOffPerMonth: before.daysOffPerMonth,
         }
       : profileRates(user)
@@ -349,15 +391,20 @@ export async function generatePayroll(monthKey: string, actor: AuditActor) {
       const kept = oldItems.get(item.key)
       return { ...item, rate: kept?.rate ?? rateFor(rates, item.kind), included: kept?.included ?? true }
     })
+    // A KPI bonus switched off stays off; amounts follow the latest payments.
+    const oldKpi = new Map(((before?.kpi as KpiItem[] | undefined) ?? []).map((k) => [k.key, k]))
+    const kpi: KpiItem[] = (kpiByUser.get(user.id) ?? []).map((k) => ({ ...k, included: oldKpi.get(k.key)?.included ?? true }))
 
     const data = {
       userName: user.name,
       role: user.role,
       ...rates,
+      allowances: rates.allowances as unknown as Prisma.InputJsonValue,
       shifts: shifts as unknown as Prisma.InputJsonValue,
       commissions: commissions as unknown as Prisma.InputJsonValue,
+      kpi: kpi as unknown as Prisma.InputJsonValue,
     }
-    const total = computeLine({ ...data, adjustments: before?.adjustments ?? [] }, payroll.otMultiplier, month.key).total
+    const total = computeLine({ ...data, allowances: rates.allowances, adjustments: before?.adjustments ?? [] }, payroll.otMultiplier, month.key).total
     if (before) {
       await db.payrollLine.update({ where: { id: before.id }, data: { ...data, total } })
     } else {
@@ -376,16 +423,21 @@ export async function generatePayroll(monthKey: string, actor: AuditActor) {
   return getPayroll(month.key)
 }
 
-/** Payroll months an order's commissions fall in: the month it was created
- *  (sales commission) and the months its products were completed (making
- *  commission). Read before the order is cancelled or deleted. */
+/** Payroll months an order's pay falls in: the month it was created (sales
+ *  commission), the months its products were completed (making commission)
+ *  and the months it was paid in (sales KPI). Read before the order is
+ *  cancelled or deleted. */
 export async function payrollMonthsForOrder(orderId: string) {
   const order = await db.order.findUnique({
     where: { id: orderId },
-    select: { createdAt: true, tasks: { where: { completedAt: { not: null } }, select: { completedAt: true } } },
+    select: {
+      createdAt: true,
+      tasks: { where: { completedAt: { not: null } }, select: { completedAt: true } },
+      payments: { select: { paidAt: true } },
+    },
   })
   if (!order) return []
-  const dates = [order.createdAt, ...order.tasks.map((t) => t.completedAt!)]
+  const dates = [order.createdAt, ...order.tasks.map((t) => t.completedAt!), ...order.payments.map((p) => p.paidAt)]
   return [...new Set(dates.map((d) => vnDateKey(d).slice(0, 7)))]
 }
 
@@ -436,7 +488,7 @@ export async function getPayroll(monthKey: string) {
 /** A staff member's own pay for a month ("Thu nhập"). Once the payroll is
  *  locked it is exactly the locked line. Before that it is an estimate from
  *  their pay profile and the month's facts so far: overtime awaiting review
- *  counts as OT (as in the manager's draft), and the manager's draft edits and
+ *  is not paid yet (as in the manager's draft), and the manager's draft edits and
  *  adjustments stay private until the payroll is locked. */
 export async function getMyPay(userId: string, monthKey: string) {
   const month = parseVnMonth(monthKey)
@@ -457,7 +509,7 @@ export async function getMyPay(userId: string, monthKey: string) {
 
   const user = await db.user.findUnique({ where: { id: userId } })
   if (!user) throw new ApiError(404, 'Không tìm thấy nhân viên')
-  const { settings, shiftsByUser, commissionsByUser } = await collectFacts(month)
+  const { settings, shiftsByUser, commissionsByUser, kpiByUser } = await collectFacts(month)
   const rates = profileRates(user)
   const line = {
     id: null,
@@ -467,6 +519,7 @@ export async function getMyPay(userId: string, monthKey: string) {
     ...rates,
     shifts: shiftsByUser.get(userId) ?? [],
     commissions: (commissionsByUser.get(userId) ?? []).map((item) => ({ ...item, rate: rateFor(rates, item.kind), included: true })),
+    kpi: (kpiByUser.get(userId) ?? []).map((k) => ({ ...k, included: true })),
     adjustments: [] as Adjustment[],
     note: null,
   }
@@ -518,10 +571,13 @@ export async function updatePayrollLine(lineId: string, body: Record<string, unk
     salesRate: line.salesRate,
     holidayHourlyRate: line.holidayHourlyRate,
     onlineHourlyRate: line.onlineHourlyRate,
+    otHourlyRate: line.otHourlyRate,
+    allowances: storedAllowances(line.allowances),
     daysOffPerMonth: line.daysOffPerMonth,
     ratesOverridden: line.ratesOverridden,
     shifts: line.shifts as ShiftItem[],
     commissions: line.commissions as CommissionItem[],
+    kpi: line.kpi as KpiItem[],
     adjustments: line.adjustments as Adjustment[],
     note: line.note,
   }
@@ -538,6 +594,10 @@ export async function updatePayrollLine(lineId: string, body: Record<string, unk
   if (body.onlineHourlyRate !== undefined) {
     next.onlineHourlyRate = body.onlineHourlyRate === null || body.onlineHourlyRate === '' ? null : asMoney(body.onlineHourlyRate, 'Đơn giá giờ online')
   }
+  if (body.otHourlyRate !== undefined) {
+    next.otHourlyRate = body.otHourlyRate === null || body.otHourlyRate === '' ? null : asMoney(body.otHourlyRate, 'Đơn giá tăng ca')
+  }
+  if (body.allowances !== undefined) next.allowances = parseAllowances(body.allowances)
   if (body.daysOffPerMonth !== undefined) {
     const n = Number(body.daysOffPerMonth)
     if (!Number.isInteger(n) || n < 0 || n > 15) throw new ApiError(400, 'Số ngày nghỉ phải từ 0 đến 15')
@@ -552,7 +612,7 @@ export async function updatePayrollLine(lineId: string, body: Record<string, unk
     next.commissions = next.commissions.map((c) => (c.kind === kind ? { ...c, rate } : c))
   }
   // Rates set by hand for this month are kept on refresh instead of re-reading the profile.
-  if (['payType', 'baseSalary', 'hourlyRate', 'holidayHourlyRate', 'onlineHourlyRate', 'daysOffPerMonth', 'makerRate', 'salesRate'].some((f) => body[f] !== undefined)) {
+  if (['payType', 'baseSalary', 'hourlyRate', 'holidayHourlyRate', 'onlineHourlyRate', 'otHourlyRate', 'allowances', 'daysOffPerMonth', 'makerRate', 'salesRate'].some((f) => body[f] !== undefined)) {
     next.ratesOverridden = true
   }
 
@@ -594,6 +654,14 @@ export async function updatePayrollLine(lineId: string, body: Record<string, unk
     })
   }
 
+  if (Array.isArray(body.kpiChanges)) {
+    const included = new Map<string, boolean>()
+    for (const c of body.kpiChanges as { key?: unknown; included?: unknown }[]) {
+      if (typeof c?.key === 'string') included.set(c.key, c.included === true)
+    }
+    next.kpi = next.kpi.map((k) => (included.has(k.key) ? { ...k, included: included.get(k.key)! } : k))
+  }
+
   if (body.adjustments !== undefined) {
     if (!Array.isArray(body.adjustments)) throw new ApiError(400, 'Danh sách điều chỉnh không hợp lệ')
     next.adjustments = (body.adjustments as { label?: unknown; amount?: unknown }[]).map((a, i) => {
@@ -608,8 +676,10 @@ export async function updatePayrollLine(lineId: string, body: Record<string, unk
     where: { id: lineId },
     data: {
       ...next,
+      allowances: next.allowances as unknown as Prisma.InputJsonValue,
       shifts: next.shifts as unknown as Prisma.InputJsonValue,
       commissions: next.commissions as unknown as Prisma.InputJsonValue,
+      kpi: next.kpi as unknown as Prisma.InputJsonValue,
       adjustments: next.adjustments as unknown as Prisma.InputJsonValue,
       total,
     },
@@ -697,7 +767,7 @@ export async function exportPayrollCsv(monthKey: string) {
   const rows: unknown[][] = [
     [`Bảng lương ${payroll.month}`, payroll.status === 'LOCKED' ? `Đã chốt bởi ${payroll.lockedByName ?? ''}` : 'Nháp', `Hệ số OT ${payroll.otMultiplier}`],
     [],
-    ['Nhân viên', 'Hình thức', 'Ngày công', 'Giờ thường', 'Giờ OT', 'Giờ ca gấp', 'Lương', 'Tiền OT', 'HH làm đơn', 'HH sale', 'Điều chỉnh', 'Tổng', 'Ghi chú'],
+    ['Nhân viên', 'Hình thức', 'Ngày công', 'Giờ thường', 'Giờ OT', 'Giờ ca gấp', 'Lương', 'Tiền OT', 'HH làm đơn', 'HH sale', 'Thưởng KPI', 'Phụ cấp', 'Điều chỉnh', 'Tổng', 'Ghi chú'],
   ]
   for (const line of payroll.lines) {
     const t = line.totals
@@ -712,6 +782,8 @@ export async function exportPayrollCsv(monthKey: string) {
       t.otPay,
       t.commissionByKind.MAKER,
       t.commissionByKind.SALES,
+      t.kpiTotal,
+      t.allowancesTotal,
       t.adjustmentsTotal,
       t.total,
       line.note ?? '',
@@ -721,6 +793,12 @@ export async function exportPayrollCsv(monthKey: string) {
   for (const line of payroll.lines) {
     for (const c of line.commissions as CommissionItem[]) {
       rows.push([line.userName, kindLabel[c.kind], c.orderCode ?? '', c.label, c.base, c.rate, Math.round((c.base * c.rate) / 100), c.included ? 'Có' : 'Không'])
+    }
+    for (const k of (line.kpi as KpiItem[]) ?? []) {
+      rows.push([line.userName, 'KPI', '', `${dayLabel(k.date)} ${k.shift}`, k.revenue, '', k.bonus, k.included ? 'Có' : 'Không'])
+    }
+    for (const a of storedAllowances(line.allowances)) {
+      rows.push([line.userName, 'Phụ cấp', '', a.label, '', '', a.amount, 'Có'])
     }
     for (const a of line.adjustments as Adjustment[]) {
       rows.push([line.userName, 'Điều chỉnh', '', a.label, '', '', a.amount, 'Có'])

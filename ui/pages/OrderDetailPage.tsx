@@ -10,6 +10,7 @@ import { useLocale } from "@/components/providers/locale-provider"
 import { useAuth } from "@/components/providers/auth-provider"
 import AddTaskDialog from "@/components/tasks/add-task-dialog"
 import { ProductCard } from "@/components/orders/product-card"
+import { OrderPayments } from "@/components/orders/order-payments"
 import { PhotoViewer } from "@/components/photo-viewer"
 import { fetchOrder, updateOrder, deleteOrder } from "@/lib/api"
 import type { CreateOrderInput, Order } from "@/lib/types"
@@ -471,7 +472,7 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
               </dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">{t('orders.detail.deposit', 'Đã cọc')}</dt>
+              <dt className="text-muted-foreground">{t('orders.detail.deposit', 'Đã thu')}</dt>
               <dd className="text-lg font-semibold text-foreground">{formatMoney(order.deposit)}</dd>
             </div>
             <div>
@@ -483,6 +484,7 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
               <dd className="text-lg font-semibold text-foreground">{formatMoney(order.total)}</dd>
             </div>
           </dl>
+          <OrderPayments order={order} isManager={isManager} onOrderChange={setOrder} />
         </section>
         )}
 

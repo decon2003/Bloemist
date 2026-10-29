@@ -10,6 +10,8 @@ const ACTION_LABELS: Record<string, string> = {
   'order.update': 'Sửa đơn',
   'order.delete': 'Xoá đơn',
   'order.assign': 'Giao đơn',
+  'order.payment': 'Ghi nhận tiền khách chuyển',
+  'order.payment_delete': 'Xoá khoản thu',
   'task.create': 'Tạo việc',
   'task.update': 'Sửa việc',
   'task.status': 'Đổi trạng thái việc',

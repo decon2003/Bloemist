@@ -1,4 +1,4 @@
-import { CreateOrderInput, CreateTaskInput, DashboardStats, Order, Task, TaskStatus, Florist, StaffCheckIn, WorkspaceSettings, User, CustomerPage, CustomerLookup, CustomerDetail, CustomerSummary, ListParams, BouquetSuggestion, AuditEntry, ShiftCorrectionInput, Payroll, PayrollLineUpdate, MyPay } from './types'
+import { CreateOrderInput, CreateTaskInput, DashboardStats, Order, Task, TaskStatus, Florist, StaffCheckIn, WorkspaceSettings, User, CustomerPage, CustomerLookup, CustomerDetail, CustomerSummary, ListParams, BouquetSuggestion, AuditEntry, ShiftCorrectionInput, Payroll, PayrollLineUpdate, MyPay, OrderPayment, OrderPaymentsResult, KpiShift, KpiTier } from './types'
 
 export interface AssignTaskPayload {
   userId: string
@@ -29,6 +29,11 @@ export interface ApiClient {
   unassignTask: (taskId: string, payload: AssignTaskPayload) => Promise<Task>
   completeTask: (taskId: string, payload: CompleteTaskPayload) => Promise<Task>
   addTaskProof: (taskId: string, photo: File | Blob) => Promise<Task>
+  fetchOrderPayments: (orderId: string) => Promise<OrderPayment[]>
+  /** `paidAt` (ISO): managers only, for a transfer recorded late. */
+  addOrderPayment: (orderId: string, input: { amount: number; note?: string; paidAt?: string }) => Promise<OrderPaymentsResult>
+  deleteOrderPayment: (orderId: string, paymentId: string) => Promise<OrderPaymentsResult>
+  updateKpiSettings: (input: { kpiShifts: KpiShift[]; kpiTiers: KpiTier[] }) => Promise<WorkspaceSettings>
   fetchCheckIns: (month?: string) => Promise<StaffCheckIn[]>
   correctCheckIn: (input: ShiftCorrectionInput) => Promise<StaffCheckIn>
   fetchRecentCheckIns: (days: number) => Promise<StaffCheckIn[]>

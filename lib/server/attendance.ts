@@ -2,6 +2,7 @@ import db from './db'
 import { ApiError } from './api-error'
 import { audit, diff, type AuditActor } from './audit'
 import { addVnDays, parseVnDateKey, vnDateKey } from './vn-time'
+import { readKpiShifts, readKpiTiers } from './kpi'
 
 // Attendance rules. Hours feed pay, so a shift must be complete and plausible:
 // - one shift per person per Vietnam day and work mode (unique staffId +
@@ -53,16 +54,18 @@ const readHolidays = (value: unknown): Holiday[] => {
 
 export async function updateShopSettings(
   actor: AuditActor,
-  input: { openTime?: unknown; closeTime?: unknown; holidays?: unknown },
+  input: { openTime?: unknown; closeTime?: unknown; holidays?: unknown; kpiShifts?: unknown; kpiTiers?: unknown },
 ) {
   const current = await getShopSettings()
   const openTime = input.openTime === undefined ? current.openTime : parseTime(input.openTime, 'Giờ mở cửa')
   const closeTime = input.closeTime === undefined ? current.closeTime : parseTime(input.closeTime, 'Giờ đóng cửa')
   if (closeTime <= openTime) throw new ApiError(400, 'Giờ đóng cửa phải sau giờ mở cửa')
   const holidays = input.holidays === undefined ? current.holidays : JSON.stringify(readHolidays(input.holidays))
-  const updated = await db.shopSettings.update({ where: { id: 1 }, data: { openTime, closeTime, holidays } })
-  const changes = diff(current, updated, ['openTime', 'closeTime', 'holidays'])
-  if (changes) await audit(actor, { action: 'settings.update', entity: 'settings', summary: 'Giờ làm việc / ngày lễ', changes })
+  const kpiShifts = input.kpiShifts === undefined ? current.kpiShifts : JSON.stringify(readKpiShifts(input.kpiShifts))
+  const kpiTiers = input.kpiTiers === undefined ? current.kpiTiers : JSON.stringify(readKpiTiers(input.kpiTiers))
+  const updated = await db.shopSettings.update({ where: { id: 1 }, data: { openTime, closeTime, holidays, kpiShifts, kpiTiers } })
+  const changes = diff(current, updated, ['openTime', 'closeTime', 'holidays', 'kpiShifts', 'kpiTiers'])
+  if (changes) await audit(actor, { action: 'settings.update', entity: 'settings', summary: 'Giờ làm việc / ngày lễ / KPI', changes })
   return updated
 }
 

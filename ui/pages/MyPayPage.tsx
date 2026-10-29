@@ -180,12 +180,22 @@ export default function MyPayPage() {
             <Stat
               label="Tiền OT"
               value={money(t.otPay)}
-              hint={`${hours(t.otHours + t.rushHours)} × ${data!.otMultiplier}${t.pendingOtDays ? ` · ${t.pendingOtDays} ngày chờ duyệt` : ''}`}
+              hint={`${hours(t.otHours + t.rushHours)} × ${line.otHourlyRate != null ? money(line.otHourlyRate) : `đơn giá giờ × ${data!.otMultiplier}`}${t.pendingOtDays ? ` · ${t.pendingOtDays} ngày chờ duyệt` : ''}`}
             />
             {line.role !== 'sales' && (
               <Stat label="HH làm đơn" value={money(t.commissionByKind.MAKER)} hint={`${makerItems.length} sản phẩm · ${line.makerRate}%`} />
             )}
             <Stat label="HH sale" value={money(t.commissionByKind.SALES)} hint={`${salesItems.length} đơn · ${line.salesRate}%`} />
+            {line.role === 'sales' && (
+              <Stat label="Thưởng KPI" value={money(t.kpiTotal)} hint={`${(line.kpi ?? []).length} ca đạt KPI`} />
+            )}
+            {t.allowancesTotal > 0 && (
+              <Stat
+                label="Phụ cấp"
+                value={money(t.allowancesTotal)}
+                hint={(line.allowances ?? []).map((a) => a.label).join(', ')}
+              />
+            )}
             <Stat
               label="Thưởng / khấu trừ"
               value={money(t.adjustmentsTotal)}
@@ -226,6 +236,29 @@ export default function MyPayPage() {
               labelHeader="Khách hàng"
               lang={lang}
             />
+          )}
+
+          {line.role === 'sales' && (
+            <section className="rounded-2xl border border-border bg-white p-5">
+              <h2 className="mb-1 font-semibold text-foreground">Ca đạt KPI ({(line.kpi ?? []).length})</h2>
+              <p className="mb-3 text-xs text-muted-foreground">
+                Tiền hoa khách chuyển cho đơn của bạn trong ca, lúc bạn đang chấm công (không tính VAT, phí ship).
+              </p>
+              {(line.kpi ?? []).length === 0 ? (
+                <p className="text-sm text-muted-foreground">Chưa có ca nào đạt KPI trong tháng.</p>
+              ) : (
+                <ul className="divide-y divide-border text-sm">
+                  {(line.kpi ?? []).map((k) => (
+                    <li key={k.key} className={cn('flex justify-between gap-3 py-2', !k.included && 'text-muted-foreground line-through')}>
+                      <span>
+                        {k.date.slice(8, 10)}/{k.date.slice(5, 7)} · {k.shift} · {money(k.revenue)}
+                      </span>
+                      <span className="font-medium">{money(k.bonus)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
           )}
 
           <section className="rounded-2xl border border-border bg-white p-5">

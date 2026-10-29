@@ -391,6 +391,18 @@ export const createOrder = async (input: CreateOrderInput) => {
         ...salesperson,
       },
     })
+    // What the customer paid when the order was taken is its first payment.
+    if (money.deposit) {
+      await tx.orderPayment.create({
+        data: {
+          orderId: created.id,
+          amount: money.deposit,
+          recordedById: input.createdById ?? null,
+          recordedByName: input.createdByName ?? null,
+          note: 'Tiền cọc khi tạo đơn',
+        },
+      })
+    }
     // Tasks are due two hours before the customer receives the order. A florist
     // chosen on the order is the maker of its products.
     const dueTime = new Date(receiveTime.getTime() - 2 * 60 * 60 * 1000)
@@ -528,6 +540,11 @@ export const updateOrder = async (orderId: string, input: Partial<CreateOrderInp
 
   if (input.salespersonId !== undefined) Object.assign(data, await readSalesperson(input.salespersonId))
 
+  // Money received after the order was taken is recorded as a payment, which
+  // keeps "Đã thu" and the sales KPI right.
+  if (input.deposit !== undefined) {
+    throw new ApiError(400, 'Tiền khách trả thêm được ghi bằng nút "Ghi nhận tiền khách chuyển" ở mục Thanh toán')
+  }
   // Changing any price input recomputes the derived amounts from the merged values.
   if (ORDER_MONEY_FIELDS.some((field) => input[field] !== undefined)) {
     const current = await db.order.findUnique({ where: { id: orderId } })

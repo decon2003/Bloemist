@@ -81,6 +81,8 @@ function LineEditor({
   const [hourlyRate, setHourlyRate] = useState(String(line.hourlyRate))
   const [holidayRate, setHolidayRate] = useState(line.holidayHourlyRate == null ? '' : String(line.holidayHourlyRate))
   const [onlineRate, setOnlineRate] = useState(line.onlineHourlyRate == null ? '' : String(line.onlineHourlyRate))
+  const [otRate, setOtRate] = useState(line.otHourlyRate == null ? '' : String(line.otHourlyRate))
+  const [allowances, setAllowances] = useState((line.allowances ?? []).map((a) => ({ label: a.label, amount: String(a.amount) })))
   const isSales = line.role === 'sales'
   const [daysOff, setDaysOff] = useState(String(line.daysOffPerMonth ?? 4))
   const [rates, setRates] = useState({ makerRate: line.makerRate, salesRate: line.salesRate })
@@ -88,6 +90,7 @@ function LineEditor({
     Object.fromEntries(line.shifts.filter((s) => s.mode !== 'ONLINE').map((s) => [s.date, s.otDecision])),
   )
   const [items, setItems] = useState<PayrollCommission[]>(line.commissions)
+  const [kpiItems, setKpiItems] = useState(line.kpi ?? [])
   const [adjustments, setAdjustments] = useState<AdjustmentDraft[]>(
     line.adjustments.map((a) => ({ label: a.label, sign: a.amount < 0 ? -1 : 1, amount: String(Math.abs(a.amount)) })),
   )
@@ -104,6 +107,10 @@ function LineEditor({
       setError('Mỗi khoản điều chỉnh cần có nội dung')
       return
     }
+    if (allowances.some((a) => !a.label.trim() && digits(a.amount) > 0)) {
+      setError('Mỗi khoản phụ cấp cần có nội dung')
+      return
+    }
     setSaving(true)
     const input: PayrollLineUpdate = {
       shiftDecisions: line.shifts
@@ -112,6 +119,7 @@ function LineEditor({
       adjustments: adjustments
         .filter((a) => a.label.trim())
         .map((a) => ({ label: a.label.trim(), amount: a.sign * digits(a.amount) })),
+      kpiChanges: kpiItems.map((k) => ({ key: k.key, included: k.included })),
       note,
     }
     // Only the rates actually changed are sent: they then stay fixed for this
@@ -123,6 +131,10 @@ function LineEditor({
     if (holiday !== (line.holidayHourlyRate ?? null)) input.holidayHourlyRate = holiday
     const online = onlineRate.trim() ? digits(onlineRate) : null
     if (online !== (line.onlineHourlyRate ?? null)) input.onlineHourlyRate = online
+    const ot = otRate.trim() ? digits(otRate) : null
+    if (ot !== (line.otHourlyRate ?? null)) input.otHourlyRate = ot
+    const nextAllowances = allowances.filter((a) => a.label.trim()).map((a) => ({ label: a.label.trim(), amount: digits(a.amount) }))
+    if (JSON.stringify(nextAllowances) !== JSON.stringify(line.allowances ?? [])) input.allowances = nextAllowances
     if (Number(daysOff) !== (line.daysOffPerMonth ?? 4)) input.daysOffPerMonth = Number(daysOff)
     // A changed line rate resets every item of that kind; otherwise send per-item edits.
     if (ratesChanged) Object.assign(input, rates)
@@ -185,8 +197,12 @@ function LineEditor({
               </label>
             )}
             <label className="space-y-1 text-sm">
-              <span className="text-muted-foreground">Đơn giá giờ (₫), cũng dùng cho OT</span>
+              <span className="text-muted-foreground">Đơn giá giờ (₫)</span>
               <input value={hourlyRate} disabled={locked} inputMode="numeric" onChange={(e) => setHourlyRate(e.target.value)} className={inputClass} />
+            </label>
+            <label className="space-y-1 text-sm">
+              <span className="text-muted-foreground">Đơn giá tăng ca (₫, trống = giờ × hệ số)</span>
+              <input value={otRate} disabled={locked} inputMode="numeric" onChange={(e) => setOtRate(e.target.value)} className={inputClass} />
             </label>
             {((isSales ? ['salesRate'] : ['makerRate', 'salesRate']) as ('makerRate' | 'salesRate')[]).map((field) => (
               <label key={field} className="space-y-1 text-sm">
@@ -218,10 +234,58 @@ function LineEditor({
         </section>
 
         <section className="space-y-2">
+          <div className="flex items-center justify-between">
+            <h4 className="font-semibold text-foreground">Phụ cấp cố định</h4>
+            {!locked && (
+              <button
+                type="button"
+                onClick={() => setAllowances((a) => [...a, { label: '', amount: '' }])}
+                className="inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-xs hover:bg-muted"
+              >
+                <Plus className="h-3.5 w-3.5" /> Thêm phụ cấp
+              </button>
+            )}
+          </div>
+          {allowances.length === 0 && <p className="text-sm text-muted-foreground">Không có phụ cấp.</p>}
+          {allowances.map((a, index) => (
+            <div key={index} className="flex gap-2">
+              <input
+                placeholder="Ví dụ: Ăn uống, Xăng xe"
+                value={a.label}
+                disabled={locked}
+                onChange={(e) => setAllowances((list) => list.map((x, i) => (i === index ? { ...x, label: e.target.value } : x)))}
+                className={inputClass}
+              />
+              <input
+                placeholder="Số tiền"
+                value={a.amount ? Number(digits(a.amount)).toLocaleString('vi-VN') : ''}
+                disabled={locked}
+                inputMode="numeric"
+                onChange={(e) => setAllowances((list) => list.map((x, i) => (i === index ? { ...x, amount: e.target.value.replace(/\D/g, '') } : x)))}
+                className="w-36 rounded-lg border border-border px-2 py-1.5 text-sm"
+              />
+              {!locked && (
+                <button
+                  type="button"
+                  aria-label="Xoá phụ cấp"
+                  onClick={() => setAllowances((list) => list.filter((_, i) => i !== index))}
+                  className="rounded-lg border border-border px-2 hover:bg-muted"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+          ))}
+          <p className="text-xs text-muted-foreground">Lấy từ hồ sơ lương, trả đủ cả tháng. Sửa ở đây chỉ áp dụng cho tháng này.</p>
+        </section>
+
+        <section className="space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h4 className="font-semibold text-foreground">
               Ca làm ({line.shifts.length}){' '}
-              <span className="text-sm font-normal text-muted-foreground">· hệ số OT ×{otMultiplier}</span>
+              <span className="text-sm font-normal text-muted-foreground">
+                · tăng ca {line.otHourlyRate != null ? `${money(line.otHourlyRate)}/giờ` : `đơn giá giờ × ${otMultiplier}`}
+              </span>
             </h4>
             {!locked && pendingDays > 0 && (
               <button
@@ -294,8 +358,8 @@ function LineEditor({
             {hours(line.totals.regularHours)} giờ thường, {hours(line.totals.otHours)} OT
             {line.totals.rushHours > 0 ? `, ${hours(line.totals.rushHours)} ca gấp` : ''}
             {line.totals.holidayHours > 0 ? `, ${hours(line.totals.holidayHours)} ngày lễ` : ''}
-            {line.totals.onlineHours > 0 ? ` (trong đó ${hours(line.totals.onlineHours)} online)` : ''}. Lệch dưới 15 phút ngoài khung được bỏ qua;
-            ngày chờ duyệt tạm tính như OT.
+            {line.totals.onlineHours > 0 ? ` (trong đó ${hours(line.totals.onlineHours)} online)` : ''}. Ngoài khung dưới 10 phút được bỏ qua,
+            từ 10 phút tính theo phút. Ngày chờ duyệt chưa được tính tiền tăng ca.
           </p>
         </section>
 
@@ -353,6 +417,54 @@ function LineEditor({
             </div>
           )}
         </section>
+
+        {(isSales || kpiItems.length > 0) && (
+          <section className="space-y-2">
+            <h4 className="font-semibold text-foreground">Thưởng KPI theo ca ({kpiItems.length})</h4>
+            {kpiItems.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Chưa có ca nào đạt KPI trong tháng.</p>
+            ) : (
+              <div className="max-h-80 overflow-auto">
+                <table className="min-w-full text-sm">
+                  <thead className="sticky top-0 bg-white text-left text-xs uppercase text-muted-foreground">
+                    <tr>
+                      <th className="py-2 pr-2">Tính</th>
+                      <th className="px-2 py-2">Ngày</th>
+                      <th className="px-2 py-2">Ca</th>
+                      <th className="px-2 py-2 text-right">Tiền hoa đã thu</th>
+                      <th className="px-2 py-2 text-right">Thưởng</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {kpiItems.map((k, index) => (
+                      <tr key={k.key} className={cn(!k.included && 'text-muted-foreground line-through')}>
+                        <td className="py-2 pr-2">
+                          <input
+                            type="checkbox"
+                            aria-label={`Tính KPI ${dayLabel(k.date)} ${k.shift}`}
+                            checked={k.included}
+                            disabled={locked}
+                            onChange={(e) => setKpiItems((list) => list.map((x, i) => (i === index ? { ...x, included: e.target.checked } : x)))}
+                          />
+                        </td>
+                        <td className="px-2 py-2 whitespace-nowrap">{dayLabel(k.date)}</td>
+                        <td className="px-2 py-2 whitespace-nowrap">{k.shift}</td>
+                        <td className="px-2 py-2 text-right whitespace-nowrap">
+                          {money(k.revenue)} <span className="text-xs text-muted-foreground">({k.payments} khoản)</span>
+                        </td>
+                        <td className="px-2 py-2 text-right whitespace-nowrap font-medium">{money(k.bonus)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Tính từ tiền khách chuyển cho đơn của người này trong ca, lúc người này đang chấm công. Chỉ tính tiền hoa, không tính VAT
+              và phí ship. Mức thưởng cài ở Cài đặt.
+            </p>
+          </section>
+        )}
 
         <section className="space-y-2">
           <div className="flex items-center justify-between">
@@ -587,7 +699,7 @@ export default function PayrollPage() {
             <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
               <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
               <p>
-                Còn <strong>{payroll.summary.pendingOtDays}</strong> ngày có giờ ngoài khung làm việc chưa duyệt (đang tạm tính như OT).
+                Còn <strong>{payroll.summary.pendingOtDays}</strong> ngày có giờ ngoài khung làm việc chưa duyệt (chưa tính tiền tăng ca).
                 Mở từng người để duyệt trước khi chốt.
               </p>
             </div>
@@ -613,6 +725,8 @@ export default function PayrollPage() {
                   <th className="px-3 py-3 text-right">Lương</th>
                   <th className="px-3 py-3 text-right">Tiền OT</th>
                   <th className="px-3 py-3 text-right">Hoa hồng</th>
+                  <th className="px-3 py-3 text-right">KPI</th>
+                  <th className="px-3 py-3 text-right">Phụ cấp</th>
                   <th className="px-3 py-3 text-right">Điều chỉnh</th>
                   <th className="px-3 py-3 text-right">Tổng</th>
                 </tr>
@@ -642,6 +756,8 @@ export default function PayrollPage() {
                     <td className="px-3 py-3 text-right">{money(line.totals.basePay)}</td>
                     <td className="px-3 py-3 text-right">{money(line.totals.otPay)}</td>
                     <td className="px-3 py-3 text-right">{money(line.totals.commission)}</td>
+                    <td className="px-3 py-3 text-right">{money(line.totals.kpiTotal)}</td>
+                    <td className="px-3 py-3 text-right">{money(line.totals.allowancesTotal)}</td>
                     <td className="px-3 py-3 text-right">{money(line.totals.adjustmentsTotal)}</td>
                     <td className="px-3 py-3 text-right font-semibold text-foreground">{money(line.totals.total)}</td>
                   </tr>
@@ -649,7 +765,7 @@ export default function PayrollPage() {
               </tbody>
               <tfoot>
                 <tr className="border-t-2 border-border font-semibold">
-                  <td className="py-3 pr-3" colSpan={8}>Tổng quỹ lương</td>
+                  <td className="py-3 pr-3" colSpan={10}>Tổng quỹ lương</td>
                   <td className="px-3 py-3 text-right">{money(payroll.summary.total)}</td>
                 </tr>
               </tfoot>

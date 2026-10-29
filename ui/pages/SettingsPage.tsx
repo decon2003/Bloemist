@@ -1,11 +1,12 @@
 'use client'
 
 import React, { useEffect, useMemo, useState } from 'react'
-import { CalendarDays, Users, Plus, Edit2, Trash2, X, Clock } from 'lucide-react'
+import { CalendarDays, Users, Plus, Edit2, Trash2, X, Clock, Target } from 'lucide-react'
 import { useLocale } from '@/components/providers/locale-provider'
 import { useAuth } from '@/components/providers/auth-provider'
 import { useAppData } from '@/components/providers/app-data-provider'
-import { User } from '@/lib/types'
+import type { KpiShift, User } from '@/lib/types'
+import { formatCurrencyInput } from '@/lib/utils'
 import { AuditTrail } from '@/components/audit-trail'
 import { TimeInput24 } from '@/components/time-input-24'
 import { DateInputVN } from '@/components/date-input-vn'
@@ -199,14 +200,35 @@ export default function SettingsPage() {
   const [holidays, setHolidays] = useState<{ date: string; name: string }[]>([])
   const [newHoliday, setNewHoliday] = useState({ date: '', name: '' })
   const [holidayMessage, setHolidayMessage] = useState('')
+  const [kpiShifts, setKpiShifts] = useState<KpiShift[]>([])
+  const [kpiTiers, setKpiTiers] = useState<{ revenue: string; bonus: string }[]>([])
+  const [kpiMessage, setKpiMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
     if (settings) {
       setWorkingHours(settings.workingHours)
       setHolidays(settings.holidays ?? [])
+      setKpiShifts(settings.kpiShifts ?? [])
+      setKpiTiers((settings.kpiTiers ?? []).map((t) => ({ revenue: String(t.revenue), bonus: String(t.bonus) })))
     }
   }, [settings])
+
+  const saveKpi = async () => {
+    setKpiMessage('')
+    try {
+      const { updateKpiSettings } = await import('@/lib/api')
+      const saved = await updateKpiSettings({
+        kpiShifts,
+        kpiTiers: kpiTiers.filter((t) => t.revenue).map((t) => ({ revenue: Number(t.revenue), bonus: Number(t.bonus || 0) })),
+      })
+      setKpiShifts(saved.kpiShifts ?? [])
+      setKpiTiers((saved.kpiTiers ?? []).map((t) => ({ revenue: String(t.revenue), bonus: String(t.bonus) })))
+      setKpiMessage('Đã lưu KPI. Bấm "Cập nhật dữ liệu mới" ở Bảng lương để tính lại tháng đang mở.')
+    } catch (error) {
+      setKpiMessage(error instanceof Error ? error.message : 'Không lưu được')
+    }
+  }
 
   const saveHolidays = async (next: { date: string; name: string }[]) => {
     setHolidayMessage('')
@@ -528,6 +550,122 @@ export default function SettingsPage() {
           </div>
         )}
         {holidayMessage && <p className="text-sm text-muted-foreground">{holidayMessage}</p>}
+      </section>
+
+      {/* Sales KPI */}
+      <section className="space-y-4 rounded-3xl border border-border bg-white/90 p-6">
+        <div className="flex items-center gap-3">
+          <Target className="h-5 w-5 text-primary" />
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">KPI sale theo ca</h2>
+            <p className="text-sm text-muted-foreground">
+              Mỗi ca, tiền hoa khách chuyển cho đơn của sale lúc sale đang chấm công đạt mức nào thì thưởng mức cao nhất đạt được.
+              Không tính VAT, phí ship. Thợ không có KPI.
+            </p>
+          </div>
+        </div>
+        <div className="grid gap-6 md:grid-cols-2">
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-foreground">Các ca</p>
+            {kpiShifts.map((s, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <input
+                  aria-label={`Tên ca ${index + 1}`}
+                  value={s.name}
+                  disabled={!canEditSettings}
+                  onChange={(e) => setKpiShifts((list) => list.map((x, i) => (i === index ? { ...x, name: e.target.value } : x)))}
+                  className="min-w-0 flex-1 rounded-lg border border-border px-2 py-1.5 text-sm"
+                />
+                <TimeInput24
+                  value={s.start}
+                  onChange={(value) => setKpiShifts((list) => list.map((x, i) => (i === index ? { ...x, start: value } : x)))}
+                  disabled={!canEditSettings}
+                  className="w-20 rounded-lg border border-border px-2 py-1.5 text-sm"
+                />
+                <span className="text-muted-foreground">–</span>
+                <TimeInput24
+                  value={s.end}
+                  onChange={(value) => setKpiShifts((list) => list.map((x, i) => (i === index ? { ...x, end: value } : x)))}
+                  disabled={!canEditSettings}
+                  className="w-20 rounded-lg border border-border px-2 py-1.5 text-sm"
+                />
+                {canEditSettings && kpiShifts.length > 1 && (
+                  <button
+                    type="button"
+                    aria-label="Bỏ ca"
+                    onClick={() => setKpiShifts((list) => list.filter((_, i) => i !== index))}
+                    className="rounded p-1 text-muted-foreground hover:bg-red-50 hover:text-red-600"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            ))}
+            {canEditSettings && kpiShifts.length < 6 && (
+              <button
+                type="button"
+                onClick={() => setKpiShifts((list) => [...list, { name: `Ca ${list.length + 1}`, start: '', end: '' }])}
+                className="text-sm font-medium text-primary hover:underline"
+              >
+                + Thêm ca
+              </button>
+            )}
+          </div>
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-foreground">Mức thưởng</p>
+            {kpiTiers.map((tier, index) => (
+              <div key={index} className="flex items-center gap-2 text-sm">
+                <span className="text-muted-foreground">Từ</span>
+                <input
+                  aria-label={`Doanh thu mức ${index + 1}`}
+                  inputMode="numeric"
+                  value={formatCurrencyInput(tier.revenue)}
+                  disabled={!canEditSettings}
+                  onChange={(e) => setKpiTiers((list) => list.map((x, i) => (i === index ? { ...x, revenue: e.target.value.replace(/\D/g, '') } : x)))}
+                  className="w-32 rounded-lg border border-border px-2 py-1.5"
+                />
+                <span className="text-muted-foreground">thưởng</span>
+                <input
+                  aria-label={`Thưởng mức ${index + 1}`}
+                  inputMode="numeric"
+                  value={formatCurrencyInput(tier.bonus)}
+                  disabled={!canEditSettings}
+                  onChange={(e) => setKpiTiers((list) => list.map((x, i) => (i === index ? { ...x, bonus: e.target.value.replace(/\D/g, '') } : x)))}
+                  className="w-28 rounded-lg border border-border px-2 py-1.5"
+                />
+                {canEditSettings && (
+                  <button
+                    type="button"
+                    aria-label="Bỏ mức"
+                    onClick={() => setKpiTiers((list) => list.filter((_, i) => i !== index))}
+                    className="rounded p-1 text-muted-foreground hover:bg-red-50 hover:text-red-600"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            ))}
+            {canEditSettings && kpiTiers.length < 10 && (
+              <button
+                type="button"
+                onClick={() => setKpiTiers((list) => [...list, { revenue: '', bonus: '' }])}
+                className="text-sm font-medium text-primary hover:underline"
+              >
+                + Thêm mức
+              </button>
+            )}
+          </div>
+        </div>
+        {canEditSettings && (
+          <button
+            type="button"
+            onClick={saveKpi}
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
+          >
+            Lưu KPI
+          </button>
+        )}
+        {kpiMessage && <p className="text-sm text-muted-foreground">{kpiMessage}</p>}
       </section>
 
       {/* User Management Section */}

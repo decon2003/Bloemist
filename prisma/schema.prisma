@@ -32,6 +32,8 @@ model User {
   commissionRate      Float?         @default(0) // % of the products this person made
   salesCommissionRate Float          @default(0) // % of orders this person sold
   onlineHourlyRate    Int? // sales: hourly rate for online (at-home) shifts; null = hourlyRate
+  otHourlyRate        Int? // overtime and "ca gấp" per hour; null = hourlyRate x the payroll's OT multiplier
+  allowances          Json           @default("[]") // fixed monthly allowances [{label, amount}], paid in full
   holidayHourlyRate   Int? // hourly rate on public holidays; null = hourlyRate
   daysOffPerMonth     Int            @default(4) // MONTHLY: paid days off; base = salary x days worked / (days in month - this)
 
@@ -94,8 +96,27 @@ model Order {
   customer  Customer? @relation(fields: [customerId], references: [id])
   assignee  User?     @relation("AssignedOrders", fields: [assigneeId], references: [id])
   tasks     Task[]
+  payments  OrderPayment[]
 
   @@index([customerId])
+}
+
+// Money a customer paid for an order (the deposit, the rest...), one row per
+// transfer, recorded by staff when it arrives. The order's `deposit` is their
+// sum ("Đã thu"). Sales KPI counts each payment in the shift it arrived in.
+model OrderPayment {
+  id             String   @id @default(uuid())
+  orderId        String
+  order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  amount         Int
+  paidAt         DateTime @default(now())
+  recordedById   String?
+  recordedByName String?
+  note           String?
+  createdAt      DateTime @default(now())
+
+  @@index([orderId])
+  @@index([paidAt])
 }
 
 // One row per buyer, keyed by normalised phone (digits only, +84 -> 0) so that
@@ -196,6 +217,9 @@ model ShopSettings {
   otMultiplier Float  @default(1.5)
   // Public holidays: JSON [{"date":"YYYY-MM-DD","name":"..."}]; hourly staff are paid holidayHourlyRate.
   holidays     String @default("[]")
+  // Sales KPI: shifts [{name, start, end}] and tiers [{revenue, bonus}] as JSON; "" = the defaults in lib/server/kpi.ts.
+  kpiShifts    String @default("")
+  kpiTiers     String @default("")
 }
 
 model Message {
@@ -270,6 +294,8 @@ model PayrollLine {
   makerRate         Float   @default(0)
   salesRate         Float   @default(0)
   onlineHourlyRate  Int?
+  otHourlyRate      Int?
+  allowances        Json    @default("[]")
   holidayHourlyRate Int?
   daysOffPerMonth   Int     @default(4)
   // Set when a manager changed this month's rates; otherwise a refresh re-copies the pay profile.
@@ -277,6 +303,8 @@ model PayrollLine {
   shifts            Json    @default("[]")
   commissions       Json    @default("[]")
   adjustments       Json    @default("[]")
+  // Sales KPI bonuses per shift: [{key, date, shift, revenue, bonus, payments, included}].
+  kpi               Json    @default("[]")
   note              String?
   total             Int     @default(0)
 

@@ -6,6 +6,7 @@ import { hashPassword, validateNewPassword } from '@/lib/server/password'
 import { toVnd } from '@/lib/server/money'
 import { MANAGER_ROLES, isManager, requireUser } from '@/lib/server/session'
 import { audit, diff } from '@/lib/server/audit'
+import { parseAllowances } from '@/lib/server/payroll'
 import {
     PAY_TYPES,
     PRIVILEGED_USER_SELECT,
@@ -81,6 +82,10 @@ export async function PATCH(request: Request, context: RouteContext) {
         if (body.onlineHourlyRate !== undefined) {
             data.onlineHourlyRate = body.onlineHourlyRate === null || body.onlineHourlyRate === '' ? null : toVnd(body.onlineHourlyRate, 'onlineHourlyRate')
         }
+        if (body.otHourlyRate !== undefined) {
+            data.otHourlyRate = body.otHourlyRate === null || body.otHourlyRate === '' ? null : toVnd(body.otHourlyRate, 'otHourlyRate')
+        }
+        if (body.allowances !== undefined) data.allowances = parseAllowances(body.allowances)
         if (body.daysOffPerMonth !== undefined) {
             const days = Number(body.daysOffPerMonth)
             if (!Number.isInteger(days) || days < 0 || days > 15) throw new ApiError(400, 'Số ngày nghỉ phải từ 0 đến 15')
@@ -141,7 +146,7 @@ export async function PATCH(request: Request, context: RouteContext) {
             })
         }
 
-        const changes = diff(existing, user, ['name', 'email', 'phone', 'role', 'status', 'avatar', 'payType', 'baseSalary', 'hourlyRate', 'holidayHourlyRate', 'onlineHourlyRate', 'daysOffPerMonth', 'commissionRate', 'salesCommissionRate'])
+        const changes = diff(existing, user, ['name', 'email', 'phone', 'role', 'status', 'avatar', 'payType', 'baseSalary', 'hourlyRate', 'holidayHourlyRate', 'onlineHourlyRate', 'otHourlyRate', 'allowances', 'daysOffPerMonth', 'commissionRate', 'salesCommissionRate'])
         const passwordReset = data.passwordHash !== undefined
         if (changes || passwordReset) {
             await audit(me, {

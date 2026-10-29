@@ -41,6 +41,8 @@ function SalaryConfigModal({ user, onClose, onSave }: { user: User, onClose: () 
   const [salesRate, setSalesRate] = useState(String(user.salesCommissionRate ?? 0))
   const [holidayRate, setHolidayRate] = useState(user.holidayHourlyRate == null ? '' : String(user.holidayHourlyRate))
   const [onlineRate, setOnlineRate] = useState(user.onlineHourlyRate == null ? '' : String(user.onlineHourlyRate))
+  const [otRate, setOtRate] = useState(user.otHourlyRate == null ? '' : String(user.otHourlyRate))
+  const [allowances, setAllowances] = useState((user.allowances ?? []).map((a) => ({ label: a.label, amount: String(a.amount) })))
   const isSales = user.role === 'sales'
   const [daysOff, setDaysOff] = useState(String(user.daysOffPerMonth ?? 4))
   const [saving, setSaving] = useState(false)
@@ -59,6 +61,10 @@ function SalaryConfigModal({ user, onClose, onSave }: { user: User, onClose: () 
         salesCommissionRate: Number(salesRate),
         holidayHourlyRate: !isSales && holidayRate.trim() ? Number(holidayRate.replace(/\D/g, '') || 0) : null,
         onlineHourlyRate: isSales && onlineRate.trim() ? Number(onlineRate.replace(/\D/g, '') || 0) : null,
+        otHourlyRate: otRate.trim() ? Number(otRate.replace(/\D/g, '') || 0) : null,
+        allowances: allowances
+          .filter((a) => a.label.trim() || a.amount)
+          .map((a) => ({ label: a.label.trim(), amount: Number(a.amount || 0) })),
         daysOffPerMonth: Number(daysOff),
       })
       onClose()
@@ -72,7 +78,7 @@ function SalaryConfigModal({ user, onClose, onSave }: { user: User, onClose: () 
   const field = 'mt-1 w-full rounded-lg border border-border p-2 text-sm'
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-md space-y-4 rounded-2xl bg-white p-6 shadow-xl">
+      <div className="max-h-[90vh] w-full max-w-md space-y-4 overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-bold">Hồ sơ lương · {user.name}</h3>
           <button onClick={onClose} aria-label="Đóng"><X className="h-5 w-5" /></button>
@@ -97,7 +103,18 @@ function SalaryConfigModal({ user, onClose, onSave }: { user: User, onClose: () 
             <input value={formatCurrencyInput(hourly)} onChange={(e) => setHourly(e.target.value.replace(/\D/g, ''))} className={field} />
           </label>
         </div>
-        <p className="text-xs text-muted-foreground">Đơn giá giờ cũng dùng để tính OT và ca gấp (kể cả người lương cứng).</p>
+        <label className="block text-sm font-medium">
+          Đơn giá tăng ca / giờ
+          <input
+            value={formatCurrencyInput(otRate)}
+            placeholder="Trống = đơn giá giờ × hệ số OT"
+            onChange={(e) => setOtRate(e.target.value.replace(/\D/g, ''))}
+            className={field}
+          />
+        </label>
+        <p className="text-xs text-muted-foreground">
+          Trả cho giờ tăng ca đã được quản lý duyệt và ca gấp, kể cả người lương cứng. Ngoài khung dưới 10 phút không tính.
+        </p>
         <div className="grid grid-cols-2 gap-3">
           <label className="block text-sm font-medium">
             Ngày nghỉ được hưởng / tháng
@@ -142,6 +159,46 @@ function SalaryConfigModal({ user, onClose, onSave }: { user: User, onClose: () 
               <input type="number" min={0} max={100} step={0.5} value={value} onChange={(e) => set(e.target.value)} className={field} />
             </label>
           ))}
+        </div>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">Phụ cấp cố định / tháng</span>
+            <button
+              type="button"
+              onClick={() => setAllowances((list) => [...list, { label: '', amount: '' }])}
+              className="text-sm font-medium text-primary hover:underline"
+            >
+              + Thêm phụ cấp
+            </button>
+          </div>
+          {allowances.map((a, index) => (
+            <div key={index} className="flex gap-2">
+              <input
+                placeholder="Ví dụ: Ăn uống"
+                aria-label={`Tên phụ cấp ${index + 1}`}
+                value={a.label}
+                onChange={(e) => setAllowances((list) => list.map((x, i) => (i === index ? { ...x, label: e.target.value } : x)))}
+                className="min-w-0 flex-1 rounded-lg border border-border p-2 text-sm"
+              />
+              <input
+                placeholder="Số tiền"
+                aria-label={`Số tiền phụ cấp ${index + 1}`}
+                inputMode="numeric"
+                value={formatCurrencyInput(a.amount)}
+                onChange={(e) => setAllowances((list) => list.map((x, i) => (i === index ? { ...x, amount: e.target.value.replace(/\D/g, '') } : x)))}
+                className="w-32 rounded-lg border border-border p-2 text-sm"
+              />
+              <button
+                type="button"
+                aria-label="Xoá phụ cấp"
+                onClick={() => setAllowances((list) => list.filter((_, i) => i !== index))}
+                className="rounded-lg border border-border px-2 hover:bg-muted"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          ))}
+          <p className="text-xs text-muted-foreground">Trả đủ mỗi tháng, không trừ theo ngày nghỉ.</p>
         </div>
         {error && <p className="text-sm text-red-700">{error}</p>}
         <div className="flex justify-end gap-3">

@@ -1,7 +1,7 @@
 // ============================================================
 // API Layer - Calls Real Backend API Routes
 // ============================================================
-import type { AuditEntry, BouquetSuggestion, MyPay, Payroll, PayrollLineUpdate, ShiftCorrectionInput, CreateOrderInput, CreateTaskInput, CustomerLookup, CustomerDetail, ListParams, CustomerPage, CustomerSummary, DashboardStats, Order, Task, TaskStatus, Florist, User, StaffCheckIn, WorkspaceSettings } from './types'
+import type { AuditEntry, BouquetSuggestion, MyPay, OrderPayment, OrderPaymentsResult, Payroll, PayrollLineUpdate, ShiftCorrectionInput, CreateOrderInput, CreateTaskInput, CustomerLookup, CustomerDetail, ListParams, CustomerPage, CustomerSummary, DashboardStats, Order, Task, TaskStatus, Florist, User, StaffCheckIn, WorkspaceSettings } from './types'
 import type { ApiClient, AssignTaskPayload, CompleteTaskPayload } from './api.types'
 import { compressImage, makeThumbnail } from './image-compress'
 
@@ -76,6 +76,11 @@ const apiClient: ApiClient = {
     const formData = await photoForm(photo)
     return request<Task>(`/tasks/${taskId}/proof`, { method: 'POST', body: formData })
   },
+  fetchOrderPayments: (orderId) => request<OrderPayment[]>(`/orders/${orderId}/payments`),
+  addOrderPayment: (orderId, input) =>
+    request<OrderPaymentsResult>(`/orders/${orderId}/payments`, { method: 'POST', body: JSON.stringify(input) }),
+  deleteOrderPayment: (orderId, paymentId) =>
+    request<OrderPaymentsResult>(`/orders/${orderId}/payments/${paymentId}`, { method: 'DELETE' }),
   uploadPhoto: async (file) => {
     const formData = await photoForm(file)
     const { url } = await request<{ url: string }>('/uploads', { method: 'POST', body: formData })
@@ -131,6 +136,7 @@ const apiClient: ApiClient = {
     request<WorkspaceSettings>('/settings', { method: 'PATCH', body: JSON.stringify({ workingHours: hours }) }),
   updateHolidays: (holidays) =>
     request<WorkspaceSettings>('/settings', { method: 'PATCH', body: JSON.stringify({ holidays }) }),
+  updateKpiSettings: (input) => request<WorkspaceSettings>('/settings', { method: 'PATCH', body: JSON.stringify(input) }),
   createCheckIn: (input) => request<StaffCheckIn>('/checkins', { method: 'POST', body: JSON.stringify(input) }),
   checkOut: (checkInId) => request<StaffCheckIn>(`/checkins/${checkInId}`, { method: 'PATCH' }),
   deleteCheckIn: (checkInId, reason) => request<void>(`/checkins/${checkInId}`, { method: 'DELETE', body: JSON.stringify({ reason }) }),
@@ -157,6 +163,10 @@ export const assignTask = apiClient.assignTask
 export const unassignTask = apiClient.unassignTask
 export const completeTask = apiClient.completeTask
 export const addTaskProof = apiClient.addTaskProof
+export const fetchOrderPayments = apiClient.fetchOrderPayments
+export const addOrderPayment = apiClient.addOrderPayment
+export const deleteOrderPayment = apiClient.deleteOrderPayment
+export const updateKpiSettings = apiClient.updateKpiSettings
 export const fetchCheckIns = apiClient.fetchCheckIns
 export const createCheckIn = apiClient.createCheckIn
 export const checkOut = apiClient.checkOut

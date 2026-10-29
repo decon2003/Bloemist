@@ -590,6 +590,15 @@ export async function updatePayrollLine(lineId: string, body: Record<string, unk
     note: line.note,
   }
 
+  // Back to the pay profile: this month's rates follow it again (and on refresh).
+  if (body.resetRates === true) {
+    const user = await db.user.findUnique({ where: { id: line.userId } })
+    if (!user) throw new ApiError(404, 'Không tìm thấy nhân viên')
+    const rates = profileRates(user)
+    Object.assign(next, rates, { ratesOverridden: false })
+    next.commissions = next.commissions.map((c) => ({ ...c, rate: rateFor(rates, c.kind) }))
+  }
+
   if (body.payType !== undefined) {
     if (body.payType !== 'MONTHLY' && body.payType !== 'HOURLY') throw new ApiError(400, 'Hình thức lương không hợp lệ')
     next.payType = body.payType

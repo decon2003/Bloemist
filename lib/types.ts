@@ -385,6 +385,8 @@ export interface PayrollLineUpdate {
   shiftDecisions?: { date: string; otDecision: OtDecision }[]
   commissionChanges?: { key: string; included?: boolean; rate?: number }[]
   kpiChanges?: { key: string; included: boolean }[]
+  /** Drop this month's hand-set rates and follow the pay profile again. */
+  resetRates?: boolean
   adjustments?: PayrollAdjustment[]
   note?: string | null
 }

@@ -231,7 +231,29 @@ function LineEditor({
             <p className="text-xs text-amber-700">Đổi % ở đây sẽ áp dụng cho mọi khoản hoa hồng cùng loại bên dưới khi lưu.</p>
           )}
           {line.ratesOverridden && (
-            <p className="text-xs text-muted-foreground">Mức lương tháng này đã được sửa tay, không tự lấy theo hồ sơ lương nữa.</p>
+            <div className="flex flex-wrap items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              <span>Mức lương tháng này đã được sửa tay, không tự lấy theo hồ sơ lương nữa.</span>
+              {!locked && (
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={async () => {
+                    if (!confirm('Bỏ các mức sửa tay của tháng này và lấy lại theo hồ sơ lương?')) return
+                    setSaving(true)
+                    try {
+                      onSaved(await updatePayrollLine(line.id, { resetRates: true }))
+                      onClose()
+                    } catch (err) {
+                      setError(err instanceof Error ? err.message : 'Không lưu được')
+                      setSaving(false)
+                    }
+                  }}
+                  className="font-semibold text-primary underline"
+                >
+                  Lấy lại theo hồ sơ lương
+                </button>
+              )}
+            </div>
           )}
         </section>
 
@@ -744,6 +766,9 @@ export default function PayrollPage() {
                       {line.userName}
                       {missingRate(line) && (
                         <span className="ml-1 rounded-full bg-red-100 px-1.5 text-xs font-normal text-red-700">Chưa có mức lương</span>
+                      )}
+                      {line.ratesOverridden && (
+                        <span className="ml-1 rounded-full bg-amber-100 px-1.5 text-xs font-normal text-amber-800">Mức sửa tay</span>
                       )}
                     </td>
                     <td className="hidden px-3 py-3 whitespace-nowrap text-muted-foreground md:table-cell">

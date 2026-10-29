@@ -326,7 +326,7 @@ export default function StaffReportsPage() {
       )}
 
       <div>
-        <p className="text-sm uppercase tracking-wide text-muted-foreground">{t('staffReports.subtitle')}</p>
+
         <h1 className="mt-1 text-3xl font-bold text-foreground">{t('staffReports.title')}</h1>
         <p className="text-sm text-muted-foreground">{monthLabel}</p>
       </div>
@@ -409,9 +409,8 @@ export default function StaffReportsPage() {
                         <div>
                           <div className="font-semibold">{row.profile.name}</div>
                           <div className="text-xs text-muted-foreground">
-                            {row.profile.title}
                             {row.lastSeen
-                              ? ` • ${t('staffReports.lastSeen')}: ${formatDateTime(row.lastSeen, lang)}`
+                              ? `${t('staffReports.lastSeen')}: ${formatDateTime(row.lastSeen, lang)}`
                               : ''}
                           </div>
                         </div>

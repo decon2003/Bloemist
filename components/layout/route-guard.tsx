@@ -43,12 +43,22 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     return children
   }
 
-  if (isLoading || !isAuthenticated) {
+  if (isLoading) {
+    return <p className="p-8 text-center text-sm text-muted-foreground">Đang tải…</p>
+  }
+  if (!isAuthenticated) {
     return null
   }
 
   // Don't render (and let fetch) protected pages while a password change is pending.
   if (user?.mustChangePassword && !pathname.includes('/change-password')) {
+    return null
+  }
+
+  // Nor a page this role may not see: it would flash and request data (refused)
+  // before the redirect above takes effect.
+  const staffOnDashboard = (user?.role === 'florist' || user?.role === 'sales') && pathname.includes('/dashboard')
+  if (staffOnDashboard || !canAccessRoute(pathname, user?.role ?? null)) {
     return null
   }
 

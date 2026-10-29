@@ -82,7 +82,7 @@ export default function BossDashboard() {
       )}
 
       {/* KPI Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-3">
         {/* Revenue */}
         <div className="rounded-2xl border border-border bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
@@ -127,7 +127,7 @@ export default function BossDashboard() {
             {kpis.tasks}
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            Sản phẩm (công việc) tạo trong tháng {today.getMonth() + 1}
+            Sản phẩm tạo trong tháng {today.getMonth() + 1}
           </p>
         </div>
       </div>

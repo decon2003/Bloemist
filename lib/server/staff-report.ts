@@ -43,13 +43,14 @@ export async function getStaffReport(month: { start: Date; end: Date }): Promise
     }),
     db.order.findMany({
       where: { createdAt: inMonth, status: { not: 'CANCELLED' }, createdById: { not: null } },
-      select: { createdById: true, sellingPrice: true, total: true },
+      select: { createdById: true, salespersonId: true, sellingPrice: true, total: true },
     }),
     db.task.findMany({
       where: { status: 'COMPLETED', completedAt: inMonth, assigneeId: { not: null } },
       select: { assigneeId: true, price: true },
     }),
-    db.task.groupBy({ by: ['assigneeId'], where: { status: 'IN_PROGRESS', assigneeId: { not: null } }, _count: true }),
+    // Given to someone and not finished yet.
+    db.task.groupBy({ by: ['assigneeId'], where: { status: { in: ['ASSIGNED', 'IN_PROGRESS'] }, assigneeId: { not: null } }, _count: true }),
   ])
 
   const rows = new Map<string, StaffReportRow>()
@@ -94,8 +95,6 @@ export async function getStaffReport(month: { start: Date; end: Date }): Promise
     const row = rows.get(entry.staffId)!
     row.checkins += 1
     row.hours += entry.workingHours ?? 0
-    row.orders += entry.ordersTouched
-    row.tasks += entry.completedTasks
     const seen = entry.timestamp.toISOString()
     if (!row.lastSeen || seen > row.lastSeen) {
       row.lastSeen = seen
@@ -103,9 +102,11 @@ export async function getStaffReport(month: { start: Date; end: Date }): Promise
     }
   }
 
+  // Orders sold (the salesperson, else the creator) and products made this month.
   for (const order of orders) {
-    const row = rows.get(order.createdById!)
+    const row = rows.get(order.salespersonId ?? order.createdById!)
     if (!row) continue
+    row.orders += 1
     row.commissionAmount += (order.sellingPrice || order.total) * ((row.profile.commissionRate ?? 0) / 100)
   }
 
@@ -113,6 +114,7 @@ export async function getStaffReport(month: { start: Date; end: Date }): Promise
     const row = rows.get(task.assigneeId!)
     if (!row) continue
     row.tasksCompleted += 1
+    row.tasks += 1
     row.commissionAmount += (task.price ?? 0) * ((row.profile.commissionRate ?? 0) / 100)
   }
 

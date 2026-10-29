@@ -119,7 +119,7 @@ const dictionaries: Record<SupportedLocale, Record<string, string>> = {
     'delivery.DELIVERY': 'Giao tận nơi',
     'delivery.PICKUP': 'Nhận tại shop',
     'checkins.title': 'Điểm danh',
-    'staffReports.title': 'Hoạt động nhân sự',
+    'staffReports.title': 'Báo cáo nhân sự',
     'staffReports.subtitle': 'Điểm danh, đơn hàng và công việc hoàn tất trong tháng.',
     'staffReports.cards.headcount': 'Nhân sự đang hoạt động',
     'staffReports.cards.orders': 'Đơn hàng đã xử lý',

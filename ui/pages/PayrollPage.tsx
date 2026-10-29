@@ -725,15 +725,15 @@ export default function PayrollPage() {
               <thead className="text-left text-xs uppercase tracking-wide text-muted-foreground">
                 <tr>
                   <th className="py-3 pr-3">Nhân viên</th>
-                  <th className="px-3 py-3">Hình thức</th>
-                  <th className="px-3 py-3">Giờ thường</th>
-                  <th className="px-3 py-3">OT</th>
-                  <th className="px-3 py-3 text-right">Lương</th>
-                  <th className="px-3 py-3 text-right">Tiền OT</th>
-                  <th className="px-3 py-3 text-right">Hoa hồng</th>
-                  <th className="px-3 py-3 text-right">KPI</th>
-                  <th className="px-3 py-3 text-right">Phụ cấp</th>
-                  <th className="px-3 py-3 text-right">Điều chỉnh</th>
+                  <th className="hidden px-3 py-3 md:table-cell">Hình thức</th>
+                  <th className="hidden px-3 py-3 md:table-cell">Giờ thường</th>
+                  <th className="hidden px-3 py-3 md:table-cell">OT</th>
+                  <th className="hidden px-3 py-3 text-right md:table-cell">Lương</th>
+                  <th className="hidden px-3 py-3 text-right md:table-cell">Tiền OT</th>
+                  <th className="hidden px-3 py-3 text-right md:table-cell">Hoa hồng</th>
+                  <th className="hidden px-3 py-3 text-right md:table-cell">KPI</th>
+                  <th className="hidden px-3 py-3 text-right md:table-cell">Phụ cấp</th>
+                  <th className="hidden px-3 py-3 text-right md:table-cell">Điều chỉnh</th>
                   <th className="px-3 py-3 text-right">Tổng</th>
                 </tr>
               </thead>
@@ -746,11 +746,11 @@ export default function PayrollPage() {
                         <span className="ml-1 rounded-full bg-red-100 px-1.5 text-xs font-normal text-red-700">Chưa có mức lương</span>
                       )}
                     </td>
-                    <td className="px-3 py-3 whitespace-nowrap text-muted-foreground">
+                    <td className="hidden px-3 py-3 whitespace-nowrap text-muted-foreground md:table-cell">
                       {line.payType === 'MONTHLY' ? `Lương cứng · ${line.totals.daysWorked}/${line.totals.standardDays} công` : 'Theo giờ'}
                     </td>
-                    <td className="px-3 py-3">{hours(line.totals.regularHours)}</td>
-                    <td className="px-3 py-3 whitespace-nowrap">
+                    <td className="hidden px-3 py-3 md:table-cell">{hours(line.totals.regularHours)}</td>
+                    <td className="hidden px-3 py-3 whitespace-nowrap md:table-cell">
                       {hours(line.totals.otHours + line.totals.rushHours)}
                       {line.totals.pendingOtDays > 0 && (
                         <span className="ml-1 rounded-full bg-amber-100 px-1.5 text-xs text-amber-800">{line.totals.pendingOtDays} chờ</span>
@@ -759,20 +759,21 @@ export default function PayrollPage() {
                         <span className="ml-1 rounded-full bg-red-100 px-1.5 text-xs text-red-700">{line.totals.autoClosedDays} quên chấm ra</span>
                       )}
                     </td>
-                    <td className="px-3 py-3 text-right">{money(line.totals.basePay)}</td>
-                    <td className="px-3 py-3 text-right">{money(line.totals.otPay)}</td>
-                    <td className="px-3 py-3 text-right">{money(line.totals.commission)}</td>
-                    <td className="px-3 py-3 text-right">{money(line.totals.kpiTotal)}</td>
-                    <td className="px-3 py-3 text-right">{money(line.totals.allowancesTotal)}</td>
-                    <td className="px-3 py-3 text-right">{money(line.totals.adjustmentsTotal)}</td>
-                    <td className="px-3 py-3 text-right font-semibold text-foreground">{money(line.totals.total)}</td>
+                    <td className="hidden px-3 py-3 text-right whitespace-nowrap md:table-cell">{money(line.totals.basePay)}</td>
+                    <td className="hidden px-3 py-3 text-right whitespace-nowrap md:table-cell">{money(line.totals.otPay)}</td>
+                    <td className="hidden px-3 py-3 text-right whitespace-nowrap md:table-cell">{money(line.totals.commission)}</td>
+                    <td className="hidden px-3 py-3 text-right whitespace-nowrap md:table-cell">{money(line.totals.kpiTotal)}</td>
+                    <td className="hidden px-3 py-3 text-right whitespace-nowrap md:table-cell">{money(line.totals.allowancesTotal)}</td>
+                    <td className="hidden px-3 py-3 text-right whitespace-nowrap md:table-cell">{money(line.totals.adjustmentsTotal)}</td>
+                    <td className="px-3 py-3 text-right font-semibold whitespace-nowrap text-foreground">{money(line.totals.total)}</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr className="border-t-2 border-border font-semibold">
-                  <td className="py-3 pr-3" colSpan={10}>Tổng quỹ lương</td>
-                  <td className="px-3 py-3 text-right">{money(payroll.summary.total)}</td>
+                  <td className="py-3 pr-3 md:hidden">Tổng quỹ lương</td>
+                  <td className="hidden py-3 pr-3 md:table-cell" colSpan={10}>Tổng quỹ lương</td>
+                  <td className="px-3 py-3 text-right whitespace-nowrap">{money(payroll.summary.total)}</td>
                 </tr>
               </tfoot>
             </table>

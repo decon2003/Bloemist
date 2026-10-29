@@ -177,11 +177,11 @@ export default function MyPayPage() {
                   : `${hours(t.regularHours)} giờ${t.onlineHours > 0 ? ` (${hours(t.onlineHours)} online)` : ''}${t.holidayHours > 0 ? ` (${hours(t.holidayHours)} ngày lễ)` : ''}`
               }
             />
-            <Stat
+            {line.role !== 'sales' && <Stat
               label="Tiền OT"
               value={money(t.otPay)}
               hint={`${hours(t.otHours + t.rushHours)} × ${line.otHourlyRate != null ? money(line.otHourlyRate) : `đơn giá giờ × ${data!.otMultiplier}`}${t.pendingOtDays ? ` · ${t.pendingOtDays} ngày chờ duyệt` : ''}`}
-            />
+            />}
             {line.role !== 'sales' && (
               <Stat label="HH làm đơn" value={money(t.commissionByKind.MAKER)} hint={`${makerItems.length} sản phẩm · ${line.makerRate}%`} />
             )}

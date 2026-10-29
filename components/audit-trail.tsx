@@ -101,6 +101,8 @@ const show = (value: unknown, lang: string) => {
   return String(value)
 }
 
+const PAGE = 15
+
 /** Who changed what and when, for managers. With no entity it shows the
  *  latest activity across the shop. */
 export function AuditTrail({
@@ -116,6 +118,8 @@ export function AuditTrail({
 }) {
   const [rows, setRows] = useState<AuditEntry[] | null>(null)
   const [error, setError] = useState('')
+  // The shop-wide feed grows by every sign-in; show it a page at a time.
+  const [shown, setShown] = useState(PAGE)
 
   useEffect(() => {
     let active = true
@@ -133,7 +137,7 @@ export function AuditTrail({
       {error && <p className="text-sm text-red-700">{error}</p>}
       {rows && rows.length === 0 && <p className="text-sm text-muted-foreground">Chưa có thay đổi nào được ghi lại.</p>}
       <ol className="space-y-3">
-        {rows?.map((row) => (
+        {rows?.slice(0, shown).map((row) => (
           <li key={row.id} className="border-l-2 border-border pl-3 text-sm">
             <p className="text-foreground">
               <span className="font-medium">{ACTION_LABELS[row.action] ?? row.action}</span>
@@ -155,6 +159,11 @@ export function AuditTrail({
           </li>
         ))}
       </ol>
+      {rows && rows.length > shown && (
+        <button type="button" onClick={() => setShown((n) => n + PAGE)} className="text-sm font-medium text-primary hover:underline">
+          Xem thêm ({rows.length - shown})
+        </button>
+      )}
     </section>
   )
 }

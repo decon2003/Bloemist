@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import Image from "next/image"
 import { ArrowLeft, User, Truck, ClipboardList, Plus, Edit, Check, X, Trash2, Hand } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useAppData } from "@/components/providers/app-data-provider"
@@ -15,7 +14,6 @@ import { PhotoViewer } from "@/components/photo-viewer"
 import { fetchOrder, updateOrder, deleteOrder } from "@/lib/api"
 import type { CreateOrderInput, Order } from "@/lib/types"
 import { cn, formatCurrencyDisplay, formatDeliveryTime, fromDateTimeLocalValue, lockedPayrollNotice, toDateTimeLocalValue } from "@/lib/utils"
-import { thumbUrl } from "@/lib/image-compress"
 import { AuditTrail } from "@/components/audit-trail"
 import { DateTimeInput24 } from "@/components/time-input-24"
 
@@ -94,11 +92,6 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
         .sort((taskA, taskB) => new Date(taskA.dueTime).getTime() - new Date(taskB.dueTime).getTime()),
     [tasks, orderId],
   )
-
-  const orderThumbnail = useMemo(() => {
-    const firstSample = relatedTasks.find((task) => task.samplePhotoUrls?.length)?.samplePhotoUrls?.[0]
-    return firstSample || order?.bouquetImage || '/placeholder.jpg'
-  }, [order, relatedTasks])
 
   const canSeeContacts = user?.role !== 'florist'
   const canEdit = user?.role !== 'florist'
@@ -424,39 +417,12 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
         </div>
       </section>
 
-      <div className="grid gap-6 md:grid-cols-[1.5fr_1fr]">
-        {/* Photo, total and status: the florists have all this above. */}
-        {canSeeContacts && (
-        <section className="rounded-2xl border border-border bg-white p-6">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center">
-            <Image
-              src={thumbUrl(orderThumbnail)}
-              alt={order.bouquetName}
-              width={160}
-              height={160}
-              className="h-40 w-40 cursor-zoom-in rounded-2xl object-cover"
-              onClick={() => setViewer({ photos: [orderThumbnail], index: 0 })}
-            />
-            <dl className="grid flex-1 grid-cols-2 gap-4 text-sm">
-              {canSeeContacts && (
-                <div>
-                  <dt className="text-muted-foreground">{t("orders.detail.total")}</dt>
-                  <dd className="text-2xl font-bold text-foreground">{formatMoney(order.total)}</dd>
-                </div>
-              )}
-              <div>
-                <dt className="text-muted-foreground">Trạng thái</dt>
-                <dd className="font-semibold text-foreground">{getOrderStatusLabel(order.status)}</dd>
-              </div>
-            </dl>
-          </div>
-        </section>
-        )}
-
+      {/* Total and status are already at the top; photos are on each product. */}
+      <div>
         {canSeeContacts && (
         <section className="rounded-2xl border border-border bg-white p-6">
           <h2 className="text-base font-semibold text-foreground">{t('orders.detail.paymentSummary', 'Thanh toán')}</h2>
-          <dl className="mt-4 grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
+          <dl className="mt-4 grid grid-cols-2 gap-4 text-sm md:grid-cols-3">
             <div>
               <dt className="text-muted-foreground">{t('orders.detail.listedPrice', 'Giá niêm yết')}</dt>
               <dd className="text-lg font-semibold text-foreground">{formatMoney(order.listedPrice, '—')}</dd>
@@ -613,7 +579,7 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
               onClick={() => setDialogOpen(true)}
               className="inline-flex items-center justify-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-semibold text-primary hover:border-primary/60"
             >
-              <Plus className="h-4 w-4" /> Thêm việc
+              <Plus className="h-4 w-4" /> Thêm sản phẩm
             </button>
           )}
         </div>

@@ -328,7 +328,6 @@ export default function NewOrderPage() {
       <div className="space-y-6 p-4 md:p-8">
         <div className="flex items-center justify-between">
           <div className="space-y-2">
-            <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">{t('orders.heroSubtitle')}</p>
             <h1 className="text-3xl font-bold text-foreground">{t('orders.new.title', 'New order')}</h1>
             <p className="text-muted-foreground">{t('orders.new.subtitle', 'Capture order basics to dispatch tasks quickly.')}</p>
           </div>
@@ -535,11 +534,14 @@ export default function NewOrderPage() {
             <div className="space-y-3">
               {products.map((product, index) => (
                 <div key={`product-${index}`} className="space-y-3 rounded-xl border border-border bg-muted/20 p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <label className="flex-1 space-y-1 text-sm font-medium text-foreground">
+                  {/* Phone: the name takes the whole first row; quantity and price share the second. */}
+                  <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:justify-between">
+                    <label className="col-span-2 space-y-1 text-sm font-medium text-foreground sm:flex-1">
                       <span>{t('orders.new.productLabel', 'Order product')}</span>
                       <input
                         required
+                        onInvalid={(event) => event.currentTarget.setCustomValidity('Nhập tên sản phẩm')}
+                        onInput={(event) => event.currentTarget.setCustomValidity('')}
                         list="bouquet-options"
                         value={product.name}
                         onChange={(event) => handleProductChange(index, 'name', event.target.value)}
@@ -551,7 +553,7 @@ export default function NewOrderPage() {
                         ))}
                       </datalist>
                     </label>
-                    <label className="w-28 space-y-1 text-sm font-medium text-foreground">
+                    <label className="space-y-1 text-sm font-medium text-foreground sm:w-28">
                       <span>{t('orders.new.quantityLabel', 'Qty')}</span>
                       <input
                         type="number"
@@ -561,10 +563,12 @@ export default function NewOrderPage() {
                         className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                       />
                     </label>
-                    <label className="w-36 space-y-1 text-sm font-medium text-foreground">
+                    <label className="space-y-1 text-sm font-medium text-foreground sm:w-36">
                       <span>Đơn giá</span>
                       <input
                         required
+                        onInvalid={(event) => event.currentTarget.setCustomValidity('Nhập đơn giá')}
+                        onInput={(event) => event.currentTarget.setCustomValidity('')}
                         inputMode="numeric"
                         placeholder="0"
                         value={product.unitPrice}
@@ -715,20 +719,22 @@ export default function NewOrderPage() {
                   </label>
                 </div>
               )}
-              <label className="space-y-2 text-sm font-medium text-foreground">
-                <span>{t('orders.new.deposit', 'Deposit')}</span>
-                <input
-                  inputMode="numeric"
-                  value={paidInFull ? formatCurrencyInput(String(orderTotalValue)) : deposit}
-                  disabled={paidInFull}
-                  onChange={(event) => setDeposit(formatCurrencyInput(event.target.value))}
-                  className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-muted/50"
-                />
+              <div className="space-y-2 text-sm font-medium text-foreground">
+                <label className="block space-y-2">
+                  <span>{t('orders.new.deposit', 'Deposit')}</span>
+                  <input
+                    inputMode="numeric"
+                    value={paidInFull ? formatCurrencyInput(String(orderTotalValue)) : deposit}
+                    disabled={paidInFull}
+                    onChange={(event) => setDeposit(formatCurrencyInput(event.target.value))}
+                    className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-muted/50"
+                  />
+                </label>
                 <label className="flex items-center gap-2 font-normal">
                   <input type="checkbox" checked={paidInFull} onChange={(event) => setPaidInFull(event.target.checked)} />
                   Khách đã thanh toán đủ
                 </label>
-              </label>
+              </div>
             </div>
 
             <div className="flex flex-col items-end gap-1 rounded-xl bg-muted/60 px-4 py-3">

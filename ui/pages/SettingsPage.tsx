@@ -418,7 +418,6 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6 p-4 md:p-8 pb-24 md:pb-12">
       <div className="space-y-2">
-        <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">{t('settings.subtitle')}</p>
         <h1 className="text-3xl font-bold text-foreground">{t('settings.title')}</h1>
         <p className="text-muted-foreground">
           Giờ làm việc, địa điểm điểm danh và tài khoản nhân viên.

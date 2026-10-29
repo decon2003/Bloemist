@@ -124,7 +124,6 @@ export default function OrdersPage() {
   return (
     <div className="space-y-6 p-4 md:p-8 pb-24 md:pb-12">
       <header className="space-y-3">
-        <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">{t('orders.heroSubtitle')}</p>
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-3">
             <h1 className="text-3xl font-bold text-foreground">{t('orders.heroTitle')}</h1>

@@ -46,6 +46,10 @@ export function toVnd(value: unknown, field: string, { required = false } = {}):
     amount = Math.round(value)
   } else if (typeof value === 'string') {
     if (value.includes('-')) throw new ApiError(400, `${fieldLabel(field)} không được âm`)
+    // "1.250.000 đ" is fine; "1e9" must not quietly become 19.
+    if (!/^[\d.,\s]+(?:đ|₫|vnđ|vnd)?$/i.test(value.trim())) {
+      throw new ApiError(400, `${fieldLabel(field)} không phải số tiền hợp lệ`)
+    }
     const digits = value.replace(/\D/g, '')
     if (!digits) throw new ApiError(400, `${fieldLabel(field)} không phải số tiền hợp lệ`)
     amount = Number(digits)

@@ -101,6 +101,15 @@ model Order {
   @@index([customerId])
 }
 
+// A failed sign-in from a client IP (lib/server/login-throttle.ts).
+model LoginFailure {
+  id String   @id @default(uuid())
+  ip String
+  at DateTime @default(now())
+
+  @@index([ip, at])
+}
+
 // Money a customer paid for an order (the deposit, the rest...), one row per
 // transfer, recorded by staff when it arrives. The order's `deposit` is their
 // sum ("Đã thu"). Sales KPI counts each payment in the shift it arrived in.

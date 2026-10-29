@@ -29,6 +29,15 @@ const ALLOWED_MIME: Record<string, string> = {
   'image/heif': 'heif',
 }
 
+/** The file starts like the image type it claims (a page renamed .png is refused). */
+const looksLike = (mime: string, b: Buffer) => {
+  const ascii = (from: number, to: number) => b.subarray(from, to).toString('latin1')
+  if (mime === 'image/jpeg') return b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff
+  if (mime === 'image/png') return b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+  if (mime === 'image/webp') return ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WEBP'
+  return ascii(4, 8) === 'ftyp' // HEIC / HEIF
+}
+
 export const PHOTO_FOLDERS = ['proofs', 'samples'] as const
 export type PhotoFolder = (typeof PHOTO_FOLDERS)[number]
 
@@ -92,6 +101,7 @@ export async function storePhoto(file: unknown, folder: PhotoFolder, thumbnail?:
   }
 
   const buffer = Buffer.from(await blob.arrayBuffer())
+  if (!looksLike(mime, buffer)) throw new ApiError(400, 'File không phải ảnh hợp lệ')
   if (!r2) {
     return `data:${mime};base64,${buffer.toString('base64')}`
   }
@@ -113,7 +123,8 @@ async function readThumbnail(value: unknown): Promise<Buffer | null> {
   if (!value || typeof value !== 'object' || typeof (value as Blob).arrayBuffer !== 'function') return null
   const blob = value as Blob
   if (blob.type !== 'image/jpeg' || blob.size === 0 || blob.size > MAX_THUMB_BYTES) return null
-  return Buffer.from(await blob.arrayBuffer())
+  const buffer = Buffer.from(await blob.arrayBuffer())
+  return looksLike('image/jpeg', buffer) ? buffer : null
 }
 
 export async function putObject(key: string, body: Buffer, contentType: string) {

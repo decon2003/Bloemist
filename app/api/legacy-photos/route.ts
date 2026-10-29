@@ -41,7 +41,7 @@ export async function GET(request: Request) {
         if (!value) throw new ApiError(404, 'Không tìm thấy ảnh')
 
         // Only images: a stored "data:text/html" must never be served as a page
-        // from this site, and links only lead to our photos or to https.
+        // from this site, and links only lead to our own photos.
         const match = /^data:(image\/(?:png|jpe?g|webp|gif|heic|heif));base64,([A-Za-z0-9+/=\s]*)$/i.exec(value)
         if (match) {
             return new NextResponse(new Uint8Array(Buffer.from(match[2], 'base64')), {
@@ -53,7 +53,7 @@ export async function GET(request: Request) {
                 },
             })
         }
-        if (value.startsWith('/api/photos/') || /^https:\/\//i.test(value)) {
+        if (value.startsWith('/api/photos/')) {
             return NextResponse.redirect(new URL(value, request.url), 302)
         }
         throw new ApiError(404, 'Không tìm thấy ảnh')

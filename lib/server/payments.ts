@@ -49,14 +49,8 @@ async function syncPaid(tx: Prisma.TransactionClient, orderId: string) {
 
 /** `paidAt` (ISO) is for managers entering a transfer recorded late. */
 export async function addPayment(orderId: string, input: { amount?: unknown; note?: unknown; paidAt?: unknown }, actor: SessionUser) {
-  const order = await db.order.findUnique({ where: { id: orderId } })
-  if (!order) throw new ApiError(404, 'Không tìm thấy đơn hàng')
-  if (order.status === 'CANCELLED') throw new ApiError(409, 'Đơn đã huỷ, không ghi nhận tiền được')
   const amount = toVnd(input.amount, 'amount', { required: true })!
   if (amount <= 0) throw new ApiError(400, 'Số tiền phải lớn hơn 0')
-  const remaining = order.remainingBalance ?? order.total
-  if (remaining <= 0) throw new ApiError(409, 'Đơn đã thu đủ tiền')
-  if (amount > remaining) throw new ApiError(400, `Số tiền lớn hơn số còn phải thu (${remaining.toLocaleString('vi-VN')} ₫)`)
 
   let paidAt = new Date()
   if (input.paidAt !== undefined && input.paidAt !== null && input.paidAt !== '') {
@@ -68,9 +62,18 @@ export async function addPayment(orderId: string, input: { amount?: unknown; not
   await assertPayrollOpen(paidAt, 'Khoản thu này')
   const note = typeof input.note === 'string' && input.note.trim() ? input.note.trim().slice(0, 200) : null
 
-  await db.$transaction(async (tx) => {
+  const order = await db.$transaction(async (tx) => {
+    // Lock the order: two clicks at once must not both pass the "còn phải thu" check.
+    await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${orderId} FOR UPDATE`
+    const current = await tx.order.findUnique({ where: { id: orderId } })
+    if (!current) throw new ApiError(404, 'Không tìm thấy đơn hàng')
+    if (current.status === 'CANCELLED') throw new ApiError(409, 'Đơn đã huỷ, không ghi nhận tiền được')
+    const remaining = current.remainingBalance ?? current.total
+    if (remaining <= 0) throw new ApiError(409, 'Đơn đã thu đủ tiền')
+    if (amount > remaining) throw new ApiError(400, `Số tiền lớn hơn số còn phải thu (${remaining.toLocaleString('vi-VN')} ₫)`)
     await tx.orderPayment.create({ data: { orderId, amount, paidAt, note, recordedById: actor.id, recordedByName: actor.name } })
     await syncPaid(tx, orderId)
+    return current
   })
   await audit(actor, {
     action: 'order.payment',

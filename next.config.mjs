@@ -8,7 +8,25 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-
+  poweredByHeader: false,
+  // Browser-side hardening for every page and API response: no framing by
+  // other sites (clickjacking), no MIME sniffing, no full URLs sent to other
+  // sites, and no camera/mic/location access from scripts (photos are taken
+  // through the file picker, which these do not affect).
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          { key: 'X-Frame-Options', value: 'DENY' },
+          { key: 'Content-Security-Policy', value: "frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'" },
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), payment=(), usb=()' },
+        ],
+      },
+    ]
+  },
 }
 
 export default nextConfig

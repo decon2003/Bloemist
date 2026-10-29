@@ -276,11 +276,22 @@ export const nextOrderCode = async (now = new Date()) => {
 /** A stored photo value: our own photo links, an inline image (only when R2 is
  *  not configured) or an https link kept from older orders. Anything else -
  *  notably a pasted "data:text/html" - is refused. */
+// Only our own photos: an outside link would let a page track who views the
+// order (and /api/legacy-photos would redirect to it).
 const isPhotoValue = (value: string) =>
   value.startsWith('/api/photos/') ||
   value.startsWith('/api/legacy-photos?') ||
-  /^data:image\/(png|jpe?g|webp|gif|heic|heif);base64,/i.test(value) ||
-  /^https:\/\//i.test(value)
+  /^data:image\/(png|jpe?g|webp|gif|heic|heif);base64,/i.test(value)
+
+/** Free text people type: long enough for any real note, short enough that
+ *  no field can be used to fill the database. Photos are checked separately. */
+const MAX_TEXT = 2000
+const assertTextLengths = (input: object) => {
+  for (const [key, value] of Object.entries(input)) {
+    if (key === 'bouquetImage' || typeof value !== 'string') continue
+    if (value.length > MAX_TEXT) throw new ApiError(400, `Nội dung quá dài (tối đa ${MAX_TEXT} ký tự)`)
+  }
+}
 
 const readPhoto = (value: unknown): string | null => {
   if (value === undefined || value === null || value === '') return null
@@ -309,6 +320,7 @@ const readProducts = (value: unknown): ProductInput[] => {
     if (!Number.isInteger(quantity) || quantity < 1) throw new ApiError(400, `${label}: số lượng không hợp lệ`)
     const unitPrice = toVnd(item.unitPrice, `${label}: đơn giá`, { required: true })!
     const photos = readPhotoList(item.samplePhotoUrls)
+    if (typeof item.note === 'string' && item.note.length > MAX_TEXT) throw new ApiError(400, `${label}: ghi chú quá dài`)
     return {
       name: item.name.trim().slice(0, 300),
       quantity,
@@ -341,6 +353,7 @@ export const createOrder = async (input: CreateOrderInput) => {
     const existing = await db.order.findUnique({ where: { requestId } })
     if (existing) return mapOrder(existing)
   }
+  assertTextLengths(input)
   const products = readProducts(input.products)
   const deliveryType = assertOneOf(input.deliveryType ?? 'PICKUP', DELIVERY_TYPES, 'deliveryType')
   const status = input.status === 'IN_PROGRESS' ? 'IN_PROGRESS' : 'NEW'
@@ -353,6 +366,9 @@ export const createOrder = async (input: CreateOrderInput) => {
   const money = readOrderMoney(
     products.length ? { ...input, listedPrice: products.reduce((sum, p) => sum + p.lineTotal, 0) } : input,
   )
+  if ((money.deposit ?? 0) > computeOrderTotals(money).total) {
+    throw new ApiError(400, 'Tiền cọc lớn hơn tổng tiền của đơn')
+  }
 
   // Codes are always assigned here; a client-supplied code could collide or mislead.
   const code = await nextOrderCode()
@@ -486,6 +502,7 @@ const readOrderMoney = (input: Partial<CreateOrderInput>, fallback?: OrderMoneyI
 /** `actor`: who is making the change - an order marked "Sẵn sàng" by a
  *  florist with nobody in charge makes them the person in charge. */
 export const updateOrder = async (orderId: string, input: Partial<CreateOrderInput>, actor?: TaskActor) => {
+  assertTextLengths(input)
   const data: any = {}
   for (const field of ORDER_UPDATABLE_FIELDS) {
     if (input[field] !== undefined) data[field] = input[field]
@@ -801,6 +818,7 @@ export const updateTaskStatus = async (taskId: string, status: TaskStatus, actor
 
 export const updateTaskNotes = async (taskId: string, notes: string) => {
   if (typeof notes !== 'string') throw new ApiError(400, 'Ghi chú không hợp lệ')
+  if (notes.length > MAX_TEXT) throw new ApiError(400, `Ghi chú quá dài (tối đa ${MAX_TEXT} ký tự)`)
   await loadTask(taskId)
   await db.task.update({ where: { id: taskId }, data: { notes } })
   return getTask(taskId)

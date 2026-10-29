@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { backupToR2 } from '@/lib/server/backup'
 import { closeOpenShifts } from '@/lib/server/attendance'
 import { isR2Configured } from '@/lib/server/storage'
+import { pruneLoginFailures } from '@/lib/server/login-throttle'
 
 // Nightly job (vercel.json, 19:00 UTC = 02:00 Vietnam): close shifts nobody
 // checked out of, then back up - so the backup holds the closed shifts.
@@ -27,6 +28,7 @@ export async function GET(request: Request) {
     console.error('Closing open shifts failed', error)
     result.closedShifts = 'failed'
   }
+  await pruneLoginFailures().catch((error) => console.error('Pruning login failures failed', error))
   if (!isR2Configured()) {
     console.error('Backup skipped: R2 is not configured')
     return NextResponse.json({ ...result, backup: 'R2 is not configured' }, { status: 500 })

@@ -6,6 +6,7 @@ import { verifyPassword } from '@/lib/server/password'
 import { setSessionCookie } from '@/lib/server/session'
 import { toSessionResponse } from '@/lib/server/auth-response'
 import { audit } from '@/lib/server/audit'
+import { assertIpAllowed, clientIp, recordLoginFailure } from '@/lib/server/login-throttle'
 
 const MAX_FAILED_ATTEMPTS = 5
 const LOCK_MINUTES = 15
@@ -19,12 +20,16 @@ export async function POST(request: Request) {
             throw new ApiError(400, 'Vui lòng nhập email và mật khẩu')
         }
 
+        const ip = clientIp(request)
+        await assertIpAllowed(ip)
+
         // Emails are stored lower-cased; look up the same way so that a
         // differently-cased address does not fail to match.
         const email = body.email.trim().toLowerCase()
         const user = await db.user.findUnique({ where: { email } })
 
         if (!user) {
+            await recordLoginFailure(ip)
             await audit(null, { action: 'auth.login_failed', entity: 'auth', summary: `Email không tồn tại: ${email}` })
             throw new ApiError(401, INVALID)
         }
@@ -38,6 +43,7 @@ export async function POST(request: Request) {
         }
 
         if (!(await verifyPassword(body.password, user.passwordHash))) {
+            await recordLoginFailure(ip)
             const failed = user.failedLoginCount + 1
             await audit(null, {
                 action: failed >= MAX_FAILED_ATTEMPTS ? 'auth.locked' : 'auth.login_failed',

@@ -29,7 +29,7 @@ Data returned to florists is redacted on the server. `redactOrderFor` and `redac
 | GET | `/api/orders/:orderId` | any | Redacted for florists. |
 | PATCH | `/api/orders/:orderId` | writers | Fields are allow-listed. Money totals are recomputed on the server. |
 | DELETE | `/api/orders/:orderId` | managers | |
-| GET | `/api/tasks` | any | `?orderId=`, `?mine=1`. Redacted for florists. |
+| GET | `/api/tasks` | any | `?orderId=`, or a date window / `?q=`. `?mine=1` (caller's), `?assigneeId=<id\|none>`, `?overdue=1` (adds unfinished tasks due before a window that includes today). Carries the order's card message and note. Redacted for florists. |
 | POST | `/api/tasks` | writers | Add a product to an order. Not allowed on a cancelled order. |
 | GET / PATCH | `/api/tasks/:taskId` | any | Florists may change `notes` only. |
 | PATCH | `/api/tasks/:taskId/status` | any | Florists may change their own tasks only. Only managers cancel a task or reopen a completed one. |

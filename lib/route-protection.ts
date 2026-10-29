@@ -12,6 +12,8 @@ export const protectedRoutes: ProtectedRoute[] = [
 
   // Orders and check-ins - shared workspace tools
   { path: '/orders', allowedRoles: ['boss', 'sales', 'florist', 'admin'] },
+  // Work list: florists see theirs, managers see everyone's
+  { path: '/tasks', allowedRoles: ['boss', 'admin', 'florist'] },
   { path: '/checkins', allowedRoles: ['boss', 'sales', 'florist', 'admin'] },
 
   // Dashboard - bosses and admins only

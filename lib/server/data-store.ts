@@ -40,7 +40,19 @@ const mapTask = (t: any): Task => ({
   customerName: t.order?.customerName ?? 'Unknown',
   deliveryType: t.order?.deliveryType ?? 'PICKUP',
   deliveryTime: t.order?.receiveTime?.toISOString() ?? '',
+  cardMessage: t.order?.cardMessage ?? null,
+  orderNotes: t.order?.notes ?? null,
 })
+
+/** Order fields joined onto a task: what the florist needs to make it. */
+const TASK_ORDER_SELECT = {
+  customerName: true,
+  receiverName: true,
+  deliveryType: true,
+  receiveTime: true,
+  cardMessage: true,
+  notes: true,
+} as const
 
 export const mapCheckIn = (c: any): StaffCheckIn => ({
   ...c,
@@ -121,16 +133,27 @@ const slimOrderPhotos = <T extends { id: string; bouquetImage?: string | null }>
 type ListViewer = { id: string; role: string }
 
 /** Tasks due in a Vietnam-day window, matching a search, or belonging to one
- *  order. Never the whole table - see lib/server/list-scope.ts. */
+ *  order. Never the whole table - see lib/server/list-scope.ts.
+ *  `assigneeId`: one maker's tasks, or 'none' for tasks nobody makes yet.
+ *  `withOverdue`: a window that includes today also carries unfinished tasks
+ *  due earlier, so forgotten work never drops out of sight. */
 export const listTasks = async (
   scope: ListScope | { kind: 'order'; orderId: string },
-  options: { assigneeId?: string; viewerRole?: string } = {},
+  options: { assigneeId?: string; viewerRole?: string; withOverdue?: boolean } = {},
 ) => {
   const where: Prisma.TaskWhereInput = {}
   if (scope.kind === 'order') {
     where.orderId = scope.orderId
   } else if (scope.kind === 'range') {
-    where.dueTime = { gte: scope.start, lt: scope.end }
+    const window = { dueTime: { gte: scope.start, lt: scope.end } }
+    const now = new Date()
+    where.OR = options.withOverdue && scope.start <= now && now < scope.end
+      ? [window, {
+          dueTime: { lt: scope.start, ...(scope.since ? { gte: scope.since } : {}) },
+          status: { notIn: ['COMPLETED', 'CANCELLED'] },
+          order: { status: { notIn: ['DELIVERED', 'CANCELLED'] } },
+        }]
+      : [window]
   } else {
     where.OR = [
       { taskTitle: { contains: scope.q, mode: 'insensitive' } },
@@ -141,22 +164,13 @@ export const listTasks = async (
     ]
     if (scope.since) where.dueTime = { gte: scope.since }
   }
-  if (options.assigneeId) where.assigneeId = options.assigneeId
+  if (options.assigneeId) where.assigneeId = options.assigneeId === 'none' ? null : options.assigneeId
 
   const tasks = await db.task.findMany({
     where,
     orderBy: scope.kind === 'search' ? { dueTime: 'desc' } : { dueTime: 'asc' },
     take: scope.kind === 'search' ? SEARCH_LIMIT : LIST_LIMIT,
-    include: {
-      order: {
-        select: {
-          customerName: true,
-          receiverName: true,
-          deliveryType: true,
-          receiveTime: true,
-        }
-      }
-    }
+    include: { order: { select: TASK_ORDER_SELECT } },
   })
   return tasks.map((task) => slimTaskPhotos(mapTask(task), { samples: true }))
 }
@@ -164,15 +178,7 @@ export const listTasks = async (
 export const getTask = async (taskId: string) => {
   const task = await db.task.findUnique({
     where: { id: taskId },
-    include: {
-      order: {
-        select: {
-          customerName: true,
-          deliveryType: true,
-          receiveTime: true,
-        }
-      }
-    }
+    include: { order: { select: TASK_ORDER_SELECT } },
   })
   if (!task) throw new ApiError(404, 'Không tìm thấy sản phẩm')
   return slimTaskPhotos(mapTask(task), { samples: false })

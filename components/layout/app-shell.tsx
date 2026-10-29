@@ -40,8 +40,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     pathname?.includes('/login') || pathname?.includes('/access-denied') || pathname?.includes('/change-password')
 
   const navItems = useMemo(() => {
+    const workNav = { href: `/${lang}/tasks`, label: 'Công việc', icon: ClipboardList }
     const staffNav = [
       { href: `/${lang}/orders`, label: t('nav.orders'), icon: ShoppingBag },
+      // Florists get their work list; sales work from the orders.
+      ...(user?.role === 'florist' ? [workNav] : []),
       { href: `/${lang}/checkins`, label: t('nav.checkins'), icon: MapPin },
       { href: `/${lang}/my-pay`, label: 'Thu nhập', icon: Wallet },
     ]
@@ -53,6 +56,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     const managerBase = [
       { href: `/${lang}/dashboard`, label: t('nav.dashboard'), icon: Leaf },
       { href: `/${lang}/orders`, label: t('nav.orders'), icon: ShoppingBag },
+      workNav,
       { href: `/${lang}/checkins`, label: t('nav.checkins'), icon: MapPin },
       { href: `/${lang}/staff`, label: t('nav.staffReports'), icon: UserCheck },
       { href: `/${lang}/payroll`, label: 'Bảng lương', icon: Wallet },

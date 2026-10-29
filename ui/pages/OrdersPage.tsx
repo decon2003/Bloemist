@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { Search, Filter, Trash2 } from 'lucide-react'
+import { Search, Filter, Trash2, Hand } from 'lucide-react'
 import { useAppData } from '@/components/providers/app-data-provider'
 import { useLocale } from '@/components/providers/locale-provider'
 import { useAuth } from '@/components/providers/auth-provider'
@@ -24,6 +24,9 @@ const statusStyle = (status: Order['status']) =>
       : status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800 border-blue-200'
         : 'bg-muted text-foreground border-transparent'
 const orderStatuses: Array<'ALL' | Order['status']> = ['ALL', ...baseStatuses]
+/** Florists move an open order up to "Sẵn sàng"; the rest is for sales and managers. */
+const floristStatuses: Order['status'][] = ['NEW', 'IN_PROGRESS', 'READY']
+const READY_CONFIRM = 'Chuyển đơn sang "Sẵn sàng"? Các sản phẩm chưa bấm hoàn tất sẽ được tính là đã làm xong.'
 
 type OrderFilter = (typeof orderStatuses)[number]
 
@@ -287,6 +290,22 @@ export default function OrdersPage() {
                       <p className={`font-semibold ${order.assigneeName ? 'text-foreground' : 'text-amber-700'}`}>
                         {order.assigneeName || 'Chưa phân công'}
                       </p>
+                      {user?.role === 'florist' && !order.assigneeId && floristStatuses.includes(order.status) && (
+                        <button
+                          type="button"
+                          onClick={async (e) => {
+                            e.stopPropagation()
+                            try {
+                              await updateOrder(order.id, { assigneeId: user.id })
+                            } catch (error) {
+                              alert(error instanceof Error ? error.message : 'Không nhận được đơn')
+                            }
+                          }}
+                          className="mt-1 inline-flex items-center gap-1 rounded-lg border border-primary bg-white px-3 py-1 text-xs font-semibold text-primary hover:bg-primary/5"
+                        >
+                          <Hand className="h-3.5 w-3.5" /> Nhận đơn
+                        </button>
+                      )}
                     </div>
                     <div className="text-left md:text-right">
                       <p className="text-muted-foreground">Sale</p>
@@ -314,8 +333,8 @@ export default function OrdersPage() {
                     <div className="text-left md:text-right" onClick={(e) => e.stopPropagation()}>
                       <p className="text-muted-foreground">Trạng thái</p>
                       <div className="flex md:justify-end">
-                        {user?.role === 'florist' ? (
-                          // Florists don't change order status: it follows their "Hoàn tất".
+                        {user?.role === 'florist' && !floristStatuses.includes(order.status) ? (
+                          // Delivered and cancelled orders are for sales and managers.
                           <span className={`inline-flex h-8 items-center rounded-md border px-2 text-xs font-medium ${statusStyle(order.status)}`}>
                             {getOrderStatusLabel(order.status)}
                           </span>
@@ -329,6 +348,7 @@ export default function OrdersPage() {
                               const next = e.target.value as Order['status']
                               if (next === 'CANCELLED' && !confirm('Huỷ đơn này? Doanh thu, hoa hồng sale và hoa hồng làm đơn của đơn sẽ không được tính nữa; các sản phẩm chưa làm sẽ dừng lại.')) return
                               if (order.status === 'CANCELLED' && !confirm('Khôi phục đơn đã huỷ? Doanh thu và hoa hồng của đơn sẽ được tính lại.')) return
+                              if (next === 'READY' && !confirm(READY_CONFIRM)) return
                               try {
                                 const updated = await updateOrder(order.id, { status: next })
                                 const notice = lockedPayrollNotice(updated.lockedPayrollMonths)
@@ -339,7 +359,7 @@ export default function OrdersPage() {
                             }}
                             className={`h-8 rounded-md border px-2 py-1 text-xs font-medium focus:ring-1 focus:ring-primary ${statusStyle(order.status)}`}
                           >
-                            {baseStatuses.map((s) => (
+                            {(user?.role === 'florist' ? floristStatuses : baseStatuses).map((s) => (
                               <option key={s} value={s}>
                                 {getOrderStatusLabel(s)}
                               </option>

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { getOrder, updateOrder, deleteOrder, redactOrderFor, syncTasksWithOrderStatus } from '@/lib/server/data-store'
+import { assertFloristOrderChange, getOrder, updateOrder, deleteOrder, redactOrderFor, syncTasksWithOrderStatus } from '@/lib/server/data-store'
+import { ApiError } from '@/lib/server/api-error'
 import { payrollMonthsForOrder, refreshPayrollsFor } from '@/lib/server/payroll'
 import { handleRouteError, readJsonBody } from '@/lib/server/route-helpers'
 import { requireUser, MANAGER_ROLES, ORDER_WRITE_ROLES } from '@/lib/server/session'
@@ -20,11 +21,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ orde
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ orderId: string }> }) {
   try {
-    const me = await requireUser(request, ORDER_WRITE_ROLES)
+    // Florists may move an open order up to "Sẵn sàng" and change its person
+    // in charge; everything else needs sales or a manager.
+    const me = await requireUser(request)
     const { orderId } = await params
     const json = await readJsonBody(request)
     const before = await getOrder(orderId)
-    const updated = await updateOrder(orderId, json)
+    if (me.role === 'florist') assertFloristOrderChange(before, json ?? {})
+    else if (!ORDER_WRITE_ROLES.includes(me.role)) throw new ApiError(403, 'Bạn không có quyền sửa đơn')
+    const updated = await updateOrder(orderId, json, me)
     const changes = diff(before, updated, ORDER_AUDIT_FIELDS)
     if (changes) await audit(me, { action: 'order.update', entity: 'order', entityId: orderId, summary: updated.code, changes })
 
@@ -35,7 +40,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ or
       await syncTasksWithOrderStatus(orderId, before.status, updated.status)
       lockedMonths = (await refreshPayrollsFor(await payrollMonthsForOrder(orderId), me)).lockedMonths
     }
-    return NextResponse.json({ ...updated, lockedPayrollMonths: lockedMonths })
+    return NextResponse.json({ ...redactOrderFor(me, updated), lockedPayrollMonths: lockedMonths })
   } catch (error) {
     return handleRouteError(error)
   }

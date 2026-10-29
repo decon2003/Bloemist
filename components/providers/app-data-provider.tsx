@@ -18,6 +18,7 @@ import {
   assignTask as assignTaskRequest,
   unassignTask as unassignTaskRequest,
   completeTask as completeTaskRequest,
+  addTaskProof as addTaskProofRequest,
   fetchCheckIns,
   createCheckIn as createCheckInRequest,
   checkOut as checkOutRequest,
@@ -50,7 +51,9 @@ interface AppDataContextValue {
   updateTaskNotes: (taskId: string, notes: string) => Promise<Task>
   assignTask: (taskId: string, payload: AssignTaskPayload) => Promise<Task>
   unassignTask: (taskId: string, payload: AssignTaskPayload) => Promise<Task>
-  completeTask: (taskId: string, file: File | Blob) => Promise<Task>
+  /** The photo is optional: sales add the finished-product photo afterwards. */
+  completeTask: (taskId: string, file?: File | Blob | null) => Promise<Task>
+  addTaskProof: (taskId: string, file: File | Blob) => Promise<Task>
   checkins: StaffCheckIn[]
   settings: WorkspaceSettings | null
   createCheckIn: (input: Partial<StaffCheckIn>) => Promise<StaffCheckIn>
@@ -153,7 +156,11 @@ const AppDataContextProvider = ({ children }: { children: React.ReactNode }) => 
   const updateOrder = useMutation({
     mutationFn: ({ orderId, input }: { orderId: string; input: Partial<CreateOrderInput> }) =>
       updateOrderRequest(orderId, input),
-    onSuccess: (updated) => mergeOrder(updated),
+    onSuccess: (updated, { input }) => {
+      mergeOrder(updated)
+      // "Sẵn sàng" completes the products; a new person in charge takes them over.
+      if (input.status !== undefined || input.assigneeId !== undefined) queryClient.removeQueries(['tasks'])
+    },
   })
 
   const deleteOrder = useMutation({
@@ -216,8 +223,13 @@ const AppDataContextProvider = ({ children }: { children: React.ReactNode }) => 
   })
 
   const completeTask = useMutation({
-    mutationFn: ({ taskId, file }: { taskId: string; file: File | Blob }) =>
+    mutationFn: ({ taskId, file }: { taskId: string; file?: File | Blob | null }) =>
       completeTaskRequest(taskId, { photo: file }),
+    onSuccess: (updated) => mergeTask(updated),
+  })
+
+  const addTaskProof = useMutation({
+    mutationFn: ({ taskId, file }: { taskId: string; file: File | Blob }) => addTaskProofRequest(taskId, file),
     onSuccess: (updated) => mergeTask(updated),
   })
 
@@ -270,7 +282,8 @@ const AppDataContextProvider = ({ children }: { children: React.ReactNode }) => 
       updateTaskNotes: (taskId: string, notes: string) => updateTaskNotes.mutateAsync({ taskId, notes }),
       assignTask: (taskId: string, payload: AssignTaskPayload) => assignTask.mutateAsync({ taskId, payload }),
       unassignTask: (taskId: string, payload: AssignTaskPayload) => unassignTask.mutateAsync({ taskId, payload }),
-      completeTask: (taskId: string, file: File | Blob) => completeTask.mutateAsync({ taskId, file }),
+      completeTask: (taskId: string, file?: File | Blob | null) => completeTask.mutateAsync({ taskId, file }),
+      addTaskProof: (taskId: string, file: File | Blob) => addTaskProof.mutateAsync({ taskId, file }),
       checkins,
       settings,
       createCheckIn: (input: Partial<StaffCheckIn>) => createCheckIn.mutateAsync(input),
@@ -301,6 +314,7 @@ const AppDataContextProvider = ({ children }: { children: React.ReactNode }) => 
       assignTask,
       unassignTask,
       completeTask,
+      addTaskProof,
       checkins,
       settings,
       users,

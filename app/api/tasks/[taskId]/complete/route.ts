@@ -9,9 +9,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ tas
   try {
     const me = await requireUser(request)
     const { taskId } = await params
-    const formData = await request.formData()
+    // The photo is optional: sales add the finished-product photo afterwards.
+    const formData = await request.formData().catch(() => new FormData())
     const photo = formData.get('photo')
-    const updated = await completeTask(taskId, { photo: photo as File | Blob, thumb: formData.get('thumb') }, me)
+    const updated = await completeTask(taskId, { photo: photo instanceof Blob && photo.size > 0 ? photo : null, thumb: formData.get('thumb') }, me)
     await audit(me, { action: 'task.complete', entity: 'task', entityId: taskId, summary: `${updated.taskTitle} · ${updated.assigneeName ?? ''}` })
     // Every product made: the order becomes "Sẵn sàng".
     await auditOrderStatus(me, await syncOrderStatusWithTasks(updated.orderId ?? null), updated.orderId)

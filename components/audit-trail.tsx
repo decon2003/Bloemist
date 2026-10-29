@@ -17,6 +17,7 @@ const ACTION_LABELS: Record<string, string> = {
   'task.unassign': 'Bỏ giao việc',
   'task.notes': 'Sửa ghi chú việc',
   'task.complete': 'Hoàn thành việc',
+  'task.proof': 'Thêm ảnh thành phẩm',
   'user.create': 'Thêm nhân viên',
   'user.update': 'Sửa nhân viên',
   'user.password_reset': 'Cấp lại mật khẩu',

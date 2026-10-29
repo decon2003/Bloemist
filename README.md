@@ -14,9 +14,17 @@ Hệ thống quản lý vận hành nội bộ của tiệm hoa Bloemist.
   - Tính tiền: phí ship hoặc freeship, VAT chỉ khi nhập (mặc định 0%), tiền cọc.
   - Lời thiệp và ghi chú đặc biệt nhập riêng.
   - Huỷ đơn: đơn huỷ không tính doanh thu và hoa hồng. Chỉ quản lý được xoá đơn.
+- **Người phụ trách đơn**
+  - Khi tạo đơn, sale có thể chọn người phụ trách hoặc để trống.
+  - Thợ tự bấm "Nhận đơn" ngay trên màn Đơn hàng, hoặc đổi người phụ trách trong trang đơn. Ai cũng đổi được, và mọi lần đổi đều ghi lịch sử.
+  - Người phụ trách mới nhận luôn các sản phẩm chưa làm của người cũ (hoặc chưa ai làm). Sản phẩm đã giao riêng cho thợ khác vẫn giữ nguyên.
 - **Sản phẩm của đơn**
-  - Mỗi sản phẩm là một việc. Thợ bấm "Nhận làm", rồi "Hoàn tất" kèm ảnh thành phẩm, ngay trên trang đơn.
+  - Mỗi sản phẩm là một việc. Thợ bấm "Nhận làm", rồi "Hoàn tất" ngay trên trang đơn (không cần ảnh).
+  - **Ảnh thành phẩm do sale chụp:** sale bấm "Thêm ảnh thành phẩm" trên sản phẩm đã hoàn tất.
   - Làm xong hết sản phẩm thì đơn tự chuyển "Sẵn sàng".
+- **Trạng thái đơn**
+  - Thợ chuyển được đơn tới "Sẵn sàng". "Đã giao" và huỷ đơn do sale hoặc quản lý làm.
+  - Chuyển đơn sang "Sẵn sàng" thì các sản phẩm còn mở được tính là đã làm xong: người làm là thợ của sản phẩm, hoặc người phụ trách nếu sản phẩm chưa có thợ. Nhờ vậy hoa hồng làm đơn không bị mất.
 - **Ai thấy gì**
   - Sale và quản lý thấy toàn bộ đơn.
   - Thợ (florist) thấy thông tin để làm hoa: giá hoa, ship, thiệp, ghi chú, ngày giờ giao, tên và địa chỉ. **Số điện thoại và chi tiết thanh toán bị ẩn ngay từ máy chủ.**

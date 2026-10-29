@@ -349,6 +349,7 @@ export const createOrder = async (input: CreateOrderInput) => {
     ? await readSalesperson(input.salespersonId)
     : { salespersonId: input.createdById ?? null, salespersonName: input.createdByName ?? null }
   const receiveTime = parseRequiredDate(input.receiveTime, 'receiveTime')
+  const inCharge = input.assigneeId ? await readAssignee(input.assigneeId) : null
   const money = readOrderMoney(
     products.length ? { ...input, listedPrice: products.reduce((sum, p) => sum + p.lineTotal, 0) } : input,
   )
@@ -384,8 +385,8 @@ export const createOrder = async (input: CreateOrderInput) => {
         cardMessage: text(input.cardMessage) || null,
         createdById: input.createdById,
         createdByName: input.createdByName,
-        assigneeId: input.assigneeId,
-        assigneeName: input.assigneeName,
+        assigneeId: inCharge?.id ?? null,
+        assigneeName: inCharge?.name ?? null,
         new_customer: newCustomer,
         ...salesperson,
       },
@@ -402,9 +403,9 @@ export const createOrder = async (input: CreateOrderInput) => {
           bouquetImage: product.image,
           taskTitle: `${product.quantity} × ${product.name}`,
           samplePhotoUrls: JSON.stringify(product.samplePhotoUrls),
-          status: input.assigneeId ? 'ASSIGNED' : 'UNASSIGNED',
-          assigneeId: input.assigneeId || null,
-          assigneeName: input.assigneeId ? input.assigneeName ?? null : null,
+          status: inCharge ? 'ASSIGNED' : 'UNASSIGNED',
+          assigneeId: inCharge?.id ?? null,
+          assigneeName: inCharge?.name ?? null,
           dueTime,
           // The order's card and special note are shown on the order page itself.
           notes: product.note,
@@ -433,8 +434,25 @@ export const createOrder = async (input: CreateOrderInput) => {
 const ORDER_UPDATABLE_FIELDS = [
   'customerName', 'customerPhone', 'receiverName', 'receiverPhone',
   'deliveryAddress', 'bouquetName', 'bouquetImage', 'deliveryType', 'status',
-  'notes', 'cardMessage', 'assigneeId', 'assigneeName', 'new_customer',
+  'notes', 'cardMessage', 'new_customer',
 ] as const
+
+/** Statuses a florist may move an order between: up to "Sẵn sàng". */
+const FLORIST_ORDER_STATUSES = ['NEW', 'IN_PROGRESS', 'READY']
+
+/** Florists may change only an open order's status (up to "Sẵn sàng") and its
+ *  person in charge; everything else is for sales and managers. */
+export const assertFloristOrderChange = (current: { status: string }, input: Record<string, unknown>) => {
+  if (Object.keys(input).some((key) => key !== 'status' && key !== 'assigneeId')) {
+    throw new ApiError(403, 'Thợ chỉ đổi được trạng thái và người phụ trách của đơn')
+  }
+  if (!FLORIST_ORDER_STATUSES.includes(current.status)) {
+    throw new ApiError(403, 'Đơn đã giao hoặc đã huỷ, thợ không đổi được nữa')
+  }
+  if (input.status !== undefined && !FLORIST_ORDER_STATUSES.includes(input.status as string)) {
+    throw new ApiError(403, 'Thợ chỉ chuyển đơn tới "Sẵn sàng". Đã giao và huỷ đơn do sale hoặc quản lý làm.')
+  }
+}
 
 // Price inputs; sellingPrice, total and remainingBalance are always derived.
 const ORDER_MONEY_FIELDS = ['listedPrice', 'deliveryFee', 'deliveryCoveredByShop', 'vatPercent', 'deposit'] as const
@@ -453,12 +471,48 @@ const readOrderMoney = (input: Partial<CreateOrderInput>, fallback?: OrderMoneyI
   }
 }
 
-export const updateOrder = async (orderId: string, input: Partial<CreateOrderInput>) => {
+/** `actor`: who is making the change - an order marked "Sẵn sàng" by a
+ *  florist with nobody in charge makes them the person in charge. */
+export const updateOrder = async (orderId: string, input: Partial<CreateOrderInput>, actor?: TaskActor) => {
   const data: any = {}
   for (const field of ORDER_UPDATABLE_FIELDS) {
     if (input[field] !== undefined) data[field] = input[field]
   }
   if (data.status !== undefined) assertOneOf(data.status, ORDER_STATUSES, 'status')
+
+  // Person in charge: checked and named here, never taken from the client.
+  // '' or null = nobody.
+  const before = input.assigneeId !== undefined || data.status === 'READY'
+    ? await db.order.findUnique({ where: { id: orderId }, select: { status: true, assigneeId: true } })
+    : null
+  if (input.assigneeId !== undefined) {
+    if (before?.status === 'CANCELLED') throw new ApiError(409, 'Đơn đã huỷ, không đổi người phụ trách được')
+    const inCharge = input.assigneeId ? await readAssignee(input.assigneeId) : null
+    data.assigneeId = inCharge?.id ?? null
+    data.assigneeName = inCharge?.name ?? null
+  }
+  const nextInCharge: { id: string; name: string | null } | null = data.assigneeId !== undefined
+    ? (data.assigneeId ? { id: data.assigneeId, name: data.assigneeName } : null)
+    : before?.assigneeId ? await db.user.findUnique({ where: { id: before.assigneeId }, select: { id: true, name: true } }) : null
+
+  // "Sẵn sàng" means every product is made: the ones still open are completed,
+  // made by their own maker or else the person in charge, so the making
+  // commission is never lost. A florist marking it with nobody in charge
+  // becomes the person in charge.
+  let readyMaker = nextInCharge
+  const becomesReady = data.status === 'READY' && before?.status !== 'READY'
+  if (becomesReady) {
+    if (!readyMaker && actor?.role === 'florist') {
+      readyMaker = { id: actor.id, name: actor.name }
+      data.assigneeId = actor.id
+      data.assigneeName = actor.name
+    }
+    const orphan = await db.task.count({ where: { orderId, assigneeId: null, status: { notIn: ['COMPLETED', 'CANCELLED'] } } })
+    if (orphan && !readyMaker) throw new ApiError(400, 'Chọn người phụ trách trước khi chuyển đơn sang "Sẵn sàng"')
+  }
+  const inChargeChanged = data.assigneeId !== undefined && data.assigneeId !== (before?.assigneeId ?? null)
+  // Someone taking charge of a new order starts it, as choosing one at creation does.
+  if (inChargeChanged && data.assigneeId && before?.status === 'NEW' && data.status === undefined) data.status = 'IN_PROGRESS'
   if (data.deliveryType !== undefined) assertOneOf(data.deliveryType, DELIVERY_TYPES, 'deliveryType')
   if (data.bouquetImage !== undefined) data.bouquetImage = readPhoto(data.bouquetImage)
 
@@ -502,6 +556,33 @@ export const updateOrder = async (orderId: string, input: Partial<CreateOrderInp
 
   const order = await db.$transaction(async (tx) => {
     const updated = await tx.order.update({ where: { id: orderId }, data })
+    // A new person in charge takes over the products not made yet that were
+    // the previous one's or nobody's; products split to others stay theirs.
+    if (inChargeChanged) {
+      await tx.task.updateMany({
+        where: {
+          orderId,
+          status: { notIn: ['COMPLETED', 'CANCELLED'] },
+          OR: [{ assigneeId: null }, ...(before?.assigneeId ? [{ assigneeId: before.assigneeId }] : [])],
+        },
+        data: data.assigneeId
+          ? { assigneeId: data.assigneeId, assigneeName: data.assigneeName, status: 'ASSIGNED' }
+          : { assigneeId: null, assigneeName: null, status: 'UNASSIGNED' },
+      })
+    }
+    if (becomesReady) {
+      const now = new Date()
+      if (readyMaker) {
+        await tx.task.updateMany({
+          where: { orderId, assigneeId: null, status: { notIn: ['COMPLETED', 'CANCELLED'] } },
+          data: { assigneeId: readyMaker.id, assigneeName: readyMaker.name },
+        })
+      }
+      await tx.task.updateMany({
+        where: { orderId, status: { notIn: ['COMPLETED', 'CANCELLED'] } },
+        data: { status: 'COMPLETED', completedAt: now },
+      })
+    }
     if (dueShiftMs !== 0) {
       const open = await tx.task.findMany({
         where: { orderId, status: { notIn: ['COMPLETED', 'CANCELLED'] } },
@@ -782,8 +863,9 @@ export const completeTask = async (taskId: string, payload: CompleteTaskPayload,
     maker = { id: actor.id, name: actor.name }
   }
 
+  // The finished-product photo is optional here: sales add it afterwards.
   // Validates type/size and uploads to R2 (or inlines it when R2 is not set up).
-  const proofUrl = await storePhoto(payload.photo, 'proofs', payload.thumb)
+  const proofUrl = payload.photo ? await storePhoto(payload.photo, 'proofs', payload.thumb) : null
 
   const { count } = await db.task.updateMany({
     where: { id: taskId, assigneeId: current.assigneeId, status: { notIn: ['COMPLETED', 'CANCELLED'] } },
@@ -797,6 +879,15 @@ export const completeTask = async (taskId: string, payload: CompleteTaskPayload,
   })
   if (count === 0) throw new ApiError(409, 'Sản phẩm vừa được người khác cập nhật. Tải lại trang để xem.')
   await setOrderAssigneeIfEmpty(current.orderId, maker)
+  return getTask(taskId)
+}
+
+/** Sales (and managers) add or replace the photo of a finished product. */
+export const setTaskProof = async (taskId: string, payload: { photo: File | Blob; thumb?: unknown }) => {
+  const current = await loadTask(taskId)
+  if (current.status !== 'COMPLETED') throw new ApiError(409, 'Chỉ thêm ảnh thành phẩm khi sản phẩm đã hoàn tất')
+  const proofUrl = await storePhoto(payload.photo, 'proofs', payload.thumb)
+  await db.task.update({ where: { id: taskId }, data: { completionProofUrl: proofUrl } })
   return getTask(taskId)
 }
 

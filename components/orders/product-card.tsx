@@ -35,10 +35,10 @@ type Props = {
   onOrderChanged: () => void
 }
 
-/** One product of an order, where its work happens: who makes it, and
- *  "Hoàn tất" with a photo of the result. */
+/** One product of an order, where its work happens: who makes it and
+ *  "Hoàn tất". Sales (and managers) add the finished-product photo. */
 export function ProductCard({ task, user, florists, lang, onViewPhotos, onOrderChanged }: Props) {
-  const { assignTask, unassignTask, completeTask, updateTaskStatus } = useAppData()
+  const { assignTask, unassignTask, completeTask, addTaskProof, updateTaskStatus } = useAppData()
   const fileRef = useRef<HTMLInputElement>(null)
   const [photo, setPhoto] = useState<File | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
@@ -175,6 +175,17 @@ export function ProductCard({ task, user, florists, lang, onViewPhotos, onOrderC
               <CheckCircle2 className="h-4 w-4" /> Đã hoàn tất{task.completedAt ? ` lúc ${formatDateTime(task.completedAt, lang)}` : ''}
             </p>
             <p>Người làm: {task.assigneeName ?? '—'}</p>
+            {!task.completionProofUrl && !canManage && <p className="text-xs text-green-800/80">Sale sẽ chụp ảnh thành phẩm.</p>}
+            {canManage && !preview && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => fileRef.current?.click()}
+                className="mt-1 inline-flex items-center gap-1 text-sm font-semibold text-primary underline"
+              >
+                <Camera className="h-4 w-4" /> {task.completionProofUrl ? 'Đổi ảnh thành phẩm' : 'Thêm ảnh thành phẩm'}
+              </button>
+            )}
           </div>
           {isManager && (
             <button
@@ -193,33 +204,6 @@ export function ProductCard({ task, user, florists, lang, onViewPhotos, onOrderC
         </div>
       ) : cancelled ? (
         <p className="mt-3 text-sm text-red-700">Sản phẩm đã huỷ, không cần làm.</p>
-      ) : preview ? (
-        <div className="mt-3 space-y-2 rounded-xl border border-border bg-muted/30 p-3">
-          <p className="text-sm font-medium text-foreground">Ảnh thành phẩm</p>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={preview} alt="Ảnh thành phẩm" className="max-h-64 rounded-lg object-contain" />
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => photo && run(() => completeTask(task.id, photo), () => { clearPhoto(); onOrderChanged() })}
-              className="inline-flex items-center gap-2 rounded-xl bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-60"
-            >
-              <CheckCircle2 className="h-4 w-4" /> {busy ? 'Đang gửi…' : 'Xác nhận hoàn tất'}
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => fileRef.current?.click()}
-              className="rounded-xl border border-border bg-white px-4 py-2 text-sm font-medium hover:bg-muted"
-            >
-              Chọn ảnh khác
-            </button>
-            <button type="button" disabled={busy} onClick={clearPhoto} className="px-2 text-sm text-muted-foreground underline">
-              Huỷ
-            </button>
-          </div>
-        </div>
       ) : (
         <div className="mt-3 flex flex-wrap items-center gap-2">
           {canClaim && (
@@ -236,10 +220,12 @@ export function ProductCard({ task, user, florists, lang, onViewPhotos, onOrderC
             <button
               type="button"
               disabled={busy}
-              onClick={() => fileRef.current?.click()}
+              onClick={() => {
+                if (window.confirm(`Đánh dấu "${task.taskTitle}" đã làm xong?`)) run(() => completeTask(task.id), onOrderChanged)
+              }}
               className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary/90 disabled:opacity-60"
             >
-              <Camera className="h-4 w-4" /> Hoàn tất
+              <CheckCircle2 className="h-4 w-4" /> {busy ? 'Đang lưu…' : 'Hoàn tất'}
             </button>
           )}
           {!canComplete && !canClaim && task.assigneeId && !mine && (
@@ -248,7 +234,28 @@ export function ProductCard({ task, user, florists, lang, onViewPhotos, onOrderC
         </div>
       )}
 
-      {/* No `capture`: the florist may take a photo or pick one already taken. */}
+      {done && preview && (
+        <div className="mt-3 space-y-2 rounded-xl border border-border bg-muted/30 p-3">
+          <p className="text-sm font-medium text-foreground">Ảnh thành phẩm</p>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={preview} alt="Ảnh thành phẩm" className="max-h-64 rounded-lg object-contain" />
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => photo && run(() => addTaskProof(task.id, photo), clearPhoto)}
+              className="inline-flex items-center gap-2 rounded-xl bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-60"
+            >
+              <CheckCircle2 className="h-4 w-4" /> {busy ? 'Đang gửi…' : 'Lưu ảnh'}
+            </button>
+            <button type="button" disabled={busy} onClick={clearPhoto} className="px-2 text-sm text-muted-foreground underline">
+              Huỷ
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* No `capture`: sales may take a photo or pick one already taken. */}
       <input
         ref={fileRef}
         type="file"

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { ArrowLeft, User, Truck, ClipboardList, Plus, Edit, Check, X, Trash2 } from "lucide-react"
+import { ArrowLeft, User, Truck, ClipboardList, Plus, Edit, Check, X, Trash2, Hand } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useAppData } from "@/components/providers/app-data-provider"
 import { useLocale } from "@/components/providers/locale-provider"
@@ -30,6 +30,8 @@ const CANCEL_CONFIRM =
   'Huỷ đơn này? Doanh thu, hoa hồng sale và hoa hồng làm đơn của đơn sẽ không được tính nữa; các sản phẩm chưa làm sẽ dừng lại.'
 
 type Toast = { text: string; kind: 'success' | 'error' }
+
+const FLORIST_STATUSES: Order['status'][] = ['NEW', 'IN_PROGRESS', 'READY']
 
 export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
   const router = useRouter()
@@ -99,6 +101,17 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
 
   const canSeeContacts = user?.role !== 'florist'
   const canEdit = user?.role !== 'florist'
+  // Florists move an open order up to "Sẵn sàng" and change its person in
+  // charge; delivering and cancelling stay with sales and managers.
+  const isFlorist = user?.role === 'florist'
+  const floristCanMove = isFlorist && !!order && FLORIST_STATUSES.includes(order.status)
+  const canChangeInCharge = !!order && order.status !== 'CANCELLED' && (canEdit || floristCanMove)
+  const inChargeOptions = useMemo(
+    () => (order?.assigneeId && !florists.some((f) => f.id === order.assigneeId)
+      ? [{ id: order.assigneeId, name: order.assigneeName ?? '—' }, ...florists]
+      : florists),
+    [florists, order?.assigneeId, order?.assigneeName],
+  )
   // Sales edit orders; only managers delete them.
   const isManager = user?.role === 'boss' || user?.role === 'admin'
 
@@ -164,18 +177,40 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
     if (!order) return
     if (newStatus === 'CANCELLED' && !window.confirm(CANCEL_CONFIRM)) return
     if (order.status === 'CANCELLED' && !window.confirm('Khôi phục đơn đã huỷ? Doanh thu và hoa hồng của đơn sẽ được tính lại.')) return
-    if (newStatus === 'DELIVERED' && relatedTasks.some((task) => task.status !== 'COMPLETED' && task.status !== 'CANCELLED')) {
+    const openProducts = relatedTasks.some((task) => task.status !== 'COMPLETED' && task.status !== 'CANCELLED')
+    if (newStatus === 'DELIVERED' && openProducts) {
       if (!window.confirm('Đơn còn sản phẩm chưa hoàn tất. Vẫn đánh dấu "Đã giao"?')) return
+    }
+    if (newStatus === 'READY' && openProducts) {
+      if (!window.confirm('Chuyển đơn sang "Sẵn sàng"? Các sản phẩm chưa bấm hoàn tất sẽ được tính là đã làm xong.')) return
     }
     try {
       const updated = await updateOrder(order.id, { status: newStatus })
       setOrder(updated)
-      // Cancelling or restoring changes the products too.
-      if (newStatus === 'CANCELLED' || order.status === 'CANCELLED') refreshTasks()
+      // Cancelling, restoring or "Sẵn sàng" changes the products too.
+      if (newStatus === 'CANCELLED' || order.status === 'CANCELLED' || newStatus === 'READY') refreshTasks()
       const notice = lockedPayrollNotice(updated.lockedPayrollMonths)
       setToast(notice ? { text: notice, kind: 'error' } : { text: 'Đã cập nhật trạng thái', kind: 'success' })
     } catch (err) {
       showError(err, 'Không cập nhật được trạng thái')
+    }
+  }
+
+  const handleChangeInCharge = async (userId: string) => {
+    if (!order || userId === (order.assigneeId ?? '')) return
+    const next = inChargeOptions.find((f) => f.id === userId)?.name
+    if (order.assigneeId && !window.confirm(
+      next
+        ? `Chuyển người phụ trách từ ${order.assigneeName ?? 'người cũ'} sang ${next}? Các sản phẩm chưa làm của ${order.assigneeName ?? 'người cũ'} sẽ chuyển theo.`
+        : `Bỏ người phụ trách ${order.assigneeName ?? ''}? Các sản phẩm chưa làm của người này sẽ thành chưa có người làm.`,
+    )) return
+    try {
+      const updated = await updateOrder(order.id, { assigneeId: userId })
+      setOrder(updated)
+      refreshTasks()
+      setToast({ text: next ? `${next} phụ trách đơn này` : 'Đã bỏ người phụ trách', kind: 'success' })
+    } catch (err) {
+      showError(err, 'Không đổi được người phụ trách')
     }
   }
 
@@ -245,17 +280,16 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {canEdit ? (
+          {canEdit || floristCanMove ? (
             <select
               value={order.status}
               onChange={(e) => handleUpdateStatus(e.target.value as Order['status'])}
+              aria-label="Trạng thái đơn"
               className={`h-9 rounded-full border px-4 py-2 text-sm font-medium focus:ring-1 focus:ring-primary ${statusStyle}`}
             >
-              <option value="NEW">{getOrderStatusLabel('NEW')}</option>
-              <option value="IN_PROGRESS">{getOrderStatusLabel('IN_PROGRESS')}</option>
-              <option value="READY">{getOrderStatusLabel('READY')}</option>
-              <option value="DELIVERED">{getOrderStatusLabel('DELIVERED')}</option>
-              <option value="CANCELLED">{getOrderStatusLabel('CANCELLED')}</option>
+              {(isFlorist ? FLORIST_STATUSES : (['NEW', 'IN_PROGRESS', 'READY', 'DELIVERED', 'CANCELLED'] as Order['status'][])).map((value) => (
+                <option key={value} value={value}>{getOrderStatusLabel(value)}</option>
+              ))}
             </select>
           ) : (
             <span className={`inline-flex h-9 items-center rounded-full border px-4 text-sm font-medium ${statusStyle}`}>
@@ -326,6 +360,33 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
             <dd className="font-semibold text-foreground">{shipLabel}</dd>
           </div>
         </dl>
+        <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-muted-foreground">Người phụ trách:</span>
+          {canChangeInCharge ? (
+            <select
+              value={order.assigneeId ?? ''}
+              onChange={(e) => handleChangeInCharge(e.target.value)}
+              aria-label="Người phụ trách"
+              className="h-9 rounded-lg border border-input bg-white px-2 text-sm font-semibold focus:ring-1 focus:ring-primary"
+            >
+              <option value="">Chưa có</option>
+              {inChargeOptions.map((f) => (
+                <option key={f.id} value={f.id}>{f.name}</option>
+              ))}
+            </select>
+          ) : (
+            <span className="font-semibold text-foreground">{order.assigneeName || 'Chưa có'}</span>
+          )}
+          {canChangeInCharge && isFlorist && user && order.assigneeId !== user.id && (
+            <button
+              type="button"
+              onClick={() => handleChangeInCharge(user.id)}
+              className="inline-flex items-center gap-1 rounded-lg border border-primary bg-white px-3 py-1.5 text-sm font-semibold text-primary hover:bg-primary/5"
+            >
+              <Hand className="h-4 w-4" /> Nhận phụ trách
+            </button>
+          )}
+        </div>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <div>
             <p className="mb-1 text-sm font-medium text-muted-foreground">Nội dung thiệp</p>

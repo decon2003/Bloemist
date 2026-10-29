@@ -483,7 +483,7 @@ export default function NewOrderPage() {
               </label>
             </div>
             <label className="space-y-2 text-sm font-medium text-foreground">
-              <span>{t('orders.assignee', 'Thợ làm')} (tuỳ chọn, thợ cũng có thể tự nhận)</span>
+              <span>{t('orders.assignee', 'Người phụ trách')} (tuỳ chọn, thợ cũng có thể tự nhận đơn)</span>
               <select
                 value={assigneeId}
                 onChange={(event) => setAssigneeId(event.target.value)}

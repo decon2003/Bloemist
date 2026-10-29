@@ -168,7 +168,7 @@ const dictionaries: Record<SupportedLocale, Record<string, string>> = {
     'role.florist': 'Thợ hoa',
     'role.user': 'Người dùng',
     'orders.floristWarning': 'Thợ hoa chỉ được xem đơn hàng, chỉ có Sales mới được tạo đơn mới.',
-    'orders.assignee': 'Thợ làm',
+    'orders.assignee': 'Người phụ trách',
     'common.select': 'Chọn',
   },
 }

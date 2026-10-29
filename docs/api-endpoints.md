@@ -27,7 +27,7 @@ Data returned to florists is redacted on the server. `redactOrderFor` and `redac
 | GET | `/api/orders` | any | List, with search, status and date filters. Redacted for florists. |
 | POST | `/api/orders` | writers | Create. `requestId` makes the call idempotent. Creates one task per product. |
 | GET | `/api/orders/:orderId` | any | Redacted for florists. |
-| PATCH | `/api/orders/:orderId` | writers | Fields are allow-listed. Money totals are recomputed on the server. |
+| PATCH | `/api/orders/:orderId` | any | Writers can change the allow-listed fields; money totals are recomputed on the server. Florists can change only `status` (NEW, IN_PROGRESS or READY, and only on an open order) and `assigneeId`. `assigneeId` sets the person in charge (`''` clears it): their open products move to the new person, and a NEW order becomes IN_PROGRESS. Setting READY completes every open product (maker = the product's assignee, or else the person in charge; a florist with nobody in charge becomes the person in charge). |
 | DELETE | `/api/orders/:orderId` | managers | |
 | GET | `/api/tasks` | any | `?orderId=`, `?mine=1`. Redacted for florists. |
 | POST | `/api/tasks` | writers | Add a product to an order. Not allowed on a cancelled order. |
@@ -36,7 +36,8 @@ Data returned to florists is redacted on the server. `redactOrderFor` and `redac
 | PATCH | `/api/tasks/:taskId/notes` | any | `{ notes }` |
 | POST | `/api/tasks/:taskId/assign` | any | `{ userId }`. Florists may only claim an unassigned task for themselves. Only managers reassign a completed task. |
 | POST | `/api/tasks/:taskId/unassign` | any | Your own task, or writers for any task. Not allowed once completed. |
-| POST | `/api/tasks/:taskId/complete` | any | Form data with `photo`. Florists may complete their own task, or an unassigned one, which then becomes theirs. Writers must pick a maker first. When every product is done, the order becomes READY. |
+| POST | `/api/tasks/:taskId/complete` | any | Form data with an optional `photo`. Florists may complete their own task, or an unassigned one, which then becomes theirs. Writers must pick a maker first. When every product is done, the order becomes READY. |
+| POST | `/api/tasks/:taskId/proof` | writers | Form data with `photo`: the finished-product photo, taken by sales. Only for a completed product. |
 | GET | `/api/bouquets` | writers | Bouquet name suggestions. |
 | GET | `/api/florists` | any | People that work can be assigned to. |
 

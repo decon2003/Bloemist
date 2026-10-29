@@ -6,7 +6,8 @@ export interface AssignTaskPayload {
 }
 
 export interface CompleteTaskPayload {
-  photo: File | Blob
+  /** Optional: sales add the finished-product photo afterwards. */
+  photo?: File | Blob | null
   /** Small JPEG for list views; optional. */
   thumb?: unknown
 }
@@ -27,6 +28,7 @@ export interface ApiClient {
   assignTask: (taskId: string, payload: AssignTaskPayload) => Promise<Task>
   unassignTask: (taskId: string, payload: AssignTaskPayload) => Promise<Task>
   completeTask: (taskId: string, payload: CompleteTaskPayload) => Promise<Task>
+  addTaskProof: (taskId: string, photo: File | Blob) => Promise<Task>
   fetchCheckIns: (month?: string) => Promise<StaffCheckIn[]>
   correctCheckIn: (input: ShiftCorrectionInput) => Promise<StaffCheckIn>
   fetchRecentCheckIns: (days: number) => Promise<StaffCheckIn[]>

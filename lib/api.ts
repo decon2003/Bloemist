@@ -69,8 +69,12 @@ const apiClient: ApiClient = {
   assignTask: (taskId, payload) => request<Task>(`/tasks/${taskId}/assign`, { method: 'POST', body: JSON.stringify(payload) }),
   unassignTask: (taskId, payload) => request<Task>(`/tasks/${taskId}/unassign`, { method: 'POST', body: JSON.stringify(payload) }),
   completeTask: async (taskId, payload) => {
-    const formData = await photoForm(payload.photo)
+    const formData = payload.photo ? await photoForm(payload.photo) : new FormData()
     return request<Task>(`/tasks/${taskId}/complete`, { method: 'POST', body: formData })
+  },
+  addTaskProof: async (taskId, photo) => {
+    const formData = await photoForm(photo)
+    return request<Task>(`/tasks/${taskId}/proof`, { method: 'POST', body: formData })
   },
   uploadPhoto: async (file) => {
     const formData = await photoForm(file)
@@ -152,6 +156,7 @@ export const updateTaskNotes = apiClient.updateTaskNotes
 export const assignTask = apiClient.assignTask
 export const unassignTask = apiClient.unassignTask
 export const completeTask = apiClient.completeTask
+export const addTaskProof = apiClient.addTaskProof
 export const fetchCheckIns = apiClient.fetchCheckIns
 export const createCheckIn = apiClient.createCheckIn
 export const checkOut = apiClient.checkOut

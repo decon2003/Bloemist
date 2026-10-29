@@ -61,7 +61,7 @@ function SalaryConfigModal({ user, onClose, onSave }: { user: User, onClose: () 
         salesCommissionRate: Number(salesRate),
         holidayHourlyRate: !isSales && holidayRate.trim() ? Number(holidayRate.replace(/\D/g, '') || 0) : null,
         onlineHourlyRate: isSales && onlineRate.trim() ? Number(onlineRate.replace(/\D/g, '') || 0) : null,
-        otHourlyRate: otRate.trim() ? Number(otRate.replace(/\D/g, '') || 0) : null,
+        otHourlyRate: !isSales && otRate.trim() ? Number(otRate.replace(/\D/g, '') || 0) : null,
         allowances: allowances
           .filter((a) => a.label.trim() || a.amount)
           .map((a) => ({ label: a.label.trim(), amount: Number(a.amount || 0) })),
@@ -103,6 +103,7 @@ function SalaryConfigModal({ user, onClose, onSave }: { user: User, onClose: () 
             <input value={formatCurrencyInput(hourly)} onChange={(e) => setHourly(e.target.value.replace(/\D/g, ''))} className={field} />
           </label>
         </div>
+        {!isSales && (<>
         <label className="block text-sm font-medium">
           Đơn giá tăng ca / giờ
           <input
@@ -115,6 +116,8 @@ function SalaryConfigModal({ user, onClose, onSave }: { user: User, onClose: () 
         <p className="text-xs text-muted-foreground">
           Trả cho giờ tăng ca đã được quản lý duyệt và ca gấp, kể cả người lương cứng. Ngoài khung dưới 10 phút không tính.
         </p>
+        </>)}
+        {isSales && <p className="text-xs text-muted-foreground">Sale không tính tăng ca: mọi giờ làm tính theo đơn giá giờ.</p>}
         <div className="grid grid-cols-2 gap-3">
           <label className="block text-sm font-medium">
             Ngày nghỉ được hưởng / tháng
@@ -291,14 +294,14 @@ export default function StaffReportsPage() {
     [staffReports, searchTerm],
   )
 
-  const roleLabel = (specialty: StaffProfile['specialty']) => {
+  const roleLabel = (specialty: string) => {
     switch (specialty) {
       case 'sales':
-        return t('staffReports.role.sales', 'Sales')
-      case 'hybrid':
-        return t('staffReports.role.hybrid', 'Florist & Sales')
+        return t('staffReports.role.sales', 'Sale')
+      case 'florist':
+        return t('staffReports.role.florist', 'Thợ hoa')
       default:
-        return t('staffReports.role.florist', 'Florist')
+        return t('staffReports.role.admin', 'Quản trị viên')
     }
   }
 

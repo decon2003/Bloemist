@@ -18,8 +18,8 @@ import { parseVnMonth, vnDateKey } from './vn-time'
 // - overtime and "ca gấp" (RUSH, the whole day paid as overtime) are paid at
 //   the person's OT rate, or hourly rate x the payroll's OT multiplier;
 // - a shift nobody checked out of counts 0 hours until it is corrected;
-// - an ONLINE shift (sales working from home) is paid at the online hourly
-//   rate for all its hours: no overtime, no holiday rate;
+// - sales have no overtime: every hour of their shifts is paid at their
+//   hourly rate (the online rate for an ONLINE shift, from home);
 // - MONTHLY pay = base salary x days worked / (days in month - paid days off),
 //   at most the full salary;
 //   HOURLY pay = hourly rate x regular hours, at the holiday rate on public
@@ -229,6 +229,7 @@ async function collectFacts(month: { key: string; start: Date; end: Date }) {
     }),
   ])
 
+  const roleOf = new Map(users.map((u) => [u.id, u.role]))
   const shiftsByUser = new Map<string, ShiftItem[]>()
   for (const s of shifts) {
     const checkIn = s.checkInAt ?? s.timestamp
@@ -237,7 +238,7 @@ async function collectFacts(month: { key: string; start: Date; end: Date }) {
     let regular = 0
     let ot = 0
     const online = s.workMode === 'ONLINE'
-    if (!s.autoClosed && online) {
+    if (!s.autoClosed && (online || roleOf.get(s.staffId) === 'sales')) {
       hours = toMinute(hoursBetween(checkIn, checkOut))
       regular = hours
     } else if (!s.autoClosed) {
@@ -274,7 +275,6 @@ async function collectFacts(month: { key: string; start: Date; end: Date }) {
     commissionsByUser.set(userId, list)
   }
 
-  const roleOf = new Map(users.map((u) => [u.id, u.role]))
   for (const task of tasks) {
     if (task.order?.status === 'CANCELLED') continue
     // Sales earn the sales commission only, even if a product was put on them.
@@ -360,6 +360,14 @@ export async function generatePayroll(monthKey: string, actor: AuditActor) {
     const before = previous.get(user.id)
     const hasActivity = shiftsByUser.has(user.id) || commissionsByUser.has(user.id) || kpiByUser.has(user.id)
     if (!before && !hasActivity && user.status !== 'active') continue
+    // Admin accounts are paid only for what they did (shifts, sales); an empty
+    // admin line left from an earlier draft is removed unless edited by hand.
+    if (user.role === 'admin' && !hasActivity) {
+      if (before && !(before.adjustments as Adjustment[]).length && !before.ratesOverridden) {
+        await db.payrollLine.delete({ where: { id: before.id } })
+      }
+      if (!before || (!(before.adjustments as Adjustment[]).length && !before.ratesOverridden)) continue
+    }
 
     const rates = before?.ratesOverridden
       ? {
@@ -381,7 +389,7 @@ export async function generatePayroll(monthKey: string, actor: AuditActor) {
     const shifts = (shiftsByUser.get(user.id) ?? []).map((s) => {
       const old = oldShifts.get(shiftKey(s))
       if (!old || old.checkIn !== s.checkIn || old.checkOut !== s.checkOut) return s
-      if (old.otDecision === 'RUSH') return { ...s, otDecision: old.otDecision }
+      if (old.otDecision === 'RUSH' && user.role !== 'sales') return { ...s, otDecision: old.otDecision }
       if (s.otHours > 0 && ['OT', 'REGULAR', 'EXCLUDE'].includes(old.otDecision)) return { ...s, otDecision: old.otDecision }
       return s
     })
@@ -626,6 +634,7 @@ export async function updatePayrollLine(lineId: string, body: Record<string, unk
       // Online shifts have no overtime decisions.
       const d = s.mode === 'ONLINE' ? undefined : decisions.get(s.date)
       if (!d || d === s.otDecision) return s
+      if (line.role === 'sales') throw new ApiError(400, 'Sale không tính tăng ca')
       const hasOt = s.otHours > 0.01
       const ok =
         (d === 'RUSH' && s.hours > 0) ||

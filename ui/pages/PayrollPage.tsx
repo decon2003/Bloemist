@@ -200,10 +200,12 @@ function LineEditor({
               <span className="text-muted-foreground">Đơn giá giờ (₫)</span>
               <input value={hourlyRate} disabled={locked} inputMode="numeric" onChange={(e) => setHourlyRate(e.target.value)} className={inputClass} />
             </label>
-            <label className="space-y-1 text-sm">
-              <span className="text-muted-foreground">Đơn giá tăng ca (₫, trống = giờ × hệ số)</span>
-              <input value={otRate} disabled={locked} inputMode="numeric" onChange={(e) => setOtRate(e.target.value)} className={inputClass} />
-            </label>
+            {!isSales && (
+              <label className="space-y-1 text-sm">
+                <span className="text-muted-foreground">Đơn giá tăng ca (₫, trống = giờ × hệ số)</span>
+                <input value={otRate} disabled={locked} inputMode="numeric" onChange={(e) => setOtRate(e.target.value)} className={inputClass} />
+              </label>
+            )}
             {((isSales ? ['salesRate'] : ['makerRate', 'salesRate']) as ('makerRate' | 'salesRate')[]).map((field) => (
               <label key={field} className="space-y-1 text-sm">
                 <span className="text-muted-foreground">% HH {field === 'makerRate' ? 'làm đơn' : 'sale'}</span>
@@ -284,7 +286,9 @@ function LineEditor({
             <h4 className="font-semibold text-foreground">
               Ca làm ({line.shifts.length}){' '}
               <span className="text-sm font-normal text-muted-foreground">
-                · tăng ca {line.otHourlyRate != null ? `${money(line.otHourlyRate)}/giờ` : `đơn giá giờ × ${otMultiplier}`}
+                {isSales
+                  ? '· sale không tính tăng ca'
+                  : `· tăng ca ${line.otHourlyRate != null ? `${money(line.otHourlyRate)}/giờ` : `đơn giá giờ × ${otMultiplier}`}`}
               </span>
             </h4>
             {!locked && pendingDays > 0 && (
@@ -335,6 +339,8 @@ function LineEditor({
                           <span className="text-xs font-medium text-red-700">Quên chấm ra – 0 giờ</span>
                         ) : s.mode === 'ONLINE' ? (
                           <span className="text-xs text-muted-foreground">Giờ online, không tính OT</span>
+                        ) : isSales ? (
+                          <span className="text-xs text-muted-foreground">Sale: mọi giờ tính lương giờ</span>
                         ) : (
                           <select
                             value={decisions[s.date]}
@@ -460,8 +466,8 @@ function LineEditor({
               </div>
             )}
             <p className="text-xs text-muted-foreground">
-              Tính từ tiền khách chuyển cho đơn của người này trong ca, lúc người này đang chấm công. Chỉ tính tiền hoa, không tính VAT
-              và phí ship. Mức thưởng cài ở Cài đặt.
+              Tính tiền khách chuyển ngay trong ca mà người này tạo đơn, lúc đang chấm công (tiền khách trả nốt ở ca khác chỉ tính hoa
+              hồng). Chỉ tính tiền hoa, không tính VAT và phí ship. Mức thưởng cài ở Cài đặt.
             </p>
           </section>
         )}

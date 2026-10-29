@@ -3,10 +3,12 @@ import { ApiError } from './api-error'
 import { vnDateKey } from './vn-time'
 
 // Sales KPI: a bonus per shift (by default sáng 08-13, chiều 13-18, tối 18-23)
-// from the money customers transferred for the salesperson's own orders while
-// that salesperson was at work (checked in, at the shop or online). Of each
-// transfer only the flowers count: payments go to the flowers first, then to
-// VAT and delivery. Only the highest tier reached is paid. Florists get no KPI.
+// from the money customers transferred, in that shift, for the orders the
+// salesperson took in that same shift while at work (checked in, at the shop
+// or online). Money paid for an order in a later shift (the rest of a deposit)
+// earns only the sales commission, not KPI. Of each transfer only the flowers
+// count: payments go to the flowers first, then to VAT and delivery. Only the
+// highest tier reached is paid. Florists get no KPI.
 
 export type KpiShift = { name: string; start: string; end: string }
 export type KpiTier = { revenue: number; bonus: number }
@@ -114,6 +116,7 @@ export async function collectKpi(
   const orders = await db.order.findMany({
     where: { id: { in: [...new Set(paid.map((p) => p.orderId))] }, status: { not: 'CANCELLED' } },
     select: {
+      createdAt: true,
       listedPrice: true,
       salespersonId: true,
       createdById: true,
@@ -121,15 +124,23 @@ export async function collectKpi(
     },
   })
 
+  // "YYYY-MM-DD|shift" an instant falls in, or null outside every shift.
+  const shiftOf = (at: Date) => {
+    const time = vnTime(at)
+    const shift = shifts.find((s) => s.start <= time && time < s.end)
+    return shift ? `${vnDateKey(at)}|${shift.name}` : null
+  }
+
   const credits = new Map<string, { at: Date; amount: number }[]>()
   for (const order of orders) {
     const seller = order.salespersonId ?? order.createdById
-    if (!seller) continue
+    const taken = shiftOf(order.createdAt)
+    if (!seller || !taken) continue
     let before = 0
     for (const payment of order.payments) {
       const flowers = Math.max(0, Math.min(payment.amount, order.listedPrice - before))
       before += payment.amount
-      if (flowers > 0 && inMonth(payment.paidAt)) {
+      if (flowers > 0 && inMonth(payment.paidAt) && shiftOf(payment.paidAt) === taken) {
         const list = credits.get(seller) ?? []
         list.push({ at: payment.paidAt, amount: flowers })
         credits.set(seller, list)

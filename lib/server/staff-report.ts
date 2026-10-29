@@ -22,7 +22,7 @@ export type StaffReportRow = {
   lastLocation: string | null
 }
 
-const titleFor = (role: string) => (role === 'florist' ? 'Florist' : role === 'sales' ? 'Sales' : 'Admin')
+const titleFor = (role: string) => (role === 'florist' ? 'Thợ hoa' : role === 'sales' ? 'Sale' : 'Quản trị viên')
 
 /** Monthly attendance, workload and pay per staff member, computed on the
  *  server from just that month's rows. The page used to download every order,
@@ -68,6 +68,8 @@ export async function getStaffReport(month: { start: Date; end: Date }): Promise
   })
 
   for (const user of users) {
+    // The admin account manages the shop; it is not staff (unless it checks in).
+    if (user.role === 'admin') continue
     rows.set(
       user.id,
       blank({

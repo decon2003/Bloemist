@@ -44,6 +44,8 @@ export default function NewOrderPage() {
   // VAT only when the customer asks for an invoice: enter it then, otherwise 0%.
   const [vatPercent, setVatPercent] = useState<number>(0)
   const [deposit, setDeposit] = useState('')
+  // Paid in full: the deposit follows the total as prices change.
+  const [paidInFull, setPaidInFull] = useState(false)
   const [deliveryType, setDeliveryType] = useState<'DELIVERY' | 'PICKUP'>('DELIVERY')
   const [deliveryAddress, setDeliveryAddress] = useState('')
   const [receiveTime, setReceiveTime] = useState(() => toDateTimeLocalValue(new Date()))
@@ -110,12 +112,12 @@ export default function NewOrderPage() {
   )
 
   const {
+    orderTotalValue,
     formattedOrderTotal,
     formattedRemainingBalance,
   } = useMemo(() => {
     const listedAmount = parseCurrencyToNumber(listedPrice)
     const deliveryAmount = parseCurrencyToNumber(deliveryFee)
-    const depositAmount = parseCurrencyToNumber(deposit)
     const vatRate = Number.isFinite(vatPercent) ? vatPercent : 0
 
     const basePriceValue = listedAmount
@@ -123,13 +125,15 @@ export default function NewOrderPage() {
     const sellingPriceValue = basePriceValue + vatAmount
     const deliveryChargeValue = deliveryType !== 'DELIVERY' || freeship ? 0 : deliveryAmount
     const orderTotalValue = sellingPriceValue + deliveryChargeValue
+    const depositAmount = paidInFull ? orderTotalValue : parseCurrencyToNumber(deposit)
     const remainingBalanceValue = Math.max(orderTotalValue - depositAmount, 0)
 
     return {
+      orderTotalValue,
       formattedOrderTotal: formatCurrencyFromNumber(orderTotalValue),
       formattedRemainingBalance: formatCurrencyFromNumber(remainingBalanceValue),
     }
-  }, [deliveryType, freeship, deliveryFee, deposit, listedPrice, vatPercent])
+  }, [deliveryType, freeship, deliveryFee, deposit, paidInFull, listedPrice, vatPercent])
 
   // Names (and latest photo) of bouquets on recent orders, for suggestions.
   const [bouquetSuggestions, setBouquetSuggestions] = useState<BouquetSuggestion[]>([])
@@ -277,7 +281,7 @@ export default function NewOrderPage() {
         deliveryFee: deliveryType === 'DELIVERY' && !freeship ? deliveryFee : undefined,
         deliveryCoveredByShop: deliveryType === 'DELIVERY' && freeship,
         vatPercent,
-        deposit,
+        deposit: paidInFull ? orderTotalValue : deposit,
         // Selling price, total and remaining balance are recomputed by the server.
         notes,
         cardMessage,
@@ -715,17 +719,24 @@ export default function NewOrderPage() {
                 <span>{t('orders.new.deposit', 'Deposit')}</span>
                 <input
                   inputMode="numeric"
-                  value={deposit}
+                  value={paidInFull ? formatCurrencyInput(String(orderTotalValue)) : deposit}
+                  disabled={paidInFull}
                   onChange={(event) => setDeposit(formatCurrencyInput(event.target.value))}
-                  className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-muted/50"
                 />
+                <label className="flex items-center gap-2 font-normal">
+                  <input type="checkbox" checked={paidInFull} onChange={(event) => setPaidInFull(event.target.checked)} />
+                  Khách đã thanh toán đủ
+                </label>
               </label>
             </div>
 
             <div className="flex flex-col items-end gap-1 rounded-xl bg-muted/60 px-4 py-3">
               <span className="text-sm text-muted-foreground">Tổng tiền</span>
               <span className="text-2xl font-bold text-foreground">{formattedOrderTotal}</span>
-              {parseCurrencyToNumber(deposit) > 0 && (
+              {paidInFull ? (
+                <span className="text-sm font-medium text-green-700">Đã thanh toán đủ</span>
+              ) : parseCurrencyToNumber(deposit) > 0 && (
                 <span className="text-sm text-muted-foreground">Còn phải thu: {formattedRemainingBalance}</span>
               )}
             </div>

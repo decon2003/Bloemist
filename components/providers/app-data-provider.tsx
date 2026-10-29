@@ -82,15 +82,14 @@ const AppDataContextProvider = ({ children }: { children: React.ReactNode }) => 
   const dataNeeds = useMemo(() => {
     const route = pathname ?? ''
     const isOrdersRoute = route.includes('/orders')
-    const isTasksRoute = route.includes('/tasks')
     const isCheckinsRoute = route.includes('/checkins')
     const isStaffRoute = route.includes('/staff')
     const isSettingsRoute = route.includes('/settings')
 
     return {
       orders: canLoad && isOrdersRoute,
-      tasks: canLoad && (isOrdersRoute || isTasksRoute),
-      florists: canLoad && (isOrdersRoute || isTasksRoute),
+      tasks: canLoad && isOrdersRoute,
+      florists: canLoad && isOrdersRoute,
       checkins: canLoad && isCheckinsRoute,
       settings: canLoad && (isCheckinsRoute || isSettingsRoute),
       users: canLoad && (isStaffRoute || isSettingsRoute || isCheckinsRoute || isOrdersRoute),
@@ -126,8 +125,7 @@ const AppDataContextProvider = ({ children }: { children: React.ReactNode }) => 
   // each page refetches its own scope and new items land where they belong.
   const mergeTask = (updated: Task) => {
     queryClient.setQueriesData<Task[] | undefined>(['tasks'], (prev) =>
-      // Merge: list rows carry fields a single-task reply may not.
-      prev?.map((task) => (task.id === updated.id ? { ...task, ...updated } : task)),
+      prev?.map((task) => (task.id === updated.id ? updated : task)),
     )
   }
 

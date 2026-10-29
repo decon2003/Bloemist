@@ -40,9 +40,6 @@ export interface Task {
   receiverPhone?: string
   deliveryType: 'DELIVERY' | 'PICKUP'
   deliveryTime: string
-  /** From the order: the card text and the special note. */
-  cardMessage?: string | null
-  orderNotes?: string | null
   bom?: never
   materialsUsed?: never
   lastAssigneeName?: string
@@ -409,13 +406,9 @@ export interface ListParams {
   to?: string
   q?: string
   orderId?: string
-  /** Person in charge (orders) or maker (tasks): user id, or 'none' = not set. */
+  /** Orders only: person in charge / salesperson (user id, or 'none' = not set). */
   assigneeId?: string
-  /** Orders only. */
   salespersonId?: string
-  /** Tasks only: just the caller's (1), and unfinished ones due earlier (1). */
-  mine?: 1
-  overdue?: 1
   /** Orders only: one status. */
   status?: string
   /** Rows wanted - grows by a page with "Xem thêm". */

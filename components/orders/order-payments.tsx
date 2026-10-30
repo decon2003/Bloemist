@@ -79,7 +79,7 @@ export function OrderPayments({
   return (
     <div className="mt-5 space-y-3 border-t border-border pt-4">
       <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-        <Wallet className="h-4 w-4" /> Các lần khách chuyển tiền
+        <Wallet className="h-4 w-4" /> Các lần khách trả tiền
       </h3>
       {payments === null ? (
         <p className="text-sm text-muted-foreground">Đang tải…</p>
@@ -116,7 +116,7 @@ export function OrderPayments({
         <>
           <div className="flex flex-col gap-2 sm:flex-row">
             <input
-              aria-label="Số tiền khách chuyển"
+              aria-label="Số tiền khách trả thêm"
               inputMode="numeric"
               placeholder={`Số tiền (còn ${money(remaining)})`}
               value={formatCurrencyInput(amount)}
@@ -136,11 +136,12 @@ export function OrderPayments({
               onClick={add}
               className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
             >
-              {busy ? 'Đang lưu…' : 'Ghi nhận tiền khách chuyển'}
+              {busy ? 'Đang lưu…' : 'Ghi nhận khách trả thêm'}
             </button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Bấm ngay khi khách chuyển tiền: giờ ghi nhận được dùng để tính KPI theo ca.{' '}
+            Tiền cọc đã ghi khi tạo đơn. Dùng ô này khi khách trả nốt sau đó: chỉ để theo dõi "Còn phải thu", không tính KPI
+            (KPI chỉ tính tiền nhận trong ca tạo đơn).{' '}
             <button type="button" onClick={() => setAmount(String(remaining))} className="font-medium text-primary hover:underline">
               Điền số còn lại
             </button>

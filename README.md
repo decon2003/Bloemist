@@ -12,7 +12,7 @@ Hệ thống quản lý vận hành nội bộ của tiệm hoa Bloemist.
 - **Đơn hàng**
   - Tạo đơn: thông tin khách có thể bổ sung sau; có ô "người nhận là khách".
   - Tính tiền: phí ship hoặc freeship, VAT chỉ khi nhập (mặc định 0%), tiền cọc.
-  - Thu tiền: tiền cọc lúc tạo đơn là lần thu đầu (tích "Khách đã thanh toán đủ" nếu khách trả hết); mỗi lần khách chuyển thêm, sale bấm "Ghi nhận tiền khách chuyển". "Đã thu" và "Còn phải thu" tự cập nhật; chỉ quản lý xoá được một khoản thu.
+  - Thu tiền: tiền cọc lúc tạo đơn là lần thu đầu (tích "Khách đã thanh toán đủ" nếu khách trả hết); khách trả nốt sau đó thì sale bấm "Ghi nhận khách trả thêm" (chỉ để theo dõi công nợ, không tính KPI). "Đã thu" và "Còn phải thu" tự cập nhật; chỉ quản lý xoá được một khoản thu.
   - Lời thiệp và ghi chú đặc biệt nhập riêng.
   - Huỷ đơn: đơn huỷ không tính doanh thu và hoa hồng. Chỉ quản lý được xoá đơn.
 - **Người phụ trách đơn**

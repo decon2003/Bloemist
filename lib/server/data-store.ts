@@ -560,7 +560,7 @@ export const updateOrder = async (orderId: string, input: Partial<CreateOrderInp
   // Money received after the order was taken is recorded as a payment, which
   // keeps "Đã thu" and the sales KPI right.
   if (input.deposit !== undefined) {
-    throw new ApiError(400, 'Tiền khách trả thêm được ghi bằng nút "Ghi nhận tiền khách chuyển" ở mục Thanh toán')
+    throw new ApiError(400, 'Tiền khách trả thêm được ghi bằng nút "Ghi nhận khách trả thêm" ở mục Thanh toán')
   }
   // Changing any price input recomputes the derived amounts from the merged values.
   if (ORDER_MONEY_FIELDS.some((field) => input[field] !== undefined)) {

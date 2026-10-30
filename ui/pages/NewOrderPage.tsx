@@ -553,9 +553,6 @@ export default function NewOrderPage() {
                     </option>
                   ))}
               </select>
-              <span className="block text-xs font-normal text-muted-foreground">
-                Người mang đơn về (bất kỳ nhân viên nào) nhận hoa hồng sale của đơn.
-              </span>
             </label>
           </section >
 

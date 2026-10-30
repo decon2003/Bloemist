@@ -35,7 +35,10 @@ export function addVnDays(date: Date, days: number): Date {
 export function parseVnDateKey(key: string | null | undefined): Date | null {
   if (!key || !/^\d{4}-\d{2}-\d{2}$/.test(key)) return null
   const time = Date.parse(`${key}T00:00:00+07:00`)
-  return Number.isNaN(time) ? null : new Date(time)
+  if (Number.isNaN(time)) return null
+  // Date.parse rolls "2026-02-30" over to 2 March: only real days count.
+  const date = new Date(time)
+  return vnDateKey(date) === key ? date : null
 }
 
 /** Start (inclusive) and end (exclusive) of a Vietnam calendar month given as

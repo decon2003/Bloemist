@@ -12,6 +12,7 @@ Hệ thống quản lý vận hành nội bộ của tiệm hoa Bloemist.
 - **Đơn hàng**
   - Tạo đơn: thông tin khách có thể bổ sung sau; có ô "người nhận là khách".
   - Tính tiền: phí ship hoặc freeship, VAT chỉ khi nhập (mặc định 0%), tiền cọc.
+  - Bán tại quầy (khách lẻ trả tiền và lấy hoa luôn): nút "Bán tại quầy" ở màn Đơn hàng. Chỉ nhập sản phẩm, giá và thợ đã làm; đơn được ghi là đã thanh toán đủ, đã giao, tính doanh thu, KPI ca hiện tại, hoa hồng sale và hoa hồng làm đơn như đơn thường.
   - Thu tiền: tiền cọc lúc tạo đơn là lần thu đầu (tích "Khách đã thanh toán đủ" nếu khách trả hết); khách trả nốt sau đó thì sale bấm "Ghi nhận khách trả thêm" (chỉ để theo dõi công nợ, không tính KPI). "Đã thu" và "Còn phải thu" tự cập nhật; chỉ quản lý xoá được một khoản thu.
   - Lời thiệp và ghi chú đặc biệt nhập riêng.
   - Huỷ đơn: đơn huỷ không tính doanh thu và hoa hồng. Chỉ quản lý được xoá đơn.
@@ -40,7 +41,7 @@ Hệ thống quản lý vận hành nội bộ của tiệm hoa Bloemist.
 - **Bảng lương**
   - Lương cứng chia theo ngày công, không vượt lương đủ tháng (mặc định nghỉ 4 ngày/tháng).
   - Lương giờ: đơn giá riêng cho ngày lễ (không áp dụng cho sale) và cho giờ online.
-  - Tăng ca (không áp dụng cho sale; mọi giờ của sale tính lương giờ): giờ ngoài khung giờ mở cửa, từ 10 phút trở lên tính theo phút; chỉ trả khi quản lý duyệt. Mỗi người có đơn giá tăng ca riêng (trống = đơn giá giờ × hệ số). Ca gấp tính toàn bộ là tăng ca.
+  - Tăng ca (không áp dụng cho sale; mọi giờ của sale tính lương giờ): giờ ngoài khung giờ mở cửa, từ 10 phút trở lên tính theo phút; chỉ trả khi quản lý duyệt. Mỗi người có đơn giá tăng ca riêng trong hồ sơ lương (trống = như đơn giá giờ). Ca gấp tính toàn bộ là tăng ca.
   - Phụ cấp cố định (ăn uống, xăng xe...) trong hồ sơ lương, trả đủ mỗi tháng.
   - Hoa hồng: hoa hồng sale; hoa hồng làm đơn chỉ cho thợ.
   - KPI sale theo ca (sáng, chiều, tối): tiền hoa khách chuyển ngay trong ca sale tạo đơn, lúc sale đang chấm công; tiền trả nốt ở ca khác chỉ tính hoa hồng; không tính VAT và ship; thưởng mức cao nhất đạt được. Ca và mức thưởng cài ở Cài đặt.

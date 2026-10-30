@@ -130,6 +130,8 @@ export interface CreateOrderInput {
   /** One-off id per "Tạo đơn" press; a retry with the same id returns the
    *  order already created instead of a duplicate. */
   requestId?: string
+  /** "Bán tại quầy": paid in full and delivered now; assigneeId is the florist who made it. */
+  walkIn?: boolean
   /** One task per line; with lines, the listed price is their sum. */
   products?: Array<{ name: string; quantity: number; note?: string; samplePhotoUrls?: string[]; unitPrice: number | string; image?: string }>
   /** Staff member credited with the sale; defaults to the creator. */

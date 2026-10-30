@@ -108,7 +108,7 @@ function SalaryConfigModal({ user, onClose, onSave }: { user: User, onClose: () 
           Đơn giá tăng ca / giờ
           <input
             value={formatCurrencyInput(otRate)}
-            placeholder="Trống = đơn giá giờ × hệ số OT"
+            placeholder="Trống = như đơn giá giờ"
             onChange={(e) => setOtRate(e.target.value.replace(/\D/g, ''))}
             className={field}
           />

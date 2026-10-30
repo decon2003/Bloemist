@@ -8,7 +8,6 @@ import {
   lockPayroll,
   unlockPayroll,
   updatePayrollLine,
-  updatePayrollSettings,
 } from '@/lib/api'
 import type {
   CommissionKind,
@@ -66,13 +65,11 @@ type AdjustmentDraft = { label: string; sign: 1 | -1; amount: string }
 function LineEditor({
   line,
   locked,
-  otMultiplier,
   onClose,
   onSaved,
 }: {
   line: PayrollLine
   locked: boolean
-  otMultiplier: number
   onClose: () => void
   onSaved: (payroll: Payroll) => void
 }) {
@@ -202,7 +199,7 @@ function LineEditor({
             </label>
             {!isSales && (
               <label className="space-y-1 text-sm">
-                <span className="text-muted-foreground">Đơn giá tăng ca (₫, trống = giờ × hệ số)</span>
+                <span className="text-muted-foreground">Đơn giá tăng ca (₫, trống = như đơn giá giờ)</span>
                 <input value={otRate} disabled={locked} inputMode="numeric" onChange={(e) => setOtRate(e.target.value)} className={inputClass} />
               </label>
             )}
@@ -310,7 +307,7 @@ function LineEditor({
               <span className="text-sm font-normal text-muted-foreground">
                 {isSales
                   ? '· sale không tính tăng ca'
-                  : `· tăng ca ${line.otHourlyRate != null ? `${money(line.otHourlyRate)}/giờ` : `đơn giá giờ × ${otMultiplier}`}`}
+                  : `· tăng ca ${money(line.otHourlyRate ?? line.hourlyRate)}/giờ`}
               </span>
             </h4>
             {!locked && pendingDays > 0 && (
@@ -588,7 +585,6 @@ export default function PayrollPage() {
   const [editing, setEditing] = useState<PayrollLine | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const [otMultiplier, setOtMultiplier] = useState('1.5')
 
   useEffect(() => {
     let active = true
@@ -602,9 +598,6 @@ export default function PayrollPage() {
     }
   }, [month])
 
-  useEffect(() => {
-    if (payroll) setOtMultiplier(String(payroll.otMultiplier))
-  }, [payroll])
 
   const run = async (action: () => Promise<Payroll>) => {
     setBusy(true)
@@ -672,22 +665,6 @@ export default function PayrollPage() {
                 <button type="button" disabled={busy} onClick={() => run(() => generatePayroll(month))} className={buttonClass}>
                   <RefreshCw className="h-4 w-4" /> Cập nhật dữ liệu mới
                 </button>
-                <label className="inline-flex items-center gap-1.5 text-sm">
-                  Hệ số OT ×
-                  <input
-                    type="number"
-                    min={1}
-                    max={5}
-                    step={0.1}
-                    value={otMultiplier}
-                    onChange={(e) => setOtMultiplier(e.target.value)}
-                    onBlur={() =>
-                      Number(otMultiplier) !== payroll.otMultiplier &&
-                      run(() => updatePayrollSettings(payroll.id, { otMultiplier: Number(otMultiplier) }))
-                    }
-                    className="w-20 rounded-lg border border-border px-2 py-1.5"
-                  />
-                </label>
                 <button
                   type="button"
                   disabled={busy || !canLock}
@@ -810,7 +787,6 @@ export default function PayrollPage() {
         <LineEditor
           line={editing}
           locked={locked}
-          otMultiplier={payroll.otMultiplier}
           onClose={() => setEditing(null)}
           onSaved={setPayroll}
         />

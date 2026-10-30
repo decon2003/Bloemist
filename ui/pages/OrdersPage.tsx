@@ -15,6 +15,7 @@ import type { Order } from '@/lib/types'
 import { formatCurrencyDisplay, formatDateTime, formatDeliveryTime, lockedPayrollNotice } from '@/lib/utils'
 import { useViewSettings } from '@/components/providers/view-settings-provider'
 import { thumbUrl } from '@/lib/image-compress'
+import { WalkInDialog } from '@/components/orders/walk-in-dialog'
 
 const baseStatuses: Order['status'][] = ['NEW', 'IN_PROGRESS', 'READY', 'DELIVERED', 'CANCELLED']
 
@@ -43,7 +44,9 @@ const daysAgoKey = (days: number) => {
 
 export default function OrdersPage() {
   const router = useRouter()
-  const { orders, users, deleteOrder, updateOrder, setOrderScope } = useAppData()
+  const { orders, users, florists, createOrder, deleteOrder, updateOrder, setOrderScope } = useAppData()
+  const [walkInOpen, setWalkInOpen] = useState(false)
+  const [walkInDone, setWalkInDone] = useState<Order | null>(null)
   const { lang, t, getDeliveryLabel, getOrderStatusLabel } = useLocale()
   const { user } = useAuth()
   const { dateFilterMode } = useViewSettings()
@@ -135,6 +138,15 @@ export default function OrdersPage() {
                 {t('orders.addNew', 'Add new order')}
               </Link>
             )}
+            {user?.role !== 'florist' && (
+              <button
+                type="button"
+                onClick={() => setWalkInOpen(true)}
+                className="hidden rounded-full border border-primary bg-white px-4 py-2 text-sm font-semibold text-primary shadow-sm hover:bg-primary/5 md:inline-flex"
+              >
+                Bán tại quầy
+              </button>
+            )}
           </div>
           <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row">
             <div className="relative flex-1 md:w-72">
@@ -155,12 +167,43 @@ export default function OrdersPage() {
       </header>
 
       {user?.role !== 'florist' && (
-        <Link
-          href={`/${lang}/orders/new`}
-          className="md:hidden inline-flex items-center justify-center rounded-2xl border border-primary bg-white px-4 py-3 text-sm font-semibold text-primary shadow-sm"
-        >
-          {t('orders.addNew', 'Add new order')}
-        </Link>
+        <div className="grid grid-cols-2 gap-2 md:hidden">
+          <Link
+            href={`/${lang}/orders/new`}
+            className="inline-flex items-center justify-center rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white shadow-sm"
+          >
+            {t('orders.addNew', 'Add new order')}
+          </Link>
+          <button
+            type="button"
+            onClick={() => setWalkInOpen(true)}
+            className="inline-flex items-center justify-center rounded-2xl border border-primary bg-white px-4 py-3 text-sm font-semibold text-primary shadow-sm"
+          >
+            Bán tại quầy
+          </button>
+        </div>
+      )}
+
+      {walkInDone && (
+        <div className="flex items-center justify-between gap-3 rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900">
+          <span>
+            Đã lưu đơn bán tại quầy <b>{walkInDone.code}</b> · {formatCurrencyDisplay(walkInDone.total)}
+          </span>
+          <button type="button" onClick={() => setWalkInDone(null)} className="font-medium underline">
+            Đóng
+          </button>
+        </div>
+      )}
+      {walkInOpen && (
+        <WalkInDialog
+          florists={florists}
+          onCreate={createOrder}
+          onClose={() => setWalkInOpen(false)}
+          onDone={(order) => {
+            setWalkInOpen(false)
+            setWalkInDone(order)
+          }}
+        />
       )}
 
       <div className="flex flex-wrap gap-2">

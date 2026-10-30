@@ -354,18 +354,30 @@ export const createOrder = async (input: CreateOrderInput) => {
     if (existing) return mapOrder(existing)
   }
   assertTextLengths(input)
+  // "Bán tại quầy": a customer at the counter pays and takes the flowers at
+  // once. The order is paid in full and delivered now, and its products are
+  // made by the florist chosen (making commission as usual).
+  const walkIn = input.walkIn === true
   const products = readProducts(input.products)
-  const deliveryType = assertOneOf(input.deliveryType ?? 'PICKUP', DELIVERY_TYPES, 'deliveryType')
-  const status = input.status === 'IN_PROGRESS' ? 'IN_PROGRESS' : 'NEW'
+  if (walkIn && !products.length) throw new ApiError(400, 'Nhập ít nhất một sản phẩm')
+  const deliveryType = walkIn ? 'PICKUP' : assertOneOf(input.deliveryType ?? 'PICKUP', DELIVERY_TYPES, 'deliveryType')
+  const status = walkIn ? 'DELIVERED' : input.status === 'IN_PROGRESS' ? 'IN_PROGRESS' : 'NEW'
   // Defaults to whoever creates the order.
   const salesperson = input.salespersonId
     ? await readSalesperson(input.salespersonId)
     : { salespersonId: input.createdById ?? null, salespersonName: input.createdByName ?? null }
-  const receiveTime = parseRequiredDate(input.receiveTime, 'receiveTime')
-  const inCharge = input.assigneeId ? await readAssignee(input.assigneeId) : null
+  const now = new Date()
+  const receiveTime = walkIn ? now : parseRequiredDate(input.receiveTime, 'receiveTime')
+  const inCharge = walkIn
+    ? await readMaker(input.assigneeId)
+    : input.assigneeId ? await readAssignee(input.assigneeId) : null
   const money = readOrderMoney(
     products.length ? { ...input, listedPrice: products.reduce((sum, p) => sum + p.lineTotal, 0) } : input,
   )
+  if (walkIn) {
+    Object.assign(money, { deliveryFee: null, deliveryCoveredByShop: false })
+    money.deposit = computeOrderTotals(money).total
+  }
   if ((money.deposit ?? 0) > computeOrderTotals(money).total) {
     throw new ApiError(400, 'Tiền cọc lớn hơn tổng tiền của đơn')
   }
@@ -385,11 +397,11 @@ export const createOrder = async (input: CreateOrderInput) => {
         code,
         requestId,
         customerId,
-        customerName: text(input.customerName),
+        customerName: text(input.customerName) || (walkIn ? 'Khách lẻ' : ''),
         customerPhone: text(input.customerPhone),
         receiverName: text(input.receiverName),
         receiverPhone: text(input.receiverPhone),
-        bouquetName: input.bouquetName,
+        bouquetName: walkIn ? products[0].name : input.bouquetName,
         bouquetImage: readPhoto(input.bouquetImage),
         receiveTime,
         deliveryType,
@@ -415,13 +427,13 @@ export const createOrder = async (input: CreateOrderInput) => {
           amount: money.deposit,
           recordedById: input.createdById ?? null,
           recordedByName: input.createdByName ?? null,
-          note: 'Tiền cọc khi tạo đơn',
+          note: walkIn ? 'Bán tại quầy' : 'Tiền cọc khi tạo đơn',
         },
       })
     }
     // Tasks are due two hours before the customer receives the order. A florist
     // chosen on the order is the maker of its products.
-    const dueTime = new Date(receiveTime.getTime() - 2 * 60 * 60 * 1000)
+    const dueTime = walkIn ? now : new Date(receiveTime.getTime() - 2 * 60 * 60 * 1000)
     for (const product of products) {
       await tx.task.create({
         data: {
@@ -431,7 +443,8 @@ export const createOrder = async (input: CreateOrderInput) => {
           bouquetImage: product.image,
           taskTitle: `${product.quantity} × ${product.name}`,
           samplePhotoUrls: JSON.stringify(product.samplePhotoUrls),
-          status: inCharge ? 'ASSIGNED' : 'UNASSIGNED',
+          status: walkIn ? 'COMPLETED' : inCharge ? 'ASSIGNED' : 'UNASSIGNED',
+          completedAt: walkIn ? now : null,
           assigneeId: inCharge?.id ?? null,
           assigneeName: inCharge?.name ?? null,
           dueTime,
@@ -719,6 +732,14 @@ const readAssignee = async (userId: unknown) => {
   if (typeof userId !== 'string' || !userId) throw new ApiError(400, 'Chọn người làm')
   const user = await db.user.findUnique({ where: { id: userId }, select: { id: true, name: true, status: true } })
   if (!user || user.status !== 'active') throw new ApiError(400, 'Người làm không tồn tại hoặc đã nghỉ việc')
+  return user
+}
+
+/** The florist who made a bouquet sold at the counter. */
+const readMaker = async (userId: unknown) => {
+  if (typeof userId !== 'string' || !userId) throw new ApiError(400, 'Chọn thợ đã làm bó hoa')
+  const user = await db.user.findUnique({ where: { id: userId }, select: { id: true, name: true, status: true, role: true } })
+  if (!user || user.status !== 'active' || user.role === 'sales') throw new ApiError(400, 'Người làm phải là thợ đang làm việc')
   return user
 }
 

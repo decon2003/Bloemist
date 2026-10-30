@@ -33,11 +33,13 @@ type Props = {
   onViewPhotos: (photos: string[], index: number) => void
   /** After a change that may move the order's status (completing, reopening). */
   onOrderChanged: () => void
+  /** The order's only product: "Nhận phụ trách" on the order already takes it. */
+  onlyProduct?: boolean
 }
 
 /** One product of an order, where its work happens: who makes it and
  *  "Hoàn tất". Sales (and managers) add the finished-product photo. */
-export function ProductCard({ task, user, florists, lang, onViewPhotos, onOrderChanged }: Props) {
+export function ProductCard({ task, user, florists, lang, onViewPhotos, onOrderChanged, onlyProduct = false }: Props) {
   const { assignTask, unassignTask, completeTask, addTaskProof, updateTaskStatus } = useAppData()
   const fileRef = useRef<HTMLInputElement>(null)
   const [photo, setPhoto] = useState<File | null>(null)
@@ -206,7 +208,7 @@ export function ProductCard({ task, user, florists, lang, onViewPhotos, onOrderC
         <p className="mt-3 text-sm text-red-700">Sản phẩm đã huỷ, không cần làm.</p>
       ) : (
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          {canClaim && (
+          {canClaim && !onlyProduct && (
             <button
               type="button"
               disabled={busy}

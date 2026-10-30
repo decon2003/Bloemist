@@ -594,6 +594,7 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
                 user={user}
                 florists={florists}
                 lang={lang}
+                onlyProduct={relatedTasks.length === 1}
                 onViewPhotos={(photos, index) => setViewer({ photos, index })}
                 onOrderChanged={() => {
                   reloadOrder()

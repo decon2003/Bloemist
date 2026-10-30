@@ -25,7 +25,7 @@ Data returned to florists is redacted on the server. `redactOrderFor` and `redac
 | Method | Path | Who | Notes |
 |---|---|---|---|
 | GET | `/api/orders` | any | List, with search, status and date filters. Redacted for florists. |
-| POST | `/api/orders` | writers | Create. `requestId` makes the call idempotent. Creates one task per product. |
+| POST | `/api/orders` | writers | Create. `requestId` makes the call idempotent. Creates one task per product. `walkIn: true` ("Bán tại quầy"): pickup, received now, paid in full, delivered; `assigneeId` (a florist) is the maker and its products are completed. |
 | GET | `/api/orders/:orderId` | any | Redacted for florists. |
 | PATCH | `/api/orders/:orderId` | any | Writers can change the allow-listed fields; money totals are recomputed on the server. `deposit` is refused: money received goes through `payments`. Florists can change only `status` (NEW, IN_PROGRESS or READY, and only on an open order) and `assigneeId`. `assigneeId` sets the person in charge (`''` clears it): their open products move to the new person, and a NEW order becomes IN_PROGRESS. Setting READY completes every open product (maker = the product's assignee, or else the person in charge; a florist with nobody in charge becomes the person in charge). |
 | DELETE | `/api/orders/:orderId` | managers | |

@@ -16,7 +16,7 @@ import { parseVnMonth, vnDateKey } from './vn-time'
 //   unless asked). Less than 10 minutes at either end of a shift is ignored;
 //   from 10 minutes it counts to the minute;
 // - overtime and "ca gấp" (RUSH, the whole day paid as overtime) are paid at
-//   the person's OT rate, or hourly rate x the payroll's OT multiplier;
+//   the person's OT rate (pay profile), or else their normal hourly rate;
 // - a shift nobody checked out of counts 0 hours until it is corrected;
 // - sales have no overtime: every hour of their shifts is paid at their
 //   hourly rate (the online rate for an ONLINE shift, from home);
@@ -130,7 +130,9 @@ export function computeLine(
   // Holidays change the rate of hourly staff only; monthly staff are paid as usual.
   const rateFor = (s: ShiftItem) =>
     !monthly && s.holiday && line.holidayHourlyRate != null ? line.holidayHourlyRate : line.hourlyRate
-  const otRateFor = (s: ShiftItem) => line.otHourlyRate ?? rateFor(s) * otMultiplier
+  // Each person's overtime rate is set in their pay profile; without one,
+  // overtime is paid at the normal hourly rate. (otMultiplier is no longer used.)
+  const otRateFor = (s: ShiftItem) => line.otHourlyRate ?? rateFor(s)
 
   let regularHours = 0
   let otHours = 0
@@ -783,7 +785,7 @@ export async function exportPayrollCsv(monthKey: string) {
   if (!payroll) throw new ApiError(404, 'Chưa có bảng lương tháng này')
   const kindLabel: Record<CommissionKind, string> = { MAKER: 'HH làm đơn', SALES: 'HH sale' }
   const rows: unknown[][] = [
-    [`Bảng lương ${payroll.month}`, payroll.status === 'LOCKED' ? `Đã chốt bởi ${payroll.lockedByName ?? ''}` : 'Nháp', `Hệ số OT ${payroll.otMultiplier}`],
+    [`Bảng lương ${payroll.month}`, payroll.status === 'LOCKED' ? `Đã chốt bởi ${payroll.lockedByName ?? ''}` : 'Nháp'],
     [],
     ['Nhân viên', 'Hình thức', 'Ngày công', 'Giờ thường', 'Giờ OT', 'Giờ ca gấp', 'Lương', 'Tiền OT', 'HH làm đơn', 'HH sale', 'Thưởng KPI', 'Phụ cấp', 'Điều chỉnh', 'Tổng', 'Ghi chú'],
   ]

@@ -180,7 +180,7 @@ export default function MyPayPage() {
             {line.role !== 'sales' && <Stat
               label="Tiền OT"
               value={money(t.otPay)}
-              hint={`${hours(t.otHours + t.rushHours)} × ${line.otHourlyRate != null ? money(line.otHourlyRate) : `đơn giá giờ × ${data!.otMultiplier}`}${t.pendingOtDays ? ` · ${t.pendingOtDays} ngày chờ duyệt` : ''}`}
+              hint={`${hours(t.otHours + t.rushHours)} × ${money(line.otHourlyRate ?? line.hourlyRate)}${t.pendingOtDays ? ` · ${t.pendingOtDays} ngày chờ duyệt` : ''}`}
             />}
             {line.role !== 'sales' && (
               <Stat label="HH làm đơn" value={money(t.commissionByKind.MAKER)} hint={`${makerItems.length} sản phẩm · ${line.makerRate}%`} />

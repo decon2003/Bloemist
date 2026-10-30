@@ -5,7 +5,7 @@
 | | Devtest (hiện có) | Production (sẽ dựng) |
 |---|---|---|
 | Mục đích | Thử nghiệm, được sửa hoặc xoá dữ liệu | Dữ liệu thật của cửa hàng |
-| Domain | `noibo.bloemistflorals.com` cho tới khi có production (xem [mục 3](#3-domain-của-devtest)) | `noibo.bloemistflorals.com` |
+| Domain | `devtest.bloemistflorals.com` (xem [mục 3](#3-domain-của-devtest)) | `noibo.bloemistflorals.com` |
 | Vercel project | project hiện tại | project mới, cùng repo |
 | Neon | project `bloemist` (Singapore) | project mới, Singapore |
 | R2 bucket | `bloemist-photos` | bucket mới, token mới |
@@ -80,14 +80,13 @@ Migration tự chạy khi build production (`scripts/migrate-if-production.mjs`,
 
 ## 3. Domain của devtest
 
-Chưa có production, nên devtest chạy thẳng ở `https://noibo.bloemistflorals.com` (quyết định ngày 29/10/2026; `devtest.bloemistflorals.com` đã được gỡ khỏi project).
+Quyết định ngày 30/10/2026: **`noibo.bloemistflorals.com` dành cho production, `devtest.bloemistflorals.com` dành cho devtest.**
 
-Khi dựng production (mục 5), `noibo` chuyển sang project production. Lúc đó devtest cần một địa chỉ khác. Code không gắn cứng domain nào, nên chỉ cần thao tác trên Vercel và DNS:
+Cho tới khi dựng xong production, devtest vẫn đang chạy ở `noibo`. Đến ngày chuyển (mục 5, bước 7). Code không gắn cứng domain nào, nên chỉ cần thao tác trên Vercel và DNS:
 
-1. Hoặc dùng luôn địa chỉ `*.vercel.app` của project devtest (xem ở **Settings → Domains**).
-2. Hoặc thêm một subdomain riêng, ví dụ `devtest.bloemistflorals.com`:
-   - vào **Settings → Domains → Add**;
-   - thêm bản ghi DNS mà Vercel hiện ra.
+1. Project devtest: **Settings → Domains → Add** `devtest.bloemistflorals.com`, thêm bản ghi DNS mà Vercel hiện ra. Làm việc này trước, để devtest có địa chỉ mới ngay.
+2. Project devtest: gỡ `noibo.bloemistflorals.com`.
+3. Project production: **Settings → Domains → Add** `noibo.bloemistflorals.com`.
 
 Ghi chú:
 - Khi gỡ domain, chỉ gỡ khỏi project. **Không** xoá `bloemistflorals.com` ở trang Domains của team.
@@ -140,8 +139,8 @@ Làm khi bản devtest đã ổn. **Mọi thứ đều mới, không dùng lại
 
    Sau đó đăng nhập, đổi email/tên admin cho đúng người thật, rồi tạo tài khoản cho nhân viên ở **Cài đặt**.
 7. **Domain:**
+   - thêm `devtest.bloemistflorals.com` vào project devtest (mục 3);
    - gỡ `noibo.bloemistflorals.com` khỏi project devtest, rồi thêm vào project production (**Settings → Domains**);
-   - cho devtest một địa chỉ khác (mục 3);
    - nếu Vercel yêu cầu thêm bản ghi DNS thì làm theo hướng dẫn trên màn hình.
 8. **Kiểm tra:**
    - `https://noibo.bloemistflorals.com/api/health?db=1` trả về ok.

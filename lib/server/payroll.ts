@@ -24,7 +24,7 @@ import { parseVnMonth, vnDateKey } from './vn-time'
 //   at most the full salary;
 //   HOURLY pay = hourly rate x regular hours, at the holiday rate on public
 //   holidays (Settings);
-// - making commission = rate% of each completed product's price (before VAT);
+// - making commission = rate% of each completed product's price;
 //   it goes in full to whoever the product's task is assigned to - never to
 //   sales, who earn the sales commission only;
 // - sales commission = rate% of the listed price of each order created that

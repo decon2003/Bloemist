@@ -23,6 +23,10 @@ import { fetchDashboardStats } from '@/lib/api'
 import { useQuery } from '@/lib/query-client'
 import { parseCurrencyToNumber, formatCurrencyFromNumber, formatDateTime } from '@/lib/utils'
 
+// Two series, fixed order (validated together for colour-blind readers).
+const FLOWERS_COLOR = '#2a78d6'
+const SHIPPING_COLOR = '#eb6834'
+
 export default function BossDashboard() {
   const { lang, getOrderStatusLabel } = useLocale()
   const dashboardQuery = useQuery({ queryKey: ['dashboard-stats'], queryFn: fetchDashboardStats, keepPreviousData: true })
@@ -43,6 +47,8 @@ export default function BossDashboard() {
   const kpis = useMemo(() => {
     return {
       revenue: stats?.monthlyRevenue ?? 0,
+      flowers: stats?.monthlyFlowers ?? 0,
+      shipping: stats?.monthlyShipping ?? 0,
       orders: stats?.monthlyOrders ?? 0,
       active: stats?.activeOrders ?? 0,
       tasks: stats?.monthlyTasks ?? 0
@@ -56,6 +62,8 @@ export default function BossDashboard() {
       return {
         name: date.toLocaleDateString(lang === 'vi' ? 'vi-VN' : 'en-US', { weekday: 'short', day: 'numeric', month: 'numeric' }),
         revenue: entry.revenue,
+        flowers: entry.flowers,
+        shipping: entry.shipping,
       }
     })
   }, [stats, lang])
@@ -94,7 +102,21 @@ export default function BossDashboard() {
           <div className="text-2xl font-bold text-foreground">
             {formatCurrencyFromNumber(kpis.revenue)}
           </div>
-          <p className="text-xs text-muted-foreground mt-1">
+          <dl className="mt-2 space-y-1 text-sm">
+            <div className="flex items-center justify-between gap-3">
+              <dt className="flex items-center gap-2 text-muted-foreground">
+                <span className="h-2.5 w-2.5 rounded-sm" style={{ background: FLOWERS_COLOR }} /> Tiền hoa
+              </dt>
+              <dd className="font-medium text-foreground">{formatCurrencyFromNumber(kpis.flowers)}</dd>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <dt className="flex items-center gap-2 text-muted-foreground">
+                <span className="h-2.5 w-2.5 rounded-sm" style={{ background: SHIPPING_COLOR }} /> Phí ship
+              </dt>
+              <dd className="font-medium text-foreground">{formatCurrencyFromNumber(kpis.shipping)}</dd>
+            </div>
+          </dl>
+          <p className="text-xs text-muted-foreground mt-2">
             {kpis.orders} đơn tạo trong tháng {today.getMonth() + 1} (không tính đơn huỷ)
           </p>
         </div>
@@ -140,6 +162,14 @@ export default function BossDashboard() {
               <TrendingUp className="h-4 w-4" />
               Doanh thu 7 ngày qua (theo ngày đặt)
             </h3>
+            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+              <span className="flex items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-sm" style={{ background: FLOWERS_COLOR }} /> Tiền hoa
+              </span>
+              <span className="flex items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-sm" style={{ background: SHIPPING_COLOR }} /> Phí ship
+              </span>
+            </div>
           </div>
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -161,14 +191,30 @@ export default function BossDashboard() {
                 <Tooltip
                   cursor={{ fill: '#F3F4F6' }}
                   contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                  formatter={(value: any) => [formatCurrencyFromNumber(Number(value || 0)), 'Doanh thu']}
+                  content={({ active, payload, label }) => {
+                    const row = active && payload?.[0]?.payload
+                    if (!row) return null
+                    return (
+                      <div className="rounded-lg bg-white px-3 py-2 text-sm shadow-md">
+                        <p className="mb-1 font-medium text-foreground">{label}</p>
+                        <p className="flex items-center gap-2 text-muted-foreground">
+                          <span className="h-2.5 w-2.5 rounded-sm" style={{ background: FLOWERS_COLOR }} />
+                          Tiền hoa <span className="ml-auto pl-4 text-foreground">{formatCurrencyFromNumber(row.flowers)}</span>
+                        </p>
+                        <p className="flex items-center gap-2 text-muted-foreground">
+                          <span className="h-2.5 w-2.5 rounded-sm" style={{ background: SHIPPING_COLOR }} />
+                          Phí ship <span className="ml-auto pl-4 text-foreground">{formatCurrencyFromNumber(row.shipping)}</span>
+                        </p>
+                        <p className="mt-1 border-t border-border pt-1 font-semibold text-foreground">
+                          Tổng <span className="float-right pl-4">{formatCurrencyFromNumber(row.revenue)}</span>
+                        </p>
+                      </div>
+                    )
+                  }}
                 />
-                <Bar
-                  dataKey="revenue"
-                  fill="#10B981"
-                  radius={[4, 4, 0, 0]}
-                  barSize={40}
-                />
+                {/* Flowers at the base, delivery on top; a 2px white gap between them. */}
+                <Bar dataKey="flowers" stackId="revenue" fill={FLOWERS_COLOR} stroke="#ffffff" strokeWidth={2} barSize={40} />
+                <Bar dataKey="shipping" stackId="revenue" fill={SHIPPING_COLOR} stroke="#ffffff" strokeWidth={2} radius={[4, 4, 0, 0]} barSize={40} />
               </BarChart>
             </ResponsiveContainer>
           </div>

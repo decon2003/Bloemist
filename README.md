@@ -11,7 +11,7 @@ Hệ thống quản lý vận hành nội bộ của tiệm hoa Bloemist.
 
 - **Đơn hàng**
   - Tạo đơn: thông tin khách có thể bổ sung sau; có ô "người nhận là khách".
-  - Tính tiền: phí ship hoặc freeship, VAT chỉ khi nhập (mặc định 0%), tiền cọc.
+  - Tính tiền: phí ship hoặc freeship, tiền cọc. Không tính VAT.
   - Bán tại cửa hàng (khách lẻ trả tiền và lấy hoa luôn): chọn "Bán tại cửa hàng" ở đầu màn Tạo đơn. Chỉ nhập sản phẩm, giá và thợ đã làm; đơn được ghi là đã thanh toán đủ, đã giao, tính doanh thu, KPI ca hiện tại, hoa hồng sale và hoa hồng làm đơn như đơn thường.
   - Thu tiền: tiền cọc lúc tạo đơn là lần thu đầu (tích "Khách đã thanh toán đủ" nếu khách trả hết); khách trả nốt sau đó thì sale bấm "Ghi nhận khách trả thêm" (chỉ để theo dõi công nợ, không tính KPI). "Đã thu" và "Còn phải thu" tự cập nhật; chỉ quản lý xoá được một khoản thu.
   - Lời thiệp và ghi chú đặc biệt nhập riêng.
@@ -44,9 +44,9 @@ Hệ thống quản lý vận hành nội bộ của tiệm hoa Bloemist.
   - Tăng ca (không áp dụng cho sale; mọi giờ của sale tính lương giờ): giờ ngoài khung giờ mở cửa, từ 10 phút trở lên tính theo phút; chỉ trả khi quản lý duyệt. Mỗi người có đơn giá tăng ca riêng trong hồ sơ lương (trống = như đơn giá giờ). Ca gấp tính toàn bộ là tăng ca.
   - Phụ cấp cố định (ăn uống, xăng xe...) trong hồ sơ lương, trả đủ mỗi tháng.
   - Hoa hồng: hoa hồng sale; hoa hồng làm đơn chỉ cho thợ.
-  - KPI sale theo ca (sáng, chiều, tối): tiền hoa khách chuyển ngay trong ca sale tạo đơn, lúc sale đang chấm công; tiền trả nốt ở ca khác chỉ tính hoa hồng; không tính VAT và ship; thưởng mức cao nhất đạt được. Ca và mức thưởng cài ở Cài đặt.
+  - KPI sale theo ca (sáng, chiều, tối): tiền hoa khách chuyển ngay trong ca sale tạo đơn, lúc sale đang chấm công; tiền trả nốt ở ca khác chỉ tính hoa hồng; không tính ship; thưởng mức cao nhất đạt được. Ca và mức thưởng cài ở Cài đặt.
   - Chỉ chốt được sau khi hết tháng. Nhân viên xem lương của mình ở mục "Thu nhập".
-- **Dashboard** (quản lý): doanh thu tháng/tuần theo ngày đặt, đơn đang xử lý.
+- **Dashboard** (quản lý): doanh thu tháng/tuần theo ngày đặt = tiền hoa + phí ship (hiện tách riêng hai phần), đơn đang xử lý.
 - **Hiển thị**: giờ theo chuẩn 24h, ngày dạng dd/mm/yyyy, múi giờ Việt Nam (+07:00).
 
 Vai trò: `admin` (quản lý), `sales`, `florist`. Mọi quyền đều được kiểm tra ở máy chủ (`lib/server/session.ts`); danh sách API và quyền nằm ở [docs/api-endpoints.md](docs/api-endpoints.md).

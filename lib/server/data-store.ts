@@ -8,7 +8,7 @@ import type { CreateOrderInput, CreateTaskInput, Florist, Order, Task, TaskStatu
 import { ApiError } from './api-error'
 import { storePhoto } from './storage'
 import { assertPayrollOpen } from './payroll'
-import { computeOrderTotals, parseCurrencyToNumber, toVatPercent, toVnd, type OrderMoneyInput } from './money'
+import { computeOrderTotals, parseCurrencyToNumber, toVnd, type OrderMoneyInput } from './money'
 import { addVnDays, startOfVnMonth, vnDateKey } from './vn-time'
 import { LIST_LIMIT, SEARCH_LIMIT, type ListScope } from './list-scope'
 import type { Prisma } from '@prisma/client'
@@ -498,7 +498,7 @@ export const assertFloristOrderChange = (current: { status: string }, input: Rec
 }
 
 // Price inputs; sellingPrice, total and remainingBalance are always derived.
-const ORDER_MONEY_FIELDS = ['listedPrice', 'deliveryFee', 'deliveryCoveredByShop', 'vatPercent', 'deposit'] as const
+const ORDER_MONEY_FIELDS = ['listedPrice', 'deliveryFee', 'deliveryCoveredByShop', 'deposit'] as const
 
 /** Validated price inputs as whole VND. `fallback` supplies the stored values
  *  for fields an update leaves out. */
@@ -509,7 +509,6 @@ const readOrderMoney = (input: Partial<CreateOrderInput>, fallback?: OrderMoneyI
     listedPrice: pick('listedPrice', () => toVnd(input.listedPrice, 'listedPrice', { required: true })!),
     deliveryFee: pick('deliveryFee', () => toVnd(input.deliveryFee, 'deliveryFee')),
     deliveryCoveredByShop: pick('deliveryCoveredByShop', () => input.deliveryCoveredByShop === true),
-    vatPercent: pick('vatPercent', () => toVatPercent(input.vatPercent)),
     deposit: pick('deposit', () => toVnd(input.deposit, 'deposit')),
   }
 }
@@ -585,7 +584,6 @@ export const updateOrder = async (orderId: string, input: Partial<CreateOrderInp
       listedPrice: current.listedPrice,
       deliveryFee: current.deliveryFee,
       deliveryCoveredByShop: current.deliveryCoveredByShop ?? false,
-      vatPercent: current.vatPercent,
       deposit: current.deposit,
     })
     Object.assign(data, money, computeOrderTotals(money))
@@ -982,11 +980,11 @@ export const getDashboardStats = async () => {
   const [monthlyOrders, weeklyOrders, activeOrders, monthlyTasks, recentOrders] = await Promise.all([
     db.order.findMany({
       where: revenueWindow(startOfMonth),
-      select: { total: true },
+      select: { listedPrice: true, deliveryFee: true, deliveryCoveredByShop: true },
     }),
     db.order.findMany({
       where: revenueWindow(weekAgo),
-      select: { createdAt: true, total: true },
+      select: { createdAt: true, listedPrice: true, deliveryFee: true, deliveryCoveredByShop: true },
     }),
     db.order.count({
       where: { status: { in: ['NEW', 'IN_PROGRESS'] } },
@@ -1008,21 +1006,35 @@ export const getDashboardStats = async () => {
     }),
   ])
 
+  // Revenue = flowers + delivery the customer paid for (not freeship), shown
+  // apart so the two can be told apart.
+  type MoneyRow = { listedPrice: number; deliveryFee: number | null; deliveryCoveredByShop: boolean | null }
+  const shipping = (o: MoneyRow) => (o.deliveryCoveredByShop ? 0 : o.deliveryFee ?? 0)
+
   const weeklyRevenue = Array.from({ length: 7 }, (_, index) => ({
     date: vnDateKey(addVnDays(weekAgo, index)),
     revenue: 0,
+    flowers: 0,
+    shipping: 0,
   }))
   const weeklyIndex = new Map(weeklyRevenue.map((entry, index) => [entry.date, index]))
 
   for (const order of weeklyOrders) {
     const index = weeklyIndex.get(vnDateKey(order.createdAt))
     if (index !== undefined) {
-      weeklyRevenue[index].revenue += parseCurrencyToNumber(order.total)
+      weeklyRevenue[index].flowers += order.listedPrice
+      weeklyRevenue[index].shipping += shipping(order)
+      weeklyRevenue[index].revenue += order.listedPrice + shipping(order)
     }
   }
 
+  const monthlyFlowers = monthlyOrders.reduce((sum, order) => sum + order.listedPrice, 0)
+  const monthlyShipping = monthlyOrders.reduce((sum, order) => sum + shipping(order), 0)
+
   return {
-    monthlyRevenue: monthlyOrders.reduce((sum, order) => sum + parseCurrencyToNumber(order.total), 0),
+    monthlyRevenue: monthlyFlowers + monthlyShipping,
+    monthlyFlowers,
+    monthlyShipping,
     monthlyOrders: monthlyOrders.length,
     activeOrders,
     monthlyTasks,

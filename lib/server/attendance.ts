@@ -134,7 +134,13 @@ function readWorkMode(value: unknown, role: string): WorkMode {
   return value
 }
 
+/** The admin account is the shop owner: no shifts, no hours. */
+function assertStaff(role: string) {
+  if (role === 'admin') throw new ApiError(403, 'Tài khoản chủ cửa hàng không chấm công')
+}
+
 export async function checkIn(staff: Staff, now = new Date(), modeInput?: unknown) {
+  assertStaff(staff.role)
   const workMode = readWorkMode(modeInput, staff.role)
   const workDate = vnDateKey(now)
   const open = await openShiftOf(staff.id, now)
@@ -222,6 +228,7 @@ export async function correctShift(
 
   const staff = await db.user.findUnique({ where: { id: staffId }, select: { id: true, name: true, role: true } })
   if (!staff) throw new ApiError(404, 'Không tìm thấy nhân viên')
+  assertStaff(staff.role)
   const workMode = readWorkMode(input.workMode, staff.role)
 
   const existing = await db.staffCheckIn.findUnique({ where: { staffId_workDate_workMode: { staffId, workDate, workMode } } })

@@ -41,7 +41,6 @@ async function syncPaid(tx: Prisma.TransactionClient, orderId: string) {
     listedPrice: order.listedPrice,
     deliveryFee: order.deliveryFee,
     deliveryCoveredByShop: order.deliveryCoveredByShop ?? false,
-    vatPercent: order.vatPercent,
     deposit,
   })
   await tx.order.update({ where: { id: orderId }, data: { deposit, remainingBalance } })

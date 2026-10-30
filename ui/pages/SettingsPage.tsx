@@ -558,7 +558,7 @@ export default function SettingsPage() {
             <h2 className="text-lg font-semibold text-foreground">KPI sale theo ca</h2>
             <p className="text-sm text-muted-foreground">
               Mỗi ca, cộng tiền hoa khách chuyển ngay trong ca cho các đơn sale tạo trong ca đó (lúc sale đang chấm công); đạt mức
-              nào thưởng mức cao nhất đạt được. Tiền khách trả nốt ở ca khác chỉ tính hoa hồng. Không tính VAT, phí ship. Thợ không
+              nào thưởng mức cao nhất đạt được. Tiền khách trả nốt ở ca khác chỉ tính hoa hồng. Không tính phí ship. Thợ không
               có KPI.
             </p>
           </div>

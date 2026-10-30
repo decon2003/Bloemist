@@ -243,7 +243,7 @@ export default function MyPayPage() {
               <h2 className="mb-1 font-semibold text-foreground">Ca đạt KPI ({(line.kpi ?? []).length})</h2>
               <p className="mb-3 text-xs text-muted-foreground">
                 Tiền hoa khách chuyển ngay trong ca bạn tạo đơn, lúc bạn đang chấm công. Tiền khách trả nốt ở ca khác chỉ tính hoa
-                hồng. Không tính VAT, phí ship.
+                hồng. Không tính phí ship.
               </p>
               {(line.kpi ?? []).length === 0 ? (
                 <p className="text-sm text-muted-foreground">Chưa có ca nào đạt KPI trong tháng.</p>

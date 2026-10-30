@@ -91,13 +91,18 @@ export interface Order {
 }
 
 export interface DashboardStats {
+  /** Flowers + delivery charged, orders created this month (not cancelled). */
   monthlyRevenue: number
+  monthlyFlowers: number
+  monthlyShipping: number
   monthlyOrders: number
   activeOrders: number
   monthlyTasks: number
   weeklyRevenue: Array<{
     date: string
     revenue: number
+    flowers: number
+    shipping: number
   }>
   recentOrders: Array<Pick<Order, 'id' | 'code' | 'bouquetName' | 'receiveTime' | 'status' | 'total'>>
 }
@@ -118,7 +123,6 @@ export interface CreateOrderInput {
   listedPrice: number | string
   deliveryFee?: number | string
   deliveryCoveredByShop?: boolean
-  vatPercent?: number
   deposit?: number | string
   notes?: string
   cardMessage?: string

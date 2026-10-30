@@ -41,8 +41,6 @@ export default function NewOrderPage() {
   const [deliveryFee, setDeliveryFee] = useState('')
   // Freeship: the customer pays no delivery fee (stored as deliveryCoveredByShop).
   const [freeship, setFreeship] = useState(false)
-  // VAT only when the customer asks for an invoice: enter it then, otherwise 0%.
-  const [vatPercent, setVatPercent] = useState<number>(0)
   const [deposit, setDeposit] = useState('')
   // Paid in full: the deposit follows the total as prices change.
   const [paidInFull, setPaidInFull] = useState(false)
@@ -121,11 +119,7 @@ export default function NewOrderPage() {
   } = useMemo(() => {
     const listedAmount = parseCurrencyToNumber(listedPrice)
     const deliveryAmount = parseCurrencyToNumber(deliveryFee)
-    const vatRate = Number.isFinite(vatPercent) ? vatPercent : 0
-
-    const basePriceValue = listedAmount
-    const vatAmount = Math.round((basePriceValue * vatRate) / 100)
-    const sellingPriceValue = basePriceValue + vatAmount
+    const sellingPriceValue = listedAmount
     const deliveryChargeValue = walkIn || deliveryType !== 'DELIVERY' || freeship ? 0 : deliveryAmount
     const orderTotalValue = sellingPriceValue + deliveryChargeValue
     const depositAmount = paidInFull || walkIn ? orderTotalValue : parseCurrencyToNumber(deposit)
@@ -136,7 +130,7 @@ export default function NewOrderPage() {
       formattedOrderTotal: formatCurrencyFromNumber(orderTotalValue),
       formattedRemainingBalance: formatCurrencyFromNumber(remainingBalanceValue),
     }
-  }, [deliveryType, freeship, deliveryFee, deposit, paidInFull, walkIn, listedPrice, vatPercent])
+  }, [deliveryType, freeship, deliveryFee, deposit, paidInFull, walkIn, listedPrice])
 
   // Names (and latest photo) of bouquets on recent orders, for suggestions.
   const [bouquetSuggestions, setBouquetSuggestions] = useState<BouquetSuggestion[]>([])
@@ -289,7 +283,6 @@ export default function NewOrderPage() {
         listedPrice,
         deliveryFee: !walkIn && deliveryType === 'DELIVERY' && !freeship ? deliveryFee : undefined,
         deliveryCoveredByShop: !walkIn && deliveryType === 'DELIVERY' && freeship,
-        vatPercent,
         deposit: paidInFull || walkIn ? orderTotalValue : deposit,
         // Selling price, total and remaining balance are recomputed by the server.
         notes: walkIn ? '' : notes,
@@ -709,20 +702,6 @@ export default function NewOrderPage() {
                   value={formatCurrencyFromNumber(Number(listedPrice))}
                   className="w-full rounded-xl border border-border bg-muted/50 px-3 py-2 text-sm text-foreground"
                 />
-              </label>
-              <label className="space-y-2 text-sm font-medium text-foreground">
-                <span>Thuế VAT %</span>
-                <select
-                  value={vatPercent}
-                  onChange={(event) => setVatPercent(Number(event.target.value))}
-                  className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                >
-                  {[0, 5, 8, 10].map((percent) => (
-                    <option key={percent} value={percent}>
-                      {percent}%
-                    </option>
-                  ))}
-                </select>
               </label>
               {!walkIn && deliveryType === 'DELIVERY' && (
                 <div className="space-y-2 text-sm font-medium text-foreground">

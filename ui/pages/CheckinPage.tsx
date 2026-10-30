@@ -236,7 +236,8 @@ export default function CheckinPage() {
   // ---------------- Manager view ----------------
   if (isAdmin) {
     const dayList = checkins.filter((entry) => entry.workDate === selectedDate)
-    const activeStaff = (users as User[]).filter((u) => u.status === 'active')
+    // The admin account is the shop owner and does not check in.
+    const activeStaff = (users as User[]).filter((u) => u.status === 'active' && u.role !== 'admin')
     // One row per shift (a sales day may have a shop and an online shift).
     const rows = activeStaff
       .flatMap((u) => {

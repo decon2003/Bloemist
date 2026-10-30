@@ -7,7 +7,7 @@ import { vnDateKey } from './vn-time'
 // salesperson took in that same shift while at work (checked in, at the shop
 // or online). Money paid for an order in a later shift (the rest of a deposit)
 // earns only the sales commission, not KPI. Of each transfer only the flowers
-// count: payments go to the flowers first, then to VAT and delivery. Only the
+// count: payments go to the flowers first, then to delivery. Only the
 // highest tier reached is paid. Florists get no KPI.
 
 export type KpiShift = { name: string; start: string; end: string }

@@ -65,29 +65,17 @@ export type OrderMoneyInput = {
   listedPrice: number
   deliveryFee: number | null
   deliveryCoveredByShop: boolean
-  vatPercent: number | null
   deposit: number | null
 }
 
 /** Derived amounts, computed on the server so a client cannot send a total
  *  that does not match its prices. Same formula as the new-order form:
- *  selling = listed + VAT (only when a VAT % is entered); total = selling +
- *  delivery fee (unless freeship); remaining = total - deposit. The shop does
- *  not give discounts. */
+ *  total = flowers + delivery fee (unless freeship); remaining = total -
+ *  deposit. The shop charges no VAT and gives no discounts. */
 export function computeOrderTotals(input: OrderMoneyInput) {
-  const base = input.listedPrice
-  const vat = Math.round((base * (input.vatPercent ?? 0)) / 100)
-  const sellingPrice = base + vat
+  const sellingPrice = input.listedPrice
   const total = sellingPrice + (input.deliveryCoveredByShop ? 0 : input.deliveryFee ?? 0)
   const remainingBalance = Math.max(total - (input.deposit ?? 0), 0)
   return { sellingPrice, total, remainingBalance }
 }
 
-export function toVatPercent(value: unknown): number | null {
-  if (value === null || value === undefined || value === '') return null
-  const numeric = typeof value === 'string' ? Number(value) : value
-  if (typeof numeric !== 'number' || !Number.isFinite(numeric) || numeric < 0 || numeric > 100) {
-    throw new ApiError(400, 'VAT phải từ 0 đến 100%')
-  }
-  return numeric
-}

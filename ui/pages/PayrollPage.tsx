@@ -486,7 +486,7 @@ function LineEditor({
             )}
             <p className="text-xs text-muted-foreground">
               Tính tiền khách chuyển ngay trong ca mà người này tạo đơn, lúc đang chấm công (tiền khách trả nốt ở ca khác chỉ tính hoa
-              hồng). Chỉ tính tiền hoa, không tính VAT và phí ship. Mức thưởng cài ở Cài đặt.
+              hồng). Chỉ tính tiền hoa, không tính phí ship. Mức thưởng cài ở Cài đặt.
             </p>
           </section>
         )}

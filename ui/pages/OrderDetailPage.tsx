@@ -428,10 +428,6 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
               <dd className="text-lg font-semibold text-foreground">{formatMoney(order.listedPrice, '—')}</dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">VAT</dt>
-              <dd className="text-lg font-semibold text-foreground">{order.vatPercent ?? 0}%</dd>
-            </div>
-            <div>
               <dt className="text-muted-foreground">Phí giao hàng</dt>
               <dd className="text-lg font-semibold text-foreground">
                 {order.deliveryCoveredByShop ? 'Freeship' : order.deliveryType === 'DELIVERY' ? formatMoney(order.deliveryFee) : '—'}

@@ -36,7 +36,6 @@ const FIELD_LABELS: Record<string, string> = {
   deposit: 'Tiền cọc',
   amount: 'Số tiền',
   price: 'Giá',
-  vatPercent: 'VAT',
   deliveryType: 'Hình thức giao',
 }
 

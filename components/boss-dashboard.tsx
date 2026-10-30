@@ -24,7 +24,7 @@ import { useQuery } from '@/lib/query-client'
 import { parseCurrencyToNumber, formatCurrencyFromNumber, formatDateTime } from '@/lib/utils'
 
 export default function BossDashboard() {
-  const { t, lang, getOrderStatusLabel } = useLocale()
+  const { lang, getOrderStatusLabel } = useLocale()
   const dashboardQuery = useQuery({ queryKey: ['dashboard-stats'], queryFn: fetchDashboardStats, keepPreviousData: true })
   const stats = dashboardQuery.data
   // Fresh figures on every visit (the cached ones are shown meanwhile).
@@ -69,9 +69,9 @@ export default function BossDashboard() {
     <div className="space-y-8 p-4 md:p-8 pb-20">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-foreground">{t('dashboard.title', 'Overview')}</h1>
+        <h1 className="text-3xl font-bold text-foreground">Bảng điều khiển</h1>
         <p className="text-muted-foreground">
-          {t('dashboard.subtitle', `Business summary for ${today.toLocaleDateString(lang === 'vi' ? 'vi-VN' : 'en-US', { month: 'long', year: 'numeric' })}`)}
+          Chào mừng trở lại! Đây là tổng quan kinh doanh.
         </p>
       </div>
 
@@ -102,7 +102,7 @@ export default function BossDashboard() {
         {/* Active Orders */}
         <div className="rounded-2xl border border-border bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
-            <span className="text-sm font-medium text-muted-foreground uppercase">{t('dashboard.kpis.active', 'Đơn chưa hoàn thành')}</span>
+            <span className="text-sm font-medium text-muted-foreground uppercase">Đơn chưa hoàn thành</span>
             <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
               <Clock className="h-4 w-4" />
             </div>
@@ -118,7 +118,7 @@ export default function BossDashboard() {
         {/* Total Products/Tasks */}
         <div className="rounded-2xl border border-border bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
-            <span className="text-sm font-medium text-muted-foreground uppercase">{t('dashboard.kpis.products', 'Sản phẩm trong tháng')}</span>
+            <span className="text-sm font-medium text-muted-foreground uppercase">Sản phẩm trong tháng</span>
             <div className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-600">
               <Package className="h-4 w-4" />
             </div>

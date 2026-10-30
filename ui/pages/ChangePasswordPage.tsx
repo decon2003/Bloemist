@@ -12,7 +12,7 @@ const inputClass =
   'w-full px-4 py-3 rounded-xl border border-border bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary transition-all disabled:opacity-50'
 
 export default function ChangePasswordPage() {
-  const { lang, t } = useLocale()
+  const { lang } = useLocale()
   const { user, updateUser, logout } = useAuth()
 
   const [currentPassword, setCurrentPassword] = useState('')
@@ -29,11 +29,11 @@ export default function ChangePasswordPage() {
     setError('')
 
     if (newPassword.length < MIN_LENGTH) {
-      setError(t('auth.newPassword', 'Mật khẩu mới (ít nhất 8 ký tự)'))
+      setError('Mật khẩu mới (ít nhất 8 ký tự)')
       return
     }
     if (newPassword !== confirmPassword) {
-      setError(t('auth.passwordMismatch', 'Hai mật khẩu mới không khớp'))
+      setError('Hai mật khẩu mới không khớp')
       return
     }
 
@@ -43,7 +43,7 @@ export default function ChangePasswordPage() {
       updateUser(updated)
       window.location.assign(`/${lang}/${homePath}`)
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('auth.loginFailed', 'Đã có lỗi xảy ra'))
+      setError(err instanceof Error ? err.message : 'Đăng nhập thất bại')
       setIsSaving(false)
     }
   }
@@ -56,10 +56,10 @@ export default function ChangePasswordPage() {
         </div>
 
         <div className="text-center space-y-2">
-          <h1 className="text-2xl font-bold text-foreground">{t('auth.changePassword', 'Đổi mật khẩu')}</h1>
+          <h1 className="text-2xl font-bold text-foreground">Đổi mật khẩu</h1>
           <p className="text-sm text-muted-foreground">
             {forced
-              ? t('auth.changePasswordForced', 'Bạn đang dùng mật khẩu tạm do quản lý cấp. Vui lòng đặt mật khẩu mới để tiếp tục.')
+              ? 'Bạn đang dùng mật khẩu tạm do quản lý cấp. Vui lòng đặt mật khẩu mới để tiếp tục.'
               : user?.email}
           </p>
         </div>
@@ -69,7 +69,7 @@ export default function ChangePasswordPage() {
           <input type="email" autoComplete="username" value={user?.email ?? ''} readOnly hidden />
           <div>
             <label htmlFor="current-password" className="block text-sm font-medium text-foreground mb-2">
-              {t('auth.currentPassword', 'Mật khẩu hiện tại')}
+              Mật khẩu hiện tại
             </label>
             <input
               id="current-password"
@@ -83,7 +83,7 @@ export default function ChangePasswordPage() {
           </div>
           <div>
             <label htmlFor="new-password" className="block text-sm font-medium text-foreground mb-2">
-              {t('auth.newPassword', 'Mật khẩu mới (ít nhất 8 ký tự)')}
+              Mật khẩu mới (ít nhất 8 ký tự)
             </label>
             <input
               id="new-password"
@@ -98,7 +98,7 @@ export default function ChangePasswordPage() {
           </div>
           <div>
             <label htmlFor="confirm-password" className="block text-sm font-medium text-foreground mb-2">
-              {t('auth.confirmPassword', 'Nhập lại mật khẩu mới')}
+              Nhập lại mật khẩu mới
             </label>
             <input
               id="confirm-password"
@@ -120,7 +120,7 @@ export default function ChangePasswordPage() {
             disabled={isSaving || !currentPassword || !newPassword || !confirmPassword}
             className="w-full bg-primary text-primary-foreground font-semibold py-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isSaving ? '...' : t('auth.savePassword', 'Lưu mật khẩu mới')}
+            {isSaving ? '...' : 'Lưu mật khẩu mới'}
           </button>
         </form>
 
@@ -134,7 +134,7 @@ export default function ChangePasswordPage() {
               }}
               className="text-sm text-muted-foreground hover:underline"
             >
-              {t('auth.signOut', 'Đăng xuất')}
+              Đăng xuất
             </button>
           ) : (
             <a href={`/${lang}/${homePath}`} className="text-sm text-primary hover:underline">

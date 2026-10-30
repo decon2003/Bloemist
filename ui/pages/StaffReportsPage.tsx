@@ -220,7 +220,7 @@ function SalaryConfigModal({ user, onClose, onSave }: { user: User, onClose: () 
 }
 
 export default function StaffReportsPage() {
-  const { lang, t } = useLocale()
+  const { lang } = useLocale()
   const { user } = useAuth()
   const { users, updateUser } = useAppData()
 
@@ -297,11 +297,11 @@ export default function StaffReportsPage() {
   const roleLabel = (specialty: string) => {
     switch (specialty) {
       case 'sales':
-        return t('staffReports.role.sales', 'Sale')
+        return 'Sale'
       case 'florist':
-        return t('staffReports.role.florist', 'Thợ hoa')
+        return 'Thợ hoa'
       default:
-        return t('staffReports.role.admin', 'Quản trị viên')
+        return 'Quản trị viên'
     }
   }
 
@@ -327,7 +327,7 @@ export default function StaffReportsPage() {
 
       <div>
 
-        <h1 className="mt-1 text-3xl font-bold text-foreground">{t('staffReports.title')}</h1>
+        <h1 className="mt-1 text-3xl font-bold text-foreground">Báo cáo nhân sự</h1>
         <p className="text-sm text-muted-foreground">{monthLabel}</p>
       </div>
 
@@ -335,21 +335,21 @@ export default function StaffReportsPage() {
       <div className="grid gap-4 md:grid-cols-3">
         <div className="rounded-2xl border border-border bg-white p-5">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">{t('staffReports.cards.headcount')}</p>
+            <p className="text-sm text-muted-foreground">Nhân sự đang hoạt động</p>
             <Users className="h-5 w-5 text-primary" />
           </div>
           <p className="mt-3 text-3xl font-semibold text-foreground">{totals.headcount}</p>
         </div>
         <div className="rounded-2xl border border-border bg-white p-5">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">{t('staffReports.cards.orders')}</p>
+            <p className="text-sm text-muted-foreground">Đơn hàng đã xử lý</p>
             <ShoppingBag className="h-5 w-5 text-primary" />
           </div>
           <p className="mt-3 text-3xl font-semibold text-foreground">{totals.orders}</p>
         </div>
         <div className="rounded-2xl border border-border bg-white p-5">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">{t('staffReports.cards.tasks')}</p>
+            <p className="text-sm text-muted-foreground">Công việc đã hoàn thành</p>
             <ClipboardList className="h-5 w-5 text-primary" />
           </div>
           <p className="mt-3 text-3xl font-semibold text-foreground">{totals.tasks}</p>
@@ -364,7 +364,7 @@ export default function StaffReportsPage() {
       <section className="rounded-3xl border border-border bg-white p-6">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 className="text-xl font-semibold text-foreground">{t('staffReports.sectionTitle')}</h2>
+            <h2 className="text-xl font-semibold text-foreground">Danh sách điểm danh tháng</h2>
             <p className="text-sm text-muted-foreground">{monthLabel}</p>
           </div>
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
@@ -373,7 +373,7 @@ export default function StaffReportsPage() {
               <input
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder={t('staffReports.searchPlaceholder')}
+                placeholder="Tìm nhân viên"
                 className="w-40 bg-transparent text-sm focus:outline-none"
               />
             </div>
@@ -386,18 +386,18 @@ export default function StaffReportsPage() {
         </div>
 
         {filteredStaffReports.length === 0 ? (
-          <p className="mt-6 text-sm text-muted-foreground">{t('staffReports.noActivity')}</p>
+          <p className="mt-6 text-sm text-muted-foreground">Chưa có hoạt động nhân sự trong tháng này.</p>
         ) : (
           <div className="mt-6 overflow-x-auto">
             <table className="min-w-full divide-y divide-border text-sm">
               <thead>
                 <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground">
-                  <th className="py-3 pr-4 font-medium">{t('staffReports.columns.staff')}</th>
-                  <th className="px-4 py-3 font-medium">{t('staffReports.columns.role')}</th>
-                  <th className="px-4 py-3 font-medium">{t('staffReports.columns.checkins', 'Check-ins')}</th>
+                  <th className="py-3 pr-4 font-medium">Nhân viên</th>
+                  <th className="px-4 py-3 font-medium">Vai trò</th>
+                  <th className="px-4 py-3 font-medium">Chấm công</th>
                   <th className="px-4 py-3 font-medium">Giờ làm</th>
-                  <th className="px-4 py-3 font-medium">{t('staffReports.columns.orders')}</th>
-                  <th className="px-4 py-3 font-medium">{t('staffReports.columns.tasksInCharge', 'Tasks in charge')}</th>
+                  <th className="px-4 py-3 font-medium">Đơn hàng</th>
+                  <th className="px-4 py-3 font-medium">Công việc phụ trách</th>
                   <th className="px-4 py-3 font-medium">Hồ sơ lương</th>
                 </tr>
               </thead>
@@ -410,7 +410,7 @@ export default function StaffReportsPage() {
                           <div className="font-semibold">{row.profile.name}</div>
                           <div className="text-xs text-muted-foreground">
                             {row.lastSeen
-                              ? `${t('staffReports.lastSeen')}: ${formatDateTime(row.lastSeen, lang)}`
+                              ? `${'Gần nhất'}: ${formatDateTime(row.lastSeen, lang)}`
                               : ''}
                           </div>
                         </div>
@@ -428,7 +428,7 @@ export default function StaffReportsPage() {
                       <p className="font-semibold">
                         {row.tasksInProgress}/{row.tasksCompleted}
                       </p>
-                      <p className="text-xs text-muted-foreground">{t('staffReports.tasksBreakdown', 'In progress / Completed')}</p>
+                      <p className="text-xs text-muted-foreground">Đang làm / Hoàn tất</p>
                     </td>
                     <td className="px-4 py-4 align-top">
                       <div className="flex items-center gap-2">

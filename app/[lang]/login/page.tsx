@@ -6,7 +6,7 @@ import { useAuth } from '@/components/providers/auth-provider'
 import Image from 'next/image'
 
 export default function LoginPage() {
-  const { lang, t } = useLocale()
+  const { lang } = useLocale()
   const { login, isLoading } = useAuth()
 
   const [email, setEmail] = useState('')
@@ -28,7 +28,7 @@ export default function LoginPage() {
       // Full navigation so data queries that failed while signed out start fresh.
       window.location.assign(`/${lang}/${destination}`)
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('auth.loginFailed', 'Login failed'))
+      setError(err instanceof Error ? err.message : 'Đăng nhập thất bại')
     }
   }
 
@@ -66,8 +66,8 @@ export default function LoginPage() {
 
           {/* Title */}
           <div className="text-center space-y-2">
-            <h1 className="text-3xl font-bold text-foreground">{t('auth.loginTitle')}</h1>
-            <p className="text-muted-foreground">{t('auth.loginSubtitle')}</p>
+            <h1 className="text-3xl font-bold text-foreground">Đăng nhập Bloemist</h1>
+            <p className="text-muted-foreground">Quản lý cửa hàng hoa dễ dàng</p>
           </div>
 
 
@@ -77,7 +77,7 @@ export default function LoginPage() {
             {/* Email/Phone Field */}
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-foreground mb-2">
-                {t('auth.emailLabel')}
+                Email
               </label>
               <input
                 id="email"
@@ -94,14 +94,14 @@ export default function LoginPage() {
             {/* Password Field */}
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-foreground mb-2">
-                {t('auth.passwordLabel')}
+                Mật khẩu
               </label>
               <div className="relative">
                 <input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
                   autoComplete="current-password"
-                  placeholder={t('auth.passwordLabel')}
+                  placeholder="Mật khẩu"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={isLoading}
@@ -130,13 +130,13 @@ export default function LoginPage() {
               disabled={isLoading || !email || !password}
               className="w-full bg-primary text-primary-foreground font-semibold py-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isLoading ? t('auth.signingIn') : t('auth.signIn')}
+              {isLoading ? 'Đang đăng nhập...' : 'Đăng nhập'}
             </button>
           </form>
 
           {/* There is no self-service reset: a manager issues a new temporary password. */}
           <p className="text-center text-sm text-muted-foreground">
-            {t('auth.forgotPasswordHint', 'Quên mật khẩu? Liên hệ quản lý để được cấp mật khẩu tạm.')}
+            Quên mật khẩu? Liên hệ quản lý để được cấp mật khẩu tạm.
           </p>
         </div>
       </div>

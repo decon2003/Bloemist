@@ -44,7 +44,7 @@ const daysAgoKey = (days: number) => {
 export default function OrdersPage() {
   const router = useRouter()
   const { orders, users, deleteOrder, updateOrder, setOrderScope } = useAppData()
-  const { lang, t, getDeliveryLabel, getOrderStatusLabel } = useLocale()
+  const { lang, getDeliveryLabel, getOrderStatusLabel } = useLocale()
   const { user } = useAuth()
   const { dateFilterMode } = useViewSettings()
   const [query, setQuery] = useState('')
@@ -110,13 +110,13 @@ export default function OrdersPage() {
 
   const handleDeleteOrder = async (e: React.MouseEvent, orderId: string) => {
     e.stopPropagation()
-    if (confirm(t('orders.detail.deleteConfirmation', 'Are you sure you want to delete this order?'))) {
+    if (confirm('Bạn có chắc chắn muốn xóa đơn hàng này? Hành động này không thể hoàn tác.')) {
       try {
         const notice = lockedPayrollNotice((await deleteOrder(orderId)).lockedPayrollMonths)
         if (notice) alert(notice)
       } catch (error) {
         console.error('Failed to delete order', error)
-        alert(t('orders.detail.deleteError', 'Failed to delete order'))
+        alert('Có lỗi xảy ra khi xóa đơn hàng')
       }
     }
   }
@@ -126,13 +126,13 @@ export default function OrdersPage() {
       <header className="space-y-3">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold text-foreground">{t('orders.heroTitle')}</h1>
+            <h1 className="text-3xl font-bold text-foreground">Đơn hàng</h1>
             {user?.role !== 'florist' && (
               <Link
                 href={`/${lang}/orders/new`}
                 className="hidden rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90 md:inline-flex"
               >
-                {t('orders.addNew', 'Add new order')}
+                Tạo đơn mới
               </Link>
             )}
           </div>
@@ -142,7 +142,7 @@ export default function OrdersPage() {
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder={t('orders.searchPlaceholder')}
+                placeholder="Mã đơn, tên, SĐT người tặng/nhận"
                 className="w-full rounded-2xl border border-border bg-white py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               />
             </div>
@@ -159,7 +159,7 @@ export default function OrdersPage() {
           href={`/${lang}/orders/new`}
           className="md:hidden inline-flex items-center justify-center rounded-2xl border border-primary bg-white px-4 py-3 text-sm font-semibold text-primary shadow-sm"
         >
-          {t('orders.addNew', 'Add new order')}
+          Tạo đơn mới
         </Link>
       )}
 
@@ -171,13 +171,13 @@ export default function OrdersPage() {
             className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${status === value ? 'bg-primary text-white shadow-sm' : 'border border-border bg-white hover:bg-muted'
               }`}
           >
-            {value === 'ALL' ? t('tasks.filter.all') : getOrderStatusLabel(value)}
+            {value === 'ALL' ? 'Tất cả' : getOrderStatusLabel(value)}
           </button>
         ))}
       </div>
 
       <DateFilterSwitcher
-        label={t('orders.dateFilter.label', 'Receive day')}
+        label="Ngày nhận"
         mode={dateFilterMode}
         onModeChange={() => { }}
         showModeToggle={false}
@@ -186,23 +186,23 @@ export default function OrdersPage() {
         range={dateRange}
         onRangeChange={setDateRange}
         modeLabels={{
-          range: t('dateFilter.mode.range', 'Date range'),
-          carousel: t('dateFilter.mode.carousel', 'Date carousel'),
+          range: 'Khoảng ngày',
+          carousel: 'Dạng băng chuyền',
         }}
         rangeLabels={{
-          from: t('tasks.dateFilter.from', 'From date'),
-          to: t('tasks.dateFilter.to', 'To date (optional)'),
+          from: 'Từ ngày',
+          to: 'Đến ngày (tuỳ chọn)',
         }}
         quickLabels={{
-          today: t('tasks.dateLabels.today', 'Today'),
-          tomorrow: t('tasks.dateLabels.tomorrow', 'Tomorrow'),
-          dayAfter: t('tasks.dateLabels.dayAfter', 'Day after tomorrow'),
-          threeDays: t('tasks.dateLabels.dayMoreAfter', 'In three days'),
-          allDays: t('tasks.dateFilter.all', 'All dates'),
+          today: 'Hôm nay',
+          tomorrow: 'Ngày mai',
+          dayAfter: 'Ngày kia',
+          threeDays: 'Ba ngày nữa',
+          allDays: 'Tất cả ngày',
         }}
-        calendarLabel={t('orders.dateFilter.openCalendar', 'Pick receive day from calendar')}
-        clearLabel={t('tasks.dateFilter.all')}
-        todayLabel={t('tasks.dateLabels.today', 'Today')}
+        calendarLabel="Chọn ngày nhận từ lịch"
+        clearLabel="Tất cả ngày"
+        todayLabel="Hôm nay"
         weekDayLabels={weekDayLabels}
         locale={lang === 'vi' ? 'vi-VN' : undefined}
         minDate={isManager ? undefined : daysAgoKey(STAFF_HISTORY_DAYS)}
@@ -244,7 +244,7 @@ export default function OrdersPage() {
 
       {filteredOrders.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border bg-white/70 p-10 text-center text-muted-foreground">
-          {t('orders.empty')}
+          Không có đơn phù hợp tìm kiếm.
         </div>
       ) : (
         <div className="grid gap-4">
@@ -318,13 +318,13 @@ export default function OrdersPage() {
                         </>
                       ) : (
                         <>
-                          <p className="text-muted-foreground">{t('orders.detail.total')}</p>
+                          <p className="text-muted-foreground">Tổng tiền</p>
                           <p className="text-lg font-semibold text-foreground">{formatMoney(order.total)}</p>
                         </>
                       )}
                     </div>
                     <div className="text-left md:text-right">
-                      <p className="text-muted-foreground">{t('orders.detail.delivery')}</p>
+                      <p className="text-muted-foreground">Giao nhận</p>
                       <p className="font-semibold text-foreground">{getDeliveryLabel(order.deliveryType)}</p>
                       <p className="text-xs text-muted-foreground">{formatDeliveryTime(order.receiveTime)}</p>
                     </div>
@@ -375,7 +375,7 @@ export default function OrdersPage() {
                       <button
                         onClick={(e) => handleDeleteOrder(e, order.id)}
                         className="flex h-10 w-10 items-center justify-center rounded-xl border border-red-100 bg-red-50 text-red-600 transition-colors hover:bg-red-100 hover:border-red-200"
-                        title={t('orders.detail.delete', 'Delete order')}
+                        title="Xóa đơn hàng"
                       >
                         <Trash2 className="h-5 w-5" />
                       </button>

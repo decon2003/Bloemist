@@ -12,7 +12,7 @@ import type { CustomerPage } from '@/lib/types'
 type Sort = 'spend' | 'recent' | 'orders'
 
 export default function CustomersPage() {
-  const { t, lang } = useLocale()
+  const { lang } = useLocale()
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
   const [sort, setSort] = useState<Sort>('spend')
@@ -44,10 +44,10 @@ export default function CustomersPage() {
   return (
     <div className="space-y-6 p-4 md:p-8 pb-24 md:pb-12">
       <div className="flex flex-col gap-1">
-        <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">{t('customers.subtitle')}</p>
-        <h1 className="text-3xl font-bold text-foreground">{t('customers.title')}</h1>
+        <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">Quan hệ khách hàng</p>
+        <h1 className="text-3xl font-bold text-foreground">Khách hàng</h1>
         <p className="text-muted-foreground">
-          {data ? `${data.total} khách hàng` : t('customers.subtitleHelper', 'Khách mua lại nhiều nhất và bó hoa gần đây.')}
+          {data ? `${data.total} khách hàng` : 'Khách mua lại nhiều nhất và bó hoa gần đây.'}
         </p>
       </div>
 
@@ -97,11 +97,11 @@ export default function CustomersPage() {
             </div>
             <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
               <div>
-                <dt className="text-muted-foreground">{t('customers.lifetimeSpend')}</dt>
+                <dt className="text-muted-foreground">Chi tiêu tích luỹ</dt>
                 <dd className="text-xl font-bold text-primary">{formatCurrencyFromNumber(customer.totalSpend)}</dd>
               </div>
               <div>
-                <dt className="text-muted-foreground">{t('customers.orders', 'Số đơn')}</dt>
+                <dt className="text-muted-foreground">Số đơn</dt>
                 <dd className="text-xl font-semibold text-foreground">{customer.orderCount}</dd>
               </div>
             </dl>

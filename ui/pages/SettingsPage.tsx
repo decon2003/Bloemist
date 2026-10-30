@@ -186,7 +186,6 @@ const UserFormModal = ({
 }
 
 export default function SettingsPage() {
-  const { t } = useLocale()
   const { user } = useAuth()
   const { users: appUsers, settings } = useAppData()
 
@@ -247,7 +246,7 @@ export default function SettingsPage() {
   const workingHoursLabel =
     workingHours.start && workingHours.end
       ? `${workingHours.start} - ${workingHours.end}`
-      : t('settings.workingHoursUnset', 'Not set')
+      : 'Chưa thiết lập'
 
   const handleAddUser = async (data: UserFormData) => {
     if (!canManageUsers) {
@@ -418,13 +417,13 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6 p-4 md:p-8 pb-24 md:pb-12">
       <div className="space-y-2">
-        <h1 className="text-3xl font-bold text-foreground">{t('settings.title')}</h1>
+        <h1 className="text-3xl font-bold text-foreground">Cài đặt</h1>
         <p className="text-muted-foreground">
           Giờ làm việc, địa điểm điểm danh và tài khoản nhân viên.
         </p>
         {!canEditSettings && (
           <div className="rounded-2xl border border-dashed border-muted bg-muted/50 p-3 text-sm text-muted-foreground">
-            {t('settings.viewingOnly')}
+            Chỉ xem. Liên hệ admin để cập nhật cài đặt.
           </div>
         )}
       </div>
@@ -434,10 +433,10 @@ export default function SettingsPage() {
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              {t('settings.workingHoursTitle', 'Working hours')}
+              Giờ làm việc
             </p>
             <h2 className="text-2xl font-semibold text-foreground">
-              {t('settings.workingHoursDescription', 'Set the expected start and end time for check-ins')}
+              Đặt giờ bắt đầu và kết thúc ca điểm danh
             </h2>
           </div>
           <div className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-semibold text-foreground">

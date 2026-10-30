@@ -27,7 +27,7 @@ type ProductForm = {
 
 export default function NewOrderPage() {
   const router = useRouter()
-  const { lang, t, getDeliveryLabel } = useLocale()
+  const { lang, getDeliveryLabel } = useLocale()
   const { createOrder, florists, users } = useAppData()
   const { user } = useAuth()
 
@@ -245,7 +245,7 @@ export default function NewOrderPage() {
 
     const preparedProducts = products.filter((product) => product.name.trim())
     if (preparedProducts.length === 0) {
-      setProductError(t('orders.new.taskValidation', 'Please enter a name for each item.'))
+      setProductError('Vui lòng nhập tên cho mỗi công việc.')
       setIsSaving(false)
       return
     }
@@ -327,23 +327,23 @@ export default function NewOrderPage() {
     user?.role === 'florist' ? (
       <div className="space-y-4 p-4 md:p-8">
         <Link href={`/${lang}/orders`} className="inline-flex items-center gap-2 text-sm text-primary">
-          {t('orders.detail.back')}
+          Quay lại đơn hàng
         </Link>
         <div className="rounded-2xl border border-dashed border-border bg-white/70 p-10 text-center text-muted-foreground">
-          {t('orders.floristWarning')}
+          Thợ hoa chỉ được xem đơn hàng, chỉ có Sales mới được tạo đơn mới.
         </div>
       </div>
     ) : (
       <div className="space-y-6 p-4 md:p-8">
         <div className="flex items-center justify-between">
           <div className="space-y-2">
-            <h1 className="text-3xl font-bold text-foreground">{t('orders.new.title', 'New order')}</h1>
+            <h1 className="text-3xl font-bold text-foreground">Đơn hàng mới</h1>
           </div>
           <Link
             href={`/${lang}/orders`}
             className="hidden rounded-xl border border-border bg-white px-4 py-2 text-sm font-medium text-foreground shadow-sm hover:bg-muted md:inline-block"
           >
-            {t('orders.detail.back')}
+            Quay lại đơn hàng
           </Link>
         </div>
 
@@ -368,14 +368,14 @@ export default function NewOrderPage() {
           </div>
           <section className="space-y-4 rounded-2xl border border-border bg-white p-5 shadow-sm">
             <div className="space-y-1">
-              <h2 className="text-lg font-semibold text-foreground">{t('orders.new.orderInfo', 'Order info')}</h2>
+              <h2 className="text-lg font-semibold text-foreground">Thông tin đơn</h2>
               {walkIn && (
                 <p className="text-sm text-muted-foreground">Tên và số điện thoại khách có thể bỏ trống (ghi là &quot;Khách lẻ&quot;).</p>
               )}
             </div>
             <div className="grid gap-4 md:grid-cols-2">
               <label className="space-y-2 text-sm font-medium text-foreground">
-                <span>{t('orders.new.customerName', 'Customer name')}</span>
+                <span>Tên khách</span>
                 <input
                   value={customerName}
                   onChange={(event) => {
@@ -386,7 +386,7 @@ export default function NewOrderPage() {
                 />
               </label>
               <label className="space-y-2 text-sm font-medium text-foreground">
-                <span>{t('orders.new.customerPhone', 'Customer phone')}</span>
+                <span>Số điện thoại khách</span>
                 <input
                   value={customerPhone}
                   onChange={(event) => setCustomerPhone(event.target.value)}
@@ -439,7 +439,7 @@ export default function NewOrderPage() {
                 Người đặt là người nhận
               </label>
               <label className="space-y-2 text-sm font-medium text-foreground">
-                <span>{t('orders.new.receiverName', 'Receiver name')}</span>
+                <span>Tên người nhận</span>
                 <input
                   value={receiverIsCustomer ? customerName : receiverName}
                   disabled={receiverIsCustomer}
@@ -448,7 +448,7 @@ export default function NewOrderPage() {
                 />
               </label>
               <label className="space-y-2 text-sm font-medium text-foreground">
-                <span>{t('orders.new.receiverPhone', 'Receiver phone')}</span>
+                <span>Số điện thoại người nhận</span>
                 <input
                   type="tel"
                   inputMode="tel"
@@ -459,7 +459,7 @@ export default function NewOrderPage() {
                 />
               </label>
               <label className="space-y-2 text-sm font-medium text-foreground">
-                <span>{t('orders.new.deliveryType', 'Delivery type')}</span>
+                <span>Hình thức giao</span>
                 <select
                   value={deliveryType}
                   onChange={(event) => setDeliveryType(event.target.value as 'DELIVERY' | 'PICKUP')}
@@ -471,17 +471,17 @@ export default function NewOrderPage() {
               </label>
               {deliveryType === 'DELIVERY' && (
                 <label className="space-y-2 text-sm font-medium text-foreground col-span-1 md:col-span-2">
-                  <span>{t('orders.new.deliveryAddress', 'Delivery Address')}</span>
+                  <span>Địa chỉ giao hàng</span>
                   <input
                     value={deliveryAddress}
                     onChange={(event) => setDeliveryAddress(event.target.value)}
-                    placeholder={t('orders.new.deliveryAddressPlaceholder', 'House number, street...')}
+                    placeholder="Số nhà, tên đường, phường, quận..."
                     className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                 </label>
               )}
               <label className="space-y-2 text-sm font-medium text-foreground">
-                <span>{t('orders.new.receiveTime', 'Ready by')}</span>
+                <span>Thời gian nhận</span>
                 <DateTimeInput24
                   value={receiveTime}
                   onChange={setReceiveTime}
@@ -519,7 +519,7 @@ export default function NewOrderPage() {
               <span>
                 {walkIn
                   ? 'Thợ đã làm bó hoa (được tính hoa hồng làm đơn)'
-                  : t('orders.assignee', 'Nhân viên phụ trách')}
+                  : 'Nhân viên phụ trách'}
               </span>
               <select
                 aria-label={walkIn ? 'Thợ đã làm bó hoa' : 'Nhân viên phụ trách'}
@@ -530,7 +530,7 @@ export default function NewOrderPage() {
                 }}
                 className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               >
-                <option value="">{t('common.select', 'Select')}</option>
+                <option value="">Chọn</option>
                 {florists.map((f) => (
                   <option key={f.id} value={f.id}>
                     {f.name}
@@ -561,12 +561,9 @@ export default function NewOrderPage() {
 
           <section className="space-y-3 rounded-2xl border border-border bg-white p-5 shadow-sm">
             <div className="flex flex-col gap-1">
-              <h2 className="text-lg font-semibold text-foreground">{t('orders.new.taskListTitle', 'Products for this order')}</h2>
+              <h2 className="text-lg font-semibold text-foreground">Sản phẩm của đơn</h2>
               <p className="text-sm text-muted-foreground">
-                {t(
-                  'orders.new.taskListSubtitle',
-                  'Add products. Each item will create an arranging task and can include an inspiration photo.',
-                )}
+                Thêm sản phẩm. Mỗi dòng sẽ tạo một công việc cắm/bó hoa và có thể đính kèm ảnh gợi ý.
               </p>
             </div>
             <div className="space-y-3">
@@ -575,7 +572,7 @@ export default function NewOrderPage() {
                   {/* Phone: the name takes the whole first row; quantity and price share the second. */}
                   <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:justify-between">
                     <label className="col-span-2 space-y-1 text-sm font-medium text-foreground sm:flex-1">
-                      <span>{t('orders.new.productLabel', 'Order product')}</span>
+                      <span>Sản phẩm trong đơn</span>
                       <input
                         required
                         onInvalid={(event) => event.currentTarget.setCustomValidity('Nhập tên sản phẩm')}
@@ -592,7 +589,7 @@ export default function NewOrderPage() {
                       </datalist>
                     </label>
                     <label className="space-y-1 text-sm font-medium text-foreground sm:w-28">
-                      <span>{t('orders.new.quantityLabel', 'Qty')}</span>
+                      <span>Số lượng</span>
                       <input
                         type="number"
                         min={1}
@@ -617,10 +614,10 @@ export default function NewOrderPage() {
                   </div>
                   <div className="space-y-2 text-xs font-medium text-foreground">
                     <div className="flex items-center justify-between">
-                      <span>{t('orders.new.samplePhoto', 'Sample photos')}</span>
+                      <span>Ảnh mẫu</span>
                       {product.samplePhotoUrls.length > 0 && (
                         <span className="text-[11px] font-semibold text-muted-foreground">
-                          {t('orders.new.samplePhotoCount', '{{count}} photo(s)').replace(
+                          {'{{count}} ảnh'.replace(
                             '{{count}}',
                             String(product.samplePhotoUrls.length),
                           )}
@@ -669,13 +666,13 @@ export default function NewOrderPage() {
                     </div>
                   </div>
                   <label className="block space-y-1 text-xs font-medium text-foreground">
-                    <span>{t('orders.new.productNote', 'Product note')}</span>
+                    <span>Ghi chú sản phẩm</span>
                     <textarea
                       value={product.note || ''}
                       onChange={(event) => handleProductChange(index, 'note', event.target.value)}
                       rows={2}
                       className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                      placeholder={t('orders.new.productNotePlaceholder', 'Specific instructions for this product')}
+                      placeholder="Hướng dẫn riêng cho sản phẩm này"
                     />
                   </label>
                   <div className="flex items-center justify-end text-xs text-muted-foreground">
@@ -685,7 +682,7 @@ export default function NewOrderPage() {
                       onClick={() => removeProductRow(index)}
                       className="text-primary disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      {t('orders.new.removeTask', 'Remove')}
+                      Xoá
                     </button>
                   </div>
                 </div>
@@ -699,13 +696,13 @@ export default function NewOrderPage() {
               onClick={addProductRow}
               className="inline-flex items-center gap-2 rounded-xl border border-dashed border-border px-3 py-2 text-sm font-semibold text-primary hover:bg-muted/50"
             >
-              {t('orders.new.addTask', 'Add another task')}
+              Thêm sản phẩm
             </button>
           </section>
 
           <section className="space-y-3 rounded-2xl border border-border bg-white p-5 shadow-sm">
             <div className="space-y-1">
-              <h2 className="text-lg font-semibold text-foreground">{t('orders.new.paymentInfo', 'Payment info')}</h2>
+              <h2 className="text-lg font-semibold text-foreground">Thanh toán</h2>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
               <label className="space-y-2 text-sm font-medium text-foreground">
@@ -717,7 +714,7 @@ export default function NewOrderPage() {
                 />
               </label>
               <label className="space-y-2 text-sm font-medium text-foreground">
-                <span>{t('orders.new.vatPercent', 'VAT %')}</span>
+                <span>Thuế VAT %</span>
                 <select
                   value={vatPercent}
                   onChange={(event) => setVatPercent(Number(event.target.value))}
@@ -732,7 +729,7 @@ export default function NewOrderPage() {
               </label>
               {!walkIn && deliveryType === 'DELIVERY' && (
                 <div className="space-y-2 text-sm font-medium text-foreground">
-                  <span>{t('orders.new.deliveryFee', 'Delivery fee')}</span>
+                  <span>Phí giao hàng</span>
                   <input
                     inputMode="numeric"
                     value={freeship ? '' : deliveryFee}
@@ -750,7 +747,7 @@ export default function NewOrderPage() {
               {!walkIn && (
               <div className="space-y-2 text-sm font-medium text-foreground">
                 <label className="block space-y-2">
-                  <span>{t('orders.new.deposit', 'Deposit')}</span>
+                  <span>Tiền cọc</span>
                   <input
                     inputMode="numeric"
                     value={paidInFull ? formatCurrencyInput(String(orderTotalValue)) : deposit}
@@ -788,14 +785,14 @@ export default function NewOrderPage() {
               href={`/${lang}/orders`}
               className="rounded-xl border border-border bg-white px-4 py-2 text-sm font-medium text-foreground shadow-sm hover:bg-muted"
             >
-              {t('orders.detail.back')}
+              Quay lại đơn hàng
             </Link>
             <button
               type="submit"
               disabled={isSaving || uploading > 0}
               className="rounded-xl bg-primary px-6 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70"
             >
-              {uploading > 0 ? 'Đang tải ảnh…' : isSaving ? 'Đang tạo…' : walkIn ? 'Lưu đơn bán tại cửa hàng' : t('orders.new.submit', 'Tạo đơn')}
+              {uploading > 0 ? 'Đang tải ảnh…' : isSaving ? 'Đang tạo…' : walkIn ? 'Lưu đơn bán tại cửa hàng' : 'Tạo đơn'}
             </button>
           </div>
         </form >

@@ -35,7 +35,7 @@ export default function AddTaskDialog({
 }: AddTaskDialogProps) {
   const { orders, florists, createTask } = useAppData()
   const router = useRouter()
-  const { lang, t } = useLocale()
+  const { lang } = useLocale()
   const [selectedOrderId, setSelectedOrderId] = useState('')
   const [selectedFloristId, setSelectedFloristId] = useState('')
   const [dueTime, setDueTime] = useState(toDateTimeLocalValue(new Date()))
@@ -72,13 +72,13 @@ export default function AddTaskDialog({
 
 
   const taskTypeOptions: Array<{ value: TaskType; label: string }> = [
-    { value: 'CAM_HOA', label: t('addTask.taskType.camHoa', 'Flower arranging') },
-    { value: 'BO_HOA', label: t('addTask.taskType.boHoa', 'Bouquet making') },
-    { value: 'SO_CHE', label: t('addTask.taskType.soChe', 'Preparation') },
-    { value: 'DON_DEP', label: t('addTask.taskType.donDep', 'Cleanup') },
-    { value: 'IN_BIEN', label: t('addTask.taskType.inBien', 'Card printing') },
-    { value: 'BOC_HOA', label: t('addTask.taskType.bocHoa', 'Wrapping') },
-    { value: 'SHIP_DON', label: t('addTask.taskType.shipDon', 'Delivery') },
+    { value: 'CAM_HOA', label: 'Cắm hoa' },
+    { value: 'BO_HOA', label: 'Bó hoa' },
+    { value: 'SO_CHE', label: 'Sơ chế' },
+    { value: 'DON_DEP', label: 'Dọn dẹp' },
+    { value: 'IN_BIEN', label: 'In biển' },
+    { value: 'BOC_HOA', label: 'Bọc hoa' },
+    { value: 'SHIP_DON', label: 'Ship đơn' },
   ]
 
   const [uploadingSamples, setUploadingSamples] = useState(0)
@@ -203,8 +203,8 @@ export default function AddTaskDialog({
       <div className="flex max-h-[92vh] w-full max-w-lg flex-col rounded-t-3xl border border-border bg-white shadow-xl md:max-h-[90vh] md:rounded-2xl">
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <div>
-            <h3 className="text-lg font-semibold">{t('addTask.title')}</h3>
-            <p className="text-sm text-muted-foreground">{t('addTask.subtitle')}</p>
+            <h3 className="text-lg font-semibold">Tạo việc cho florist</h3>
+            <p className="text-sm text-muted-foreground">Liên kết đơn hàng với nhiệm vụ chế tác.</p>
           </div>
           <button onClick={onClose} className="rounded-lg p-2 hover:bg-muted" aria-label="Đóng">
             <Plus className="h-5 w-5 rotate-45" />
@@ -214,10 +214,10 @@ export default function AddTaskDialog({
         <form onSubmit={handleSubmit} className="flex-1 space-y-4 overflow-y-auto px-6 py-4">
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <label className="text-sm font-medium">{t('addTask.fields.order')}</label>
+              <label className="text-sm font-medium">Đơn hàng liên kết</label>
               {lockOrderSelection ? (
                 <span className="rounded-full bg-muted px-3 py-1 text-[11px] font-semibold text-muted-foreground">
-                  {t('addTask.fields.lockedOrder', 'Linked to this order')}
+                  Đang gắn với đơn này
                 </span>
               ) : (
                 <label className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -233,7 +233,7 @@ export default function AddTaskDialog({
                     }}
                     className="h-4 w-4"
                   />
-                  {t('addTask.fields.noOrder', 'No linked order')}
+                  Không có đơn liên kết
                 </label>
               )}
             </div>
@@ -250,7 +250,7 @@ export default function AddTaskDialog({
                     )
                     if (match) handleOrderChange(match.id)
                   }}
-                  placeholder={t('addTask.fields.orderSearch', 'Search order code or customer')}
+                  placeholder="Tìm mã đơn hoặc khách hàng"
                   className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:cursor-not-allowed disabled:bg-muted/50"
                   disabled={lockOrderSelection}
                   readOnly={lockOrderSelection}
@@ -267,7 +267,7 @@ export default function AddTaskDialog({
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">{t('addTask.fields.taskName')}</label>
+            <label className="text-sm font-medium">Tên công việc</label>
             <input
               value={taskTitle}
               onChange={(event) => setTaskTitle(event.target.value)}
@@ -278,10 +278,10 @@ export default function AddTaskDialog({
 
           <div className="space-y-2">
             <div className="flex items-center justify-between text-sm font-medium">
-              <span>{t('addTask.fields.samplePhoto', 'Sample photos')}</span>
+              <span>Ảnh mẫu</span>
               {samplePhotoUrls.length > 0 && (
                 <span className="text-xs font-semibold text-muted-foreground">
-                  {t('addTask.fields.samplePhotoCount', '{{count}} photo(s)').replace(
+                  {'{{count}} ảnh'.replace(
                     '{{count}}',
                     String(samplePhotoUrls.length),
                   )}
@@ -339,7 +339,7 @@ export default function AddTaskDialog({
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <label className="text-sm font-medium">{t('addTask.fields.type', 'Task type')}</label>
+              <label className="text-sm font-medium">Loại công việc</label>
               <select
                 value={taskType}
                 onChange={(event) => setTaskType(event.target.value as TaskType)}
@@ -353,7 +353,7 @@ export default function AddTaskDialog({
               </select>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">{t('addTask.fields.quantity', 'Products to prepare')}</label>
+              <label className="text-sm font-medium">Sản phẩm cần chuẩn bị</label>
               <input
                 type="number"
                 min={1}
@@ -365,7 +365,7 @@ export default function AddTaskDialog({
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">{t('addTask.fields.assign')}</label>
+            <label className="text-sm font-medium">Chọn florist</label>
             <select
               value={selectedFloristId}
               onChange={(event) => setSelectedFloristId(event.target.value)}
@@ -380,7 +380,7 @@ export default function AddTaskDialog({
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">{t('addTask.fields.dueTime')}</label>
+            <label className="text-sm font-medium">Thời hạn dự kiến</label>
             <DateTimeInput24
               value={dueTime}
               onChange={setDueTime}
@@ -389,13 +389,13 @@ export default function AddTaskDialog({
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">{t('addTask.fields.notes')}</label>
+            <label className="text-sm font-medium">Ghi chú</label>
             <textarea
               value={notes}
               onChange={(event) => setNotes(event.target.value)}
               rows={3}
               className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              placeholder={t('addTask.fields.notesPlaceholder')}
+              placeholder="Hướng dẫn gói, đổi hoa, v.v."
             />
           </div>
 
@@ -410,14 +410,14 @@ export default function AddTaskDialog({
               }}
               className="flex-1 rounded-xl border border-border px-4 py-2 text-sm font-medium hover:bg-muted"
             >
-              {t('addTask.actions.cancel')}
+              Huỷ
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
               className="flex-1 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {isSubmitting ? t('addTask.actions.creating', 'Creating...') : t('addTask.actions.create')}
+              {isSubmitting ? 'Đang tạo...' : 'Tạo công việc'}
             </button>
           </div>
         </form>

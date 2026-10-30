@@ -7,7 +7,7 @@ import { Lock } from 'lucide-react'
 
 export default function AccessDeniedPage() {
   const router = useRouter()
-  const { lang, t } = useLocale()
+  const { lang } = useLocale()
   const { user } = useAuth()
 
   const handleGoBack = () => {
@@ -18,7 +18,7 @@ export default function AccessDeniedPage() {
     }
   }
 
-  const destinationLabel = user?.role === 'florist' || user?.role === 'sales' ? t('nav.orders') : t('nav.dashboard')
+  const destinationLabel = user?.role === 'florist' || user?.role === 'sales' ? 'Đơn hàng' : 'Bảng điều khiển'
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-muted/40 p-4">
@@ -30,9 +30,9 @@ export default function AccessDeniedPage() {
         </div>
 
         <div className="space-y-2">
-          <h1 className="text-2xl font-bold text-foreground">{t('accessDenied.title')}</h1>
+          <h1 className="text-2xl font-bold text-foreground">Từ chối truy cập</h1>
           <p className="text-muted-foreground">
-            {t('accessDenied.message')}
+            Khu vực này dành cho admin. Bạn không có quyền truy cập phần này.
           </p>
         </div>
 
@@ -40,7 +40,7 @@ export default function AccessDeniedPage() {
           onClick={handleGoBack}
           className="w-full bg-primary text-primary-foreground font-semibold py-2 rounded-lg hover:opacity-90 transition-opacity"
         >
-          {`${t('accessDenied.goBack')} ${destinationLabel}`}
+          {`${'Quay lại'} ${destinationLabel}`}
         </button>
       </div>
     </div>

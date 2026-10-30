@@ -1,64 +1,50 @@
 'use client'
 
-import { createContext, useCallback, useContext, useMemo, type ReactNode } from 'react'
-import { defaultLocale, getDictionary, isSupportedLocale, SupportedLocale } from '@/lib/i18n'
-import { Order, TaskStatus } from '@/lib/types'
+import { createContext, useContext, type ReactNode } from 'react'
+import { defaultLocale, isSupportedLocale, type SupportedLocale } from '@/lib/i18n'
+import type { Order, TaskStatus } from '@/lib/types'
 
-interface LocaleContextValue {
-  lang: SupportedLocale
-  dictionary: Record<string, string>
+// The app is in Vietnamese only and its texts are written where they are
+// shown. This keeps the "/vi" segment of the URLs and the labels of the
+// status and delivery codes.
+
+const TASK_STATUS_LABEL: Record<TaskStatus, string> = {
+  UNASSIGNED: 'Chưa phân công',
+  ASSIGNED: 'Đã phân công',
+  IN_PROGRESS: 'Đang làm',
+  READY: 'Sẵn sàng',
+  COMPLETED: 'Hoàn tất',
+  CANCELLED: 'Đã huỷ',
 }
 
-const LocaleContext = createContext<LocaleContextValue | null>(null)
+const ORDER_STATUS_LABEL: Record<Order['status'], string> = {
+  NEW: 'Mới',
+  IN_PROGRESS: 'Đang xử lý',
+  READY: 'Sẵn sàng',
+  DELIVERED: 'Đã giao',
+  CANCELLED: 'Đã huỷ',
+}
+
+const DELIVERY_LABEL: Record<'DELIVERY' | 'PICKUP', string> = {
+  DELIVERY: 'Giao tận nơi',
+  PICKUP: 'Nhận tại shop',
+}
+
+const LocaleContext = createContext<SupportedLocale | null>(null)
 
 export function LocaleProvider({ lang, children }: { lang: string; children: ReactNode }) {
-  const normalizedLang = isSupportedLocale(lang) ? lang : defaultLocale
-  const value = useMemo<LocaleContextValue>(
-    () => ({
-      lang: normalizedLang,
-      dictionary: getDictionary(normalizedLang),
-    }),
-    [normalizedLang],
-  )
-
-  return <LocaleContext.Provider value={value}>{children}</LocaleContext.Provider>
+  return <LocaleContext.Provider value={isSupportedLocale(lang) ? lang : defaultLocale}>{children}</LocaleContext.Provider>
 }
 
-type OrderStatus = Order['status']
-
 export function useLocale() {
-  const context = useContext(LocaleContext)
-  if (!context) {
+  const lang = useContext(LocaleContext)
+  if (!lang) {
     throw new Error('useLocale must be used within LocaleProvider')
   }
-
-  const t = useCallback(
-    (key: string, fallback?: string) => {
-      return context.dictionary[key] ?? fallback ?? key
-    },
-    [context.dictionary],
-  )
-
-  const getTaskStatusLabel = useCallback(
-    (status: TaskStatus) => t(`status.task.${status}`, status.replace('_', ' ')),
-    [t],
-  )
-
-  const getOrderStatusLabel = useCallback(
-    (status: OrderStatus) => t(`status.order.${status}`, status.replace('_', ' ')),
-    [t],
-  )
-
-  const getDeliveryLabel = useCallback(
-    (type: 'DELIVERY' | 'PICKUP') => t(`delivery.${type}`, type === 'DELIVERY' ? 'Delivery' : 'Pickup'),
-    [t],
-  )
-
   return {
-    lang: context.lang,
-    t,
-    getTaskStatusLabel,
-    getOrderStatusLabel,
-    getDeliveryLabel,
+    lang,
+    getTaskStatusLabel: (status: TaskStatus) => TASK_STATUS_LABEL[status] ?? status,
+    getOrderStatusLabel: (status: Order['status']) => ORDER_STATUS_LABEL[status] ?? status,
+    getDeliveryLabel: (type: 'DELIVERY' | 'PICKUP') => DELIVERY_LABEL[type] ?? type,
   }
 }

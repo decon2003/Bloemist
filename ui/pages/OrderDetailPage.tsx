@@ -35,7 +35,7 @@ const FLORIST_STATUSES: Order['status'][] = ['NEW', 'IN_PROGRESS', 'READY']
 export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
   const router = useRouter()
   const { tasks, florists, setTaskScope, refreshTasks } = useAppData()
-  const { lang, t, getDeliveryLabel, getOrderStatusLabel } = useLocale()
+  const { lang, getDeliveryLabel, getOrderStatusLabel } = useLocale()
   const { user } = useAuth()
   const [order, setOrder] = useState<Order | null>(null)
   const [isFetching, setIsFetching] = useState(true)
@@ -152,7 +152,7 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
 
   const handleDelete = async () => {
     if (!order) return
-    if (!window.confirm(t('orders.detail.deleteConfirmation'))) return
+    if (!window.confirm('Bạn có chắc chắn muốn xóa đơn hàng này? Hành động này không thể hoàn tác.')) return
 
     try {
       const notice = lockedPayrollNotice((await deleteOrder(order.id)).lockedPayrollMonths)
@@ -222,10 +222,10 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
     return (
       <div className="space-y-4 p-4 md:p-8">
         <Link href={`/${lang}/orders`} className="inline-flex items-center gap-2 text-sm text-primary">
-          <ArrowLeft className="h-4 w-4" /> {t("orders.detail.back")}
+          <ArrowLeft className="h-4 w-4" /> Quay lại đơn hàng
         </Link>
         <div className="rounded-2xl border border-dashed border-border bg-white/70 p-10 text-center text-muted-foreground">
-          {loadError ?? t("orders.detail.notFound")}
+          {loadError ?? 'Không tìm thấy đơn hàng.'}
         </div>
       </div>
     )
@@ -244,7 +244,7 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
   return (
     <div className="space-y-6 p-4 md:p-8 pb-24 md:pb-12">
       <Link href={`/${lang}/orders`} className="inline-flex items-center gap-2 text-sm text-primary">
-        <ArrowLeft className="h-4 w-4" /> {t("orders.detail.back")}
+        <ArrowLeft className="h-4 w-4" /> Quay lại đơn hàng
       </Link>
 
       {toast && (
@@ -421,10 +421,10 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
       <div>
         {canSeeContacts && (
         <section className="rounded-2xl border border-border bg-white p-6">
-          <h2 className="text-base font-semibold text-foreground">{t('orders.detail.paymentSummary', 'Thanh toán')}</h2>
+          <h2 className="text-base font-semibold text-foreground">Tổng quan thanh toán</h2>
           <dl className="mt-4 grid grid-cols-2 gap-4 text-sm md:grid-cols-3">
             <div>
-              <dt className="text-muted-foreground">{t('orders.detail.listedPrice', 'Giá niêm yết')}</dt>
+              <dt className="text-muted-foreground">Giá niêm yết</dt>
               <dd className="text-lg font-semibold text-foreground">{formatMoney(order.listedPrice, '—')}</dd>
             </div>
             <div>
@@ -432,21 +432,21 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
               <dd className="text-lg font-semibold text-foreground">{order.vatPercent ?? 0}%</dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">{t('orders.detail.deliveryFee', 'Phí giao hàng')}</dt>
+              <dt className="text-muted-foreground">Phí giao hàng</dt>
               <dd className="text-lg font-semibold text-foreground">
                 {order.deliveryCoveredByShop ? 'Freeship' : order.deliveryType === 'DELIVERY' ? formatMoney(order.deliveryFee) : '—'}
               </dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">{t('orders.detail.deposit', 'Đã thu')}</dt>
+              <dt className="text-muted-foreground">Đã thu</dt>
               <dd className="text-lg font-semibold text-foreground">{formatMoney(order.deposit)}</dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">{t('orders.detail.remainingBalance', 'Còn phải thu')}</dt>
+              <dt className="text-muted-foreground">Còn phải thu</dt>
               <dd className="text-lg font-semibold text-foreground">{formatMoney(order.remainingBalance)}</dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">{t('orders.detail.total', 'Tổng tiền')}</dt>
+              <dt className="text-muted-foreground">Tổng tiền</dt>
               <dd className="text-lg font-semibold text-foreground">{formatMoney(order.total)}</dd>
             </div>
           </dl>
@@ -458,7 +458,7 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
         <section className="space-y-4">
           <div className="rounded-2xl border border-border bg-white p-5">
             <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-              <User className="h-4 w-4" /> {t("orders.detail.customer")}
+              <User className="h-4 w-4" /> Khách đặt
             </div>
             {isEditMode && canEdit ? (
               <div className="mt-3 space-y-2">
@@ -501,7 +501,7 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
 
           <div className="rounded-2xl border border-border bg-white p-5">
             <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-              <Truck className="h-4 w-4" /> {t("orders.detail.receiver")}
+              <Truck className="h-4 w-4" /> Người nhận
             </div>
             {isEditMode && canEdit ? (
               <div className="mt-3 space-y-2">
@@ -525,7 +525,7 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
                     type="text"
                     value={editForm.deliveryAddress || ""}
                     onChange={(e) => handleEditChange("deliveryAddress", e.target.value)}
-                    placeholder={t('orders.new.deliveryAddressPlaceholder')}
+                    placeholder="Số nhà, tên đường, phường, quận..."
                     className={inputClass}
                   />
                 )}

@@ -21,7 +21,6 @@ import {
   UserCheck,
   Wallet,
 } from 'lucide-react'
-import { supportedLocales, localeNames } from '@/lib/i18n'
 import { useLocale } from '@/components/providers/locale-provider'
 import { useAuth } from '@/components/providers/auth-provider'
 
@@ -30,7 +29,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
-  const { lang, t } = useLocale()
+  const { lang } = useLocale()
   const { user, logout, isAuthenticated } = useAuth()
 
   // change-password is signed-in only (RouteGuard enforces that) but renders
@@ -40,8 +39,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const navItems = useMemo(() => {
     const staffNav = [
-      { href: `/${lang}/orders`, label: t('nav.orders'), icon: ShoppingBag },
-      { href: `/${lang}/checkins`, label: t('nav.checkins'), icon: MapPin },
+      { href: `/${lang}/orders`, label: 'Đơn hàng', icon: ShoppingBag },
+      { href: `/${lang}/checkins`, label: 'Điểm danh', icon: MapPin },
       { href: `/${lang}/my-pay`, label: 'Thu nhập', icon: Wallet },
     ]
 
@@ -50,24 +49,24 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     }
 
     const managerBase = [
-      { href: `/${lang}/dashboard`, label: t('nav.dashboard'), icon: Leaf },
-      { href: `/${lang}/orders`, label: t('nav.orders'), icon: ShoppingBag },
-      { href: `/${lang}/checkins`, label: t('nav.checkins'), icon: MapPin },
-      { href: `/${lang}/staff`, label: t('nav.staffReports'), icon: UserCheck },
+      { href: `/${lang}/dashboard`, label: 'Bảng điều khiển', icon: Leaf },
+      { href: `/${lang}/orders`, label: 'Đơn hàng', icon: ShoppingBag },
+      { href: `/${lang}/checkins`, label: 'Điểm danh', icon: MapPin },
+      { href: `/${lang}/staff`, label: 'Báo cáo nhân sự', icon: UserCheck },
       { href: `/${lang}/payroll`, label: 'Bảng lương', icon: Wallet },
-      { href: `/${lang}/settings`, label: t('nav.settings'), icon: Settings },
+      { href: `/${lang}/settings`, label: 'Cài đặt', icon: Settings },
     ]
 
     if (user?.role === 'admin') {
       return [
         ...managerBase,
 
-        { href: `/${lang}/customers`, label: t('nav.customers'), icon: Users },
+        { href: `/${lang}/customers`, label: 'Khách hàng', icon: Users },
       ]
     }
 
     return managerBase
-  }, [lang, t, user?.role])
+  }, [lang, user?.role])
 
   const restPath = useMemo(() => {
     if (!pathname) return ''
@@ -103,13 +102,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const getRoleBadge = () => {
     switch (user?.role) {
       case 'admin':
-        return { label: t('role.admin'), color: 'bg-violet-100 text-violet-800', icon: Award }
+        return { label: 'Quản trị viên', color: 'bg-violet-100 text-violet-800', icon: Award }
       case 'sales':
-        return { label: t('role.sales'), color: 'bg-blue-100 text-blue-800', icon: Zap }
+        return { label: 'Nhân viên Sales', color: 'bg-blue-100 text-blue-800', icon: Zap }
       case 'florist':
-        return { label: t('role.florist'), color: 'bg-green-100 text-green-800', icon: Zap }
+        return { label: 'Thợ hoa', color: 'bg-green-100 text-green-800', icon: Zap }
       default:
-        return { label: t('role.user'), color: 'bg-gray-100 text-gray-800', icon: User }
+        return { label: 'Người dùng', color: 'bg-gray-100 text-gray-800', icon: User }
     }
   }
 
@@ -162,14 +161,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 className="w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted flex items-center gap-2"
               >
                 <User className="h-4 w-4" />
-                {t('auth.changePassword', 'Đổi mật khẩu')}
+                Đổi mật khẩu
               </button>
               <button
                 onClick={handleLogout}
                 className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
               >
                 <LogOut className="h-4 w-4" />
-                {t('auth.signOut')}
+                Đăng xuất
               </button>
             </div>
           )}
@@ -228,14 +227,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-muted rounded-lg flex items-center gap-2 font-medium"
                 >
                   <User className="h-4 w-4" />
-                  {t('auth.changePassword', 'Đổi mật khẩu')}
+                  Đổi mật khẩu
                 </Link>
                 <button
                   onClick={handleLogout}
                   className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-2 font-medium"
                 >
                   <LogOut className="h-4 w-4" />
-                  {t('auth.signOut')}
+                  Đăng xuất
                 </button>
               </div>
 

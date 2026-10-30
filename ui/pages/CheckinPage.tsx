@@ -202,7 +202,6 @@ function CorrectionModal({
 
 export default function CheckinPage() {
   const { user } = useAuth()
-  const { t } = useLocale()
   const { checkins, settings, users, createCheckIn, checkOut, correctCheckIn, deleteCheckIn, setCheckinMonth } = useAppData()
   const today = vnDay()
   const isAdmin = user?.role === 'admin'
@@ -409,7 +408,7 @@ export default function CheckinPage() {
   return (
     <div className="space-y-6 p-4 pb-20 md:p-8 md:pb-12">
       <header className="space-y-1">
-        <h1 className="text-3xl font-bold text-foreground">{t('checkins.title', 'Chấm công')}</h1>
+        <h1 className="text-3xl font-bold text-foreground">Điểm danh</h1>
         <p className="text-sm text-muted-foreground">
           Giờ làm việc {openTime} – {closeTime}
         </p>

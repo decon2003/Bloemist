@@ -362,13 +362,11 @@ export async function generatePayroll(monthKey: string, actor: AuditActor) {
     const before = previous.get(user.id)
     const hasActivity = shiftsByUser.has(user.id) || commissionsByUser.has(user.id) || kpiByUser.has(user.id)
     if (!before && !hasActivity && user.status !== 'active') continue
-    // Admin accounts are paid only for what they did (shifts, sales); an empty
-    // admin line left from an earlier draft is removed unless edited by hand.
-    if (user.role === 'admin' && !hasActivity) {
-      if (before && !(before.adjustments as Adjustment[]).length && !before.ratesOverridden) {
-        await db.payrollLine.delete({ where: { id: before.id } })
-      }
-      if (!before || (!(before.adjustments as Adjustment[]).length && !before.ratesOverridden)) continue
+    // The admin account is the shop owner, never on the payroll; a line left
+    // from an earlier draft is removed.
+    if (user.role === 'admin') {
+      if (before) await db.payrollLine.delete({ where: { id: before.id } })
+      continue
     }
 
     const rates = before?.ratesOverridden

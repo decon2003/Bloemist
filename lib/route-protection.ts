@@ -21,7 +21,7 @@ export const protectedRoutes: ProtectedRoute[] = [
   { path: '/payroll', allowedRoles: ['admin'] },
 
   // Own pay - everyone sees only their own
-  { path: '/my-pay', allowedRoles: ['admin', 'sales', 'florist'] },
+  { path: '/my-pay', allowedRoles: ['sales', 'florist'] },
 
   // Staff performance reporting - admins only
   { path: '/staff', allowedRoles: ['admin'] },

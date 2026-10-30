@@ -93,7 +93,10 @@ export default function OrdersPage() {
   useEffect(() => setOrderScope(scope), [scope, setOrderScope])
 
   const isManager = user?.role === 'admin'
-  const staff = useMemo(() => users.filter((u) => u.status === 'active'), [users])
+  // The admin account is the shop owner, not staff.
+  const staff = useMemo(() => users.filter((u) => u.status === 'active' && u.role !== 'admin'), [users])
+  // The owner may bring a sale from their own contacts.
+  const owners = useMemo(() => users.filter((u) => u.status === 'active' && u.role === 'admin'), [users])
 
   const filteredOrders = useMemo(
     () => orders.filter((order) => status === 'ALL' || order.status === status),
@@ -231,6 +234,9 @@ export default function OrdersPage() {
                   className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm font-normal normal-case tracking-normal text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                 >
                   <option value="">Tất cả</option>
+                  {owners.map((u) => (
+                    <option key={u.id} value={u.id}>{u.name} (chủ cửa hàng)</option>
+                  ))}
                   {staff.map((u) => (
                     <option key={u.id} value={u.id}>{u.name}</option>
                   ))}

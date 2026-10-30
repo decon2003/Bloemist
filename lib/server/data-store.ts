@@ -338,6 +338,8 @@ const readSalesperson = async (value: unknown) => {
   if (typeof value !== 'string' || !value) throw new ApiError(400, 'Vui lòng chọn nhân viên sale')
   const user = await db.user.findUnique({ where: { id: value }, select: { id: true, name: true } })
   if (!user) throw new ApiError(400, 'Nhân viên sale không tồn tại')
+  // The owner (admin) may be the salesperson - a customer from their own
+  // contacts - and earns no commission: admins are never on the payroll.
   return { salespersonId: user.id, salespersonName: user.name }
 }
 
@@ -739,7 +741,7 @@ const readAssignee = async (userId: unknown) => {
 const readMaker = async (userId: unknown) => {
   if (typeof userId !== 'string' || !userId) throw new ApiError(400, 'Chọn thợ đã làm bó hoa')
   const user = await db.user.findUnique({ where: { id: userId }, select: { id: true, name: true, status: true, role: true } })
-  if (!user || user.status !== 'active' || user.role === 'sales') throw new ApiError(400, 'Người làm phải là thợ đang làm việc')
+  if (!user || user.status !== 'active' || user.role !== 'florist') throw new ApiError(400, 'Người làm phải là thợ đang làm việc')
   return user
 }
 

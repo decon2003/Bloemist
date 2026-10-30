@@ -38,16 +38,21 @@ function getSecret(): string {
 
 const sign = (payload: string) => createHmac('sha256', getSecret()).update(payload).digest('base64url')
 
-// Cookie value: base64url("<userId>.<sessionVersion>.<expiresAtSeconds>").<hmac>
-// Stateless, but every request re-reads the user, so deactivating an account or
-// bumping sessionVersion (password change/reset) revokes it immediately.
+// Cookie value: base64url("<userId>.<sessionVersion>.<expiresAtSeconds>.<sessionId>").<hmac>
+// Every request re-reads the user, so deactivating an account or bumping
+// sessionVersion (password change/reset) signs out all its devices at once.
+// Signing out revokes only this device's sessionId: an account may be shared
+// (the owner and the technician use the admin account).
 function encodeSession(userId: string, sessionVersion: number): string {
   const expiresAt = Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS
-  const payload = Buffer.from(`${userId}.${sessionVersion}.${expiresAt}`).toString('base64url')
+  const sessionId = randomBytes(16).toString('base64url')
+  const payload = Buffer.from(`${userId}.${sessionVersion}.${expiresAt}.${sessionId}`).toString('base64url')
   return `${payload}.${sign(payload)}`
 }
 
-function decodeSession(value: string): { userId: string; sessionVersion: number } | null {
+type DecodedSession = { userId: string; sessionVersion: number; expiresAt: Date; sessionId: string | null }
+
+function decodeSession(value: string): DecodedSession | null {
   const [payload, signature] = value.split('.')
   if (!payload || !signature) return null
 
@@ -55,9 +60,26 @@ function decodeSession(value: string): { userId: string; sessionVersion: number 
   const actual = Buffer.from(signature)
   if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) return null
 
-  const [userId, version, expiresAt] = Buffer.from(payload, 'base64url').toString().split('.')
+  const [userId, version, expiresAt, sessionId] = Buffer.from(payload, 'base64url').toString().split('.')
   if (!userId || Number(expiresAt) * 1000 < Date.now()) return null
-  return { userId, sessionVersion: Number(version) }
+  return { userId, sessionVersion: Number(version), expiresAt: new Date(Number(expiresAt) * 1000), sessionId: sessionId || null }
+}
+
+/** Sign this device out: its cookie stops working; the account's other devices do not. */
+export async function revokeSession(request: Request) {
+  const raw = readCookie(request, SESSION_COOKIE)
+  const session = raw ? decodeSession(raw) : null
+  if (!session?.sessionId) return
+  await db.revokedSession.upsert({
+    where: { id: session.sessionId },
+    update: {},
+    create: { id: session.sessionId, expiresAt: session.expiresAt },
+  })
+}
+
+/** Nightly: forget revoked sessions whose cookies have expired anyway. */
+export async function pruneRevokedSessions(now = new Date()) {
+  await db.revokedSession.deleteMany({ where: { expiresAt: { lt: now } } })
 }
 
 function readCookie(request: Request, name: string): string | null {
@@ -90,11 +112,14 @@ export async function getSessionUser(request: Request): Promise<SessionUser | nu
   const session = decodeSession(raw)
   if (!session) return null
 
-  const user = await db.user.findUnique({
-    where: { id: session.userId },
-    select: { id: true, name: true, email: true, role: true, status: true, mustChangePassword: true, sessionVersion: true },
-  })
-  if (!user || user.sessionVersion !== session.sessionVersion || BLOCKED_STATUSES.includes(user.status)) {
+  const [user, revoked] = await Promise.all([
+    db.user.findUnique({
+      where: { id: session.userId },
+      select: { id: true, name: true, email: true, role: true, status: true, mustChangePassword: true, sessionVersion: true },
+    }),
+    session.sessionId ? db.revokedSession.findUnique({ where: { id: session.sessionId }, select: { id: true } }) : null,
+  ])
+  if (!user || revoked || user.sessionVersion !== session.sessionVersion || BLOCKED_STATUSES.includes(user.status)) {
     return null
   }
   return {

@@ -301,7 +301,7 @@ export default function StaffReportsPage() {
       case 'florist':
         return 'Thợ hoa'
       default:
-        return 'Quản trị viên'
+        return 'Chủ cửa hàng'
     }
   }
 

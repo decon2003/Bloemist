@@ -32,7 +32,7 @@ export default function AccessDeniedPage() {
         <div className="space-y-2">
           <h1 className="text-2xl font-bold text-foreground">Từ chối truy cập</h1>
           <p className="text-muted-foreground">
-            Khu vực này dành cho admin. Bạn không có quyền truy cập phần này.
+            Khu vực này dành cho chủ cửa hàng. Bạn không có quyền truy cập phần này.
           </p>
         </div>
 

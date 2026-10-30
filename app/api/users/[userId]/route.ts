@@ -19,7 +19,6 @@ import {
     requireNonBlank,
 } from '@/lib/server/validation'
 
-const PROTECTED_ADMIN_EMAIL = 'admin@bloemist.com'
 
 interface RouteContext {
     params: Promise<{ userId: string }>
@@ -112,22 +111,17 @@ export async function PATCH(request: Request, context: RouteContext) {
 
         const roleChanges = data.role !== undefined && data.role !== existing.role
         const statusChanges = data.status !== undefined && data.status !== existing.status
-        const emailChanges = data.email !== undefined && data.email !== existing.email
-        // The main admin's role, status and email keep the account usable.
-        if (existing.email === PROTECTED_ADMIN_EMAIL && (roleChanges || statusChanges || emailChanges)) {
-            throw new ApiError(403, 'Không đổi được vai trò, trạng thái hoặc email của tài khoản Admin chính')
+        // There is one admin account: the shop owner's. It cannot be demoted or
+        // stopped (its name, e-mail and password can change), and nobody else
+        // can be made admin.
+        if (existing.role === 'admin' && (roleChanges || statusChanges)) {
+            throw new ApiError(403, 'Không đổi được vai trò hoặc trạng thái của tài khoản chủ cửa hàng')
+        }
+        if (roleChanges && data.role === 'admin') {
+            throw new ApiError(403, 'Chỉ có một tài khoản chủ cửa hàng')
         }
         if (userId === me.id && (roleChanges || statusChanges)) {
             throw new ApiError(403, 'Không tự đổi vai trò hoặc ngừng tài khoản của chính mình')
-        }
-        // Never leave the shop without an active manager.
-        const isManagerRole = (role: string) => role === 'admin'
-        const losesManager =
-            isManagerRole(existing.role) && existing.status === 'active' &&
-            ((roleChanges && !isManagerRole(data.role as string)) || (statusChanges && data.status !== 'active'))
-        if (losesManager) {
-            const others = await db.user.count({ where: { id: { not: userId }, status: 'active', role: 'admin' } })
-            if (others === 0) throw new ApiError(409, 'Cần giữ ít nhất một quản lý đang làm việc')
         }
         const deactivating = statusChanges && data.status !== 'active'
         // A leaver is signed out everywhere at once.
@@ -182,9 +176,9 @@ export async function DELETE(request: Request, context: RouteContext) {
             throw new ApiError(404, 'Không tìm thấy nhân viên')
         }
 
-        // Don't allow deleting the main admin
-        if (user.email === PROTECTED_ADMIN_EMAIL) {
-            throw new ApiError(403, 'Không xoá được tài khoản Admin chính')
+        // The owner's account is never deleted.
+        if (user.role === 'admin') {
+            throw new ApiError(403, 'Không xoá được tài khoản chủ cửa hàng')
         }
 
         // Deleting a user who still owns tasks, orders or check-ins raises an FK

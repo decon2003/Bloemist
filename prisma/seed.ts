@@ -12,16 +12,15 @@ async function main() {
         status: 'active'
     }
 
-    await db.user.upsert({
-        where: { email: adminUser.email },
-        update: {
-            name: adminUser.name,
-            role: adminUser.role,
-        },
-        create: adminUser
-    })
-
-    console.log(`Admin user created: ${adminUser.email}`)
+    // The shop has one admin account, the owner's: never make a second one
+    // (the owner may have changed its e-mail since).
+    const owner = await db.user.findFirst({ where: { role: 'admin' } })
+    if (owner) {
+        console.log(`Admin account already exists: ${owner.email}`)
+    } else {
+        await db.user.create({ data: adminUser })
+        console.log(`Admin user created: ${adminUser.email}`)
+    }
 
     // Create default store location
     await db.storeLocation.upsert({

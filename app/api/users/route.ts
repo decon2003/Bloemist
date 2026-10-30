@@ -47,6 +47,8 @@ export async function POST(request: Request) {
         // role is a bare String in the schema; without this allow-list any
         // caller could mint themselves an arbitrary (or misspelled) role.
         const role = assertOneOf(body.role, USER_ROLES, 'role')
+        // The only admin account is the shop owner's.
+        if (role === 'admin') throw new ApiError(403, 'Chỉ có một tài khoản chủ cửa hàng')
 
         // Pay profile can be set right away (otherwise MONTHLY with 0 everywhere).
         const payType = body.payType === undefined ? 'MONTHLY' : assertOneOf(body.payType, PAY_TYPES, 'payType')

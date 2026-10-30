@@ -102,7 +102,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const getRoleBadge = () => {
     switch (user?.role) {
       case 'admin':
-        return { label: 'Quản trị viên', color: 'bg-violet-100 text-violet-800', icon: Award }
+        return { label: 'Chủ cửa hàng', color: 'bg-violet-100 text-violet-800', icon: Award }
       case 'sales':
         return { label: 'Nhân viên Sales', color: 'bg-blue-100 text-blue-800', icon: Zap }
       case 'florist':

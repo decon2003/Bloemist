@@ -101,6 +101,15 @@ model Order {
   @@index([customerId])
 }
 
+// A signed-out session (one device); its cookie is refused until it would
+// have expired anyway. Other devices of the same account stay signed in.
+model RevokedSession {
+  id        String   @id // the session id carried in the cookie
+  expiresAt DateTime
+
+  @@index([expiresAt])
+}
+
 // A failed sign-in from a client IP (lib/server/login-throttle.ts).
 model LoginFailure {
   id String   @id @default(uuid())

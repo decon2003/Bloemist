@@ -21,7 +21,7 @@ interface UserFormData {
 }
 
 const ROLE_LABEL: Record<User['role'], string> = {
-  admin: 'Quản trị viên',
+  admin: 'Chủ cửa hàng',
   sales: 'Sale',
   florist: 'Thợ hoa',
 }
@@ -116,15 +116,20 @@ const UserFormModal = ({
 
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">Vai trò</label>
-            <select
-              value={localData.role}
-              onChange={(e) => setLocalData(prev => ({ ...prev, role: e.target.value as User['role'] }))}
-              className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-            >
-              {(Object.keys(ROLE_LABEL) as User['role'][]).map((role) => (
-                <option key={role} value={role}>{ROLE_LABEL[role]}</option>
-              ))}
-            </select>
+            {localData.role === 'admin' ? (
+              // The owner's account: one of a kind, its role never changes.
+              <p className="px-3 py-2 text-sm text-muted-foreground">{ROLE_LABEL.admin}</p>
+            ) : (
+              <select
+                value={localData.role}
+                onChange={(e) => setLocalData(prev => ({ ...prev, role: e.target.value as User['role'] }))}
+                className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                {(['sales', 'florist'] as User['role'][]).map((role) => (
+                  <option key={role} value={role}>{ROLE_LABEL[role]}</option>
+                ))}
+              </select>
+            )}
           </div>
 
           {!passwordRequired && (
@@ -423,7 +428,7 @@ export default function SettingsPage() {
         </p>
         {!canEditSettings && (
           <div className="rounded-2xl border border-dashed border-muted bg-muted/50 p-3 text-sm text-muted-foreground">
-            Chỉ xem. Liên hệ admin để cập nhật cài đặt.
+            Chỉ xem. Liên hệ chủ cửa hàng để cập nhật cài đặt.
           </div>
         )}
       </div>

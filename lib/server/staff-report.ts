@@ -22,7 +22,7 @@ export type StaffReportRow = {
   lastLocation: string | null
 }
 
-const titleFor = (role: string) => (role === 'florist' ? 'Thợ hoa' : role === 'sales' ? 'Sale' : 'Quản trị viên')
+const titleFor = (role: string) => (role === 'florist' ? 'Thợ hoa' : role === 'sales' ? 'Sale' : 'Chủ cửa hàng')
 
 /** Monthly attendance, workload and pay per staff member, computed on the
  *  server from just that month's rows. The page used to download every order,

@@ -9,9 +9,9 @@ Quyết định ngày 30/10/2026: chỉ chủ cửa hàng phát triển và th�
 | Ở đâu | Máy của chủ cửa hàng: `npm run devtest` (mục 3) | `https://noibo.bloemistflorals.com` |
 | Dữ liệu | Database Postgres riêng trong `.devtest/`, tài khoản mẫu | Dữ liệu thật của cửa hàng |
 | Vercel | không dùng | project hiện tại (nhánh `main`) |
-| Neon | không dùng | **project mới**, Singapore (mục 5) |
-| R2 | không dùng (ảnh lưu trong database trên máy) | **bucket mới**, token mới (mục 5) |
-| Secret | tự tạo trong `.devtest/` | **bộ mới hoàn toàn** |
+| Neon | không dùng | project `bloemist` hiện tại (Singapore), xoá dữ liệu thử (mục 5) |
+| R2 | không dùng (ảnh lưu trong database trên máy) | bucket `bloemist-photos` hiện tại, đổi khoá (mục 5) |
+| Secret | tự tạo trong `.devtest/` | **đổi mới hết** (mục 5) |
 
 Dịch vụ của production:
 
@@ -64,12 +64,12 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
 
 ## 2. Hiện trạng (trước khi lên production)
 
-Project Vercel hiện tại đang chạy ở `noibo` nhưng nối với **database và bucket thử nghiệm** (dựng ngày 05/10/2026):
+Project Vercel hiện tại đang chạy ở `noibo`, nối với database và bucket dựng ngày 05/10/2026, hiện chứa **dữ liệu thử**:
 
-- Neon project `bloemist`: AWS ap-southeast-1 (Singapore), Postgres 17. Có dữ liệu thử.
+- Neon project `bloemist`: AWS ap-southeast-1 (Singapore), Postgres 17.
 - R2 bucket `bloemist-photos`, riêng tư.
 
-Đến ngày lên production (mục 5), project này được chuyển sang database và bucket mới. Sau khi production chạy ổn, xoá Neon project `bloemist` và bucket `bloemist-photos` cũ.
+Ngày lên production (mục 5), dữ liệu thử bị xoá, cấu hình được giữ, và mọi khoá được đổi.
 
 Migration tự chạy khi build production (`scripts/migrate-if-production.mjs`, chỉ khi `VERCEL_ENV=production`), nên database luôn khớp với code đã deploy.
 
@@ -123,36 +123,36 @@ node scripts/migrate-photos-to-r2.mjs --apply  # chuyển thật, chạy lại n
 
 ---
 
-## 5. Dựng bản production
+## 5. Lên production
 
-Dùng luôn **project Vercel hiện tại** và domain `noibo`, chỉ thay sang **database, bucket và secret mới**. Làm ngoài giờ bán.
+Bản đang chạy ở `noibo` **trở thành production luôn**: giữ project Vercel, database Neon và bucket R2 hiện tại, chỉ xoá dữ liệu thử và đổi khoá. Làm ngoài giờ bán.
 
-1. **Neon:** tạo **project mới**, region Singapore, Postgres 17. Lấy cả chuỗi pooled (host có `-pooler`) và chuỗi direct.
-2. **R2:** tạo bucket mới (ví dụ `bloemist-prod`) và token mới **chỉ có quyền trên bucket này** (mục 4), kèm lifecycle rule cho `backups/`.
-3. **Vercel → Settings → Environment Variables:** thay giá trị mới cho `DATABASE_URL`, `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `AUTH_SECRET`, `CRON_SECRET` (mục 1).
-   - Chỉ chọn môi trường **Production**. Xoá các giá trị đang đặt cho *Preview*, để bản preview không bao giờ chạm vào dữ liệu thật.
-   - Xoá các biến không dùng: `GEMINI_API_KEY`, `GEMINI_MODEL`, `TELEGRAM_WEBHOOK_SECRET` (và thu hồi khoá Gemini).
-   - Bật **Settings → Deployment Protection** cho bản preview.
-4. **Redeploy.** Bước build tự chạy toàn bộ migration lên database mới (đã thử dựng database trống từ đầu: 17 migration, khớp `schema.prisma`).
-5. **Tạo tài khoản quản lý đầu tiên.** Chạy trên máy; chuỗi direct của production chỉ đặt trong terminal, **không ghi vào `.env`**, và đóng terminal khi xong. Ví dụ với PowerShell:
+1. **Xoá dữ liệu thử, giữ cấu hình.** Trong terminal, đặt `DATABASE_URL` là chuỗi **direct** của Neon (không ghi vào `.env`):
 
    ```powershell
-   $env:DATABASE_URL = "<chuỗi direct của production>"
-   npx tsx prisma/seed.ts                     # admin@bloemist.com (id ngẫu nhiên) + địa điểm cửa hàng
-   node scripts/set-password.mjs admin@bloemist.com '<mat-khau-tam>' --temporary
+   $env:DATABASE_URL = "<chuỗi direct của Neon>"
+   node scripts/reset-for-production.mjs            # chạy thử: chỉ đếm
+   node scripts/reset-for-production.mjs --apply    # xoá thật
+   Remove-Item Env:DATABASE_URL
    ```
 
-   Sau đó đăng nhập, đổi email/tên admin cho đúng người thật.
-6. **Cài đặt cửa hàng:** giờ mở cửa, ngày lễ, KPI theo ca; tạo tài khoản nhân viên (**Cài đặt**) và hồ sơ lương từng người (**Báo cáo nhân sự → Hồ sơ lương**).
-7. **Kiểm tra:**
-   - `https://noibo.bloemistflorals.com/api/health?db=1` trả về ok.
-   - Đăng nhập được; tạo một đơn đặt hoa, ghi tiền khách trả thêm, tạo một đơn bán tại cửa hàng, chấm công vào/ra; rồi huỷ/xoá các đơn thử.
-   - Sáng hôm sau, tìm `Backup written` trong Logs; thử khôi phục một lần vào một branch Neon trống (mục 6).
-8. **Dọn dẹp:** khi production đã chạy ổn, xoá Neon project `bloemist` và bucket `bloemist-photos` cũ (dữ liệu thử).
+   - Xoá: đơn, sản phẩm, khoản thu, khách hàng, chấm công, bảng lương, lịch sử, bộ đếm mã đơn, tài khoản test (`@x.vn`, `PENTEST…`).
+   - Giữ: tài khoản thật kèm hồ sơ lương, cài đặt, KPI, ngày lễ, địa điểm cửa hàng.
+   - Mọi người bị đăng xuất. **Admin giữ mật khẩu.** Mỗi nhân viên được một mật khẩu tạm và phải đổi ở lần đăng nhập đầu; danh sách nằm trong `.devtest/staff-temporary-passwords.txt` (chỉ trên máy, không in ra, không commit). Đưa trực tiếp cho từng người rồi xoá file.
+   - Trước khi xoá, script lưu một bản sao vào `.devtest/before-reset-….json`.
+2. **Đổi khoá** (khoá cũ từng bị dán vào chat):
+   - Neon: **Reset password** (mục 1) → cập nhật `DATABASE_URL` trên Vercel.
+   - R2: **Roll** token (mục 1) → cập nhật `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`.
+   - Tạo `AUTH_SECRET` và `CRON_SECRET` mới (lệnh ở mục 1).
+3. **Vercel → Settings → Environment Variables:**
+   - Mọi biến chỉ áp cho **Production**; xoá các giá trị của *Preview*, để bản preview không bao giờ chạm vào dữ liệu thật.
+   - Xoá `GEMINI_API_KEY`, `GEMINI_MODEL`, `TELEGRAM_WEBHOOK_SECRET` (và thu hồi khoá Gemini).
+   - **Settings → Deployment Protection:** bật cho bản preview.
+4. **Redeploy** (không dùng build cache). Log phải có `No pending migrations to apply`; mở `https://noibo.bloemistflorals.com/api/health?db=1` phải thấy `"ok":true`.
+5. **Kiểm tra:** đăng nhập admin; tạo một đơn đặt hoa, ghi tiền khách trả thêm, tạo một đơn bán tại cửa hàng, chấm công vào/ra; rồi xoá các đơn thử và bấm **Cập nhật dữ liệu mới** ở Bảng lương.
+6. **Sáng hôm sau:** tìm `Backup written` trong Logs; thêm monitor UptimeRobot (mục 8).
 
-Production bắt đầu với dữ liệu trống: không mang dữ liệu thử sang.
-
-**Nếu có sự cố sau khi deploy:** Vercel → Deployments → bản trước → **Instant Rollback**. Các migration chỉ thêm cột và bảng, nên bản cũ vẫn chạy được trên database mới.
+**Nếu có sự cố sau khi deploy:** Vercel → Deployments → bản trước → **Instant Rollback**.
 
 ---
 

@@ -5,7 +5,7 @@ Hệ thống quản lý vận hành nội bộ của tiệm hoa Bloemist.
 | Môi trường | Địa chỉ | Trạng thái |
 |---|---|---|
 | **Devtest** | Trên máy: `npm run devtest` | Chỉ chủ cửa hàng thử nghiệm; database riêng trên máy |
-| **Production** | `noibo.bloemistflorals.com` | Nhân viên dùng. Hiện vẫn nối với database thử cho tới ngày lên production (xem [DEPLOY.md](DEPLOY.md#5-dựng-bản-production)) |
+| **Production** | `noibo.bloemistflorals.com` | Nhân viên dùng. Đang có dữ liệu thử; ngày lên production sẽ xoá dữ liệu thử, giữ cấu hình (xem [DEPLOY.md](DEPLOY.md#5-dựng-bản-production)) |
 
 ## Chức năng
 

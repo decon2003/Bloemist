@@ -250,13 +250,13 @@ export default function NewOrderPage() {
       return
     }
     if (preparedProducts.some((product) => !product.unitPrice.trim())) {
-      setProductError('Vui lòng nhập đơn giá cho từng sản phẩm.')
+      setProductError('Vui lòng nhập giá tiền cho từng sản phẩm.')
       setIsSaving(false)
       return
     }
     // "350k" would be read as 350 ₫: nothing in the shop costs under 1.000 ₫.
     if (preparedProducts.some((product) => parseCurrencyToNumber(product.unitPrice) < 1000)) {
-      setProductError('Đơn giá phải từ 1.000 ₫. Gõ đủ số, ví dụ 350000 (không gõ "350k").')
+      setProductError('Giá tiền phải từ 1.000 ₫. Gõ đủ số, ví dụ 350000 (không gõ "350k").')
       setIsSaving(false)
       return
     }
@@ -522,10 +522,10 @@ export default function NewOrderPage() {
               <span>
                 {walkIn
                   ? 'Thợ đã làm bó hoa (được tính hoa hồng làm đơn)'
-                  : `${t('orders.assignee', 'Người phụ trách')} (tuỳ chọn, thợ cũng có thể tự nhận đơn)`}
+                  : t('orders.assignee', 'Nhân viên phụ trách')}
               </span>
               <select
-                aria-label={walkIn ? 'Thợ đã làm bó hoa' : 'Người phụ trách'}
+                aria-label={walkIn ? 'Thợ đã làm bó hoa' : 'Nhân viên phụ trách'}
                 value={assigneeId}
                 onChange={(event) => {
                   setAssigneeId(event.target.value)
@@ -542,7 +542,7 @@ export default function NewOrderPage() {
               </select>
             </label>
             <label className="space-y-2 text-sm font-medium text-foreground">
-              <span>Người sale</span>
+              <span>Nhân viên sale</span>
               <select
                 value={salespersonId || user?.id || ''}
                 onChange={(event) => setSalespersonId(event.target.value)}
@@ -605,10 +605,10 @@ export default function NewOrderPage() {
                       />
                     </label>
                     <label className="space-y-1 text-sm font-medium text-foreground sm:w-36">
-                      <span>Đơn giá</span>
+                      <span>Giá tiền</span>
                       <input
                         required
-                        onInvalid={(event) => event.currentTarget.setCustomValidity('Nhập đơn giá')}
+                        onInvalid={(event) => event.currentTarget.setCustomValidity('Nhập giá tiền')}
                         onInput={(event) => event.currentTarget.setCustomValidity('')}
                         inputMode="numeric"
                         placeholder="0"
@@ -669,10 +669,6 @@ export default function NewOrderPage() {
                           Thêm ảnh
                         </label>
                       </div>
-                      <p className="text-[11px] font-normal text-muted-foreground">
-                        Chụp hoặc chọn ảnh từ máy (chọn được nhiều ảnh). Trên máy tính có thể dán ảnh (Ctrl+V) copy từ Zalo,
-                        Messenger vào khung này. Thợ bấm vào ảnh để phóng to.
-                      </p>
                     </div>
                   </div>
                   <label className="block space-y-1 text-xs font-medium text-foreground">
@@ -722,7 +718,7 @@ export default function NewOrderPage() {
             </div>
             <div className="grid gap-3 md:grid-cols-2">
               <label className="space-y-2 text-sm font-medium text-foreground">
-                <span>{t('orders.new.listedPrice', 'Listed price')} (tổng các sản phẩm)</span>
+                <span>Tổng tiền</span>
                 <input
                   readOnly
                   value={formatCurrencyFromNumber(Number(listedPrice))}
@@ -756,7 +752,7 @@ export default function NewOrderPage() {
                   />
                   <label className="flex items-center gap-2 font-normal">
                     <input type="checkbox" checked={freeship} onChange={(event) => setFreeship(event.target.checked)} />
-                    Freeship (khách không trả phí giao)
+                    Freeship
                   </label>
                 </div>
               )}
@@ -781,7 +777,7 @@ export default function NewOrderPage() {
             </div>
 
             <div className="flex flex-col items-end gap-1 rounded-xl bg-muted/60 px-4 py-3">
-              <span className="text-sm text-muted-foreground">{walkIn ? 'Khách trả' : 'Tổng tiền'}</span>
+              <span className="text-sm text-muted-foreground">{walkIn ? 'Khách trả' : 'Khách phải trả'}</span>
               <span className="text-2xl font-bold text-foreground">{formattedOrderTotal}</span>
               {walkIn ? (
                 <span className="text-sm font-medium text-green-700">Đã thanh toán đủ · đã giao</span>

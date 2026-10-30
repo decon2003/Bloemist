@@ -335,9 +335,9 @@ const readProducts = (value: unknown): ProductInput[] => {
 /** The staff member credited with the sale (any staff member - whoever
  *  brought the order in). They earn the order's sales commission. */
 const readSalesperson = async (value: unknown) => {
-  if (typeof value !== 'string' || !value) throw new ApiError(400, 'Vui lòng chọn người sale')
+  if (typeof value !== 'string' || !value) throw new ApiError(400, 'Vui lòng chọn nhân viên sale')
   const user = await db.user.findUnique({ where: { id: value }, select: { id: true, name: true } })
-  if (!user) throw new ApiError(400, 'Người sale không tồn tại')
+  if (!user) throw new ApiError(400, 'Nhân viên sale không tồn tại')
   return { salespersonId: user.id, salespersonName: user.name }
 }
 
@@ -485,7 +485,7 @@ const FLORIST_ORDER_STATUSES = ['NEW', 'IN_PROGRESS', 'READY']
  *  person in charge; everything else is for sales and managers. */
 export const assertFloristOrderChange = (current: { status: string }, input: Record<string, unknown>) => {
   if (Object.keys(input).some((key) => key !== 'status' && key !== 'assigneeId')) {
-    throw new ApiError(403, 'Thợ chỉ đổi được trạng thái và người phụ trách của đơn')
+    throw new ApiError(403, 'Thợ chỉ đổi được trạng thái và nhân viên phụ trách của đơn')
   }
   if (!FLORIST_ORDER_STATUSES.includes(current.status)) {
     throw new ApiError(403, 'Đơn đã giao hoặc đã huỷ, thợ không đổi được nữa')
@@ -528,7 +528,7 @@ export const updateOrder = async (orderId: string, input: Partial<CreateOrderInp
     ? await db.order.findUnique({ where: { id: orderId }, select: { status: true, assigneeId: true } })
     : null
   if (input.assigneeId !== undefined) {
-    if (before?.status === 'CANCELLED') throw new ApiError(409, 'Đơn đã huỷ, không đổi người phụ trách được')
+    if (before?.status === 'CANCELLED') throw new ApiError(409, 'Đơn đã huỷ, không đổi nhân viên phụ trách được')
     const inCharge = input.assigneeId ? await readAssignee(input.assigneeId) : null
     data.assigneeId = inCharge?.id ?? null
     data.assigneeName = inCharge?.name ?? null
@@ -550,7 +550,7 @@ export const updateOrder = async (orderId: string, input: Partial<CreateOrderInp
       data.assigneeName = actor.name
     }
     const orphan = await db.task.count({ where: { orderId, assigneeId: null, status: { notIn: ['COMPLETED', 'CANCELLED'] } } })
-    if (orphan && !readyMaker) throw new ApiError(400, 'Chọn người phụ trách trước khi chuyển đơn sang "Sẵn sàng"')
+    if (orphan && !readyMaker) throw new ApiError(400, 'Chọn nhân viên phụ trách trước khi chuyển đơn sang "Sẵn sàng"')
   }
   const inChargeChanged = data.assigneeId !== undefined && data.assigneeId !== (before?.assigneeId ?? null)
   // Someone taking charge of a new order starts it, as choosing one at creation does.

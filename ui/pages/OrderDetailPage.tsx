@@ -195,16 +195,16 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
     const next = inChargeOptions.find((f) => f.id === userId)?.name
     if (order.assigneeId && !window.confirm(
       next
-        ? `Chuyển người phụ trách từ ${order.assigneeName ?? 'người cũ'} sang ${next}? Các sản phẩm chưa làm của ${order.assigneeName ?? 'người cũ'} sẽ chuyển theo.`
-        : `Bỏ người phụ trách ${order.assigneeName ?? ''}? Các sản phẩm chưa làm của người này sẽ thành chưa có người làm.`,
+        ? `Chuyển nhân viên phụ trách từ ${order.assigneeName ?? 'người cũ'} sang ${next}? Các sản phẩm chưa làm của ${order.assigneeName ?? 'người cũ'} sẽ chuyển theo.`
+        : `Bỏ nhân viên phụ trách ${order.assigneeName ?? ''}? Các sản phẩm chưa làm của người này sẽ thành chưa có người làm.`,
     )) return
     try {
       const updated = await updateOrder(order.id, { assigneeId: userId })
       setOrder(updated)
       refreshTasks()
-      setToast({ text: next ? `${next} phụ trách đơn này` : 'Đã bỏ người phụ trách', kind: 'success' })
+      setToast({ text: next ? `${next} phụ trách đơn này` : 'Đã bỏ nhân viên phụ trách', kind: 'success' })
     } catch (err) {
-      showError(err, 'Không đổi được người phụ trách')
+      showError(err, 'Không đổi được nhân viên phụ trách')
     }
   }
 
@@ -355,12 +355,12 @@ export default function OrderDetailPage({ orderId }: OrderDetailPageProps) {
           </div>
         </dl>
         <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
-          <span className="text-muted-foreground">Người phụ trách:</span>
+          <span className="text-muted-foreground">Nhân viên phụ trách:</span>
           {canChangeInCharge ? (
             <select
               value={order.assigneeId ?? ''}
               onChange={(e) => handleChangeInCharge(e.target.value)}
-              aria-label="Người phụ trách"
+              aria-label="Nhân viên phụ trách"
               className="h-9 rounded-lg border border-input bg-white px-2 text-sm font-semibold focus:ring-1 focus:ring-primary"
             >
               <option value="">Chưa có</option>

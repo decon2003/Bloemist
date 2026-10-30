@@ -210,7 +210,7 @@ export default function OrdersPage() {
           user ? (
             <>
               <label className="space-y-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                <span>Người phụ trách</span>
+                <span>Nhân viên phụ trách</span>
                 <select
                   value={assigneeFilter}
                   onChange={(e) => setAssigneeFilter(e.target.value)}
@@ -224,7 +224,7 @@ export default function OrdersPage() {
                 </select>
               </label>
               <label className="space-y-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                <span>Người sale</span>
+                <span>Nhân viên sale</span>
                 <select
                   value={salespersonFilter}
                   onChange={(e) => setSalespersonFilter(e.target.value)}
@@ -285,7 +285,7 @@ export default function OrdersPage() {
                   </div>
                   <div className="grid flex-1 grid-cols-2 gap-4 text-sm md:grid-cols-5 md:text-right">
                     <div className="text-left md:text-right">
-                      <p className="text-muted-foreground">Phụ trách</p>
+                      <p className="text-muted-foreground">Nhân viên phụ trách</p>
                       <p className={`font-semibold ${order.assigneeName ? 'text-foreground' : 'text-amber-700'}`}>
                         {order.assigneeName || 'Chưa phân công'}
                       </p>
@@ -307,7 +307,7 @@ export default function OrdersPage() {
                       )}
                     </div>
                     <div className="text-left md:text-right">
-                      <p className="text-muted-foreground">Sale</p>
+                      <p className="text-muted-foreground">Nhân viên sale</p>
                       <p className="font-semibold text-foreground">{order.salespersonName || order.createdByName || '—'}</p>
                     </div>
                     <div className="text-left md:text-right">

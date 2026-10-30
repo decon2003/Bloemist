@@ -235,7 +235,7 @@ export default function OrdersPage() {
                 >
                   <option value="">Tất cả</option>
                   {owners.map((u) => (
-                    <option key={u.id} value={u.id}>{u.name} (chủ cửa hàng)</option>
+                    <option key={u.id} value={u.id}>{u.name}</option>
                   ))}
                   {staff.map((u) => (
                     <option key={u.id} value={u.id}>{u.name}</option>

@@ -249,15 +249,15 @@ export const getOrder = async (orderId: string) => {
   }
 }
 
+/** Who can make the flowers: the florists, then the owner (admin), who may
+ *  make an order too but earns no making commission (never on the payroll). */
 export const listFlorists = async () => {
   const users = await db.user.findMany({
-    where: {
-      role: 'florist',
-      status: 'active'
-    },
-    select: { id: true, name: true }
+    where: { role: { in: ['florist', 'admin'] }, status: 'active' },
+    select: { id: true, name: true, role: true },
+    orderBy: { name: 'asc' },
   })
-  return users
+  return [...users.filter((u) => u.role === 'florist'), ...users.filter((u) => u.role === 'admin')].map((u) => ({ id: u.id, name: u.name }))
 }
 
 /** Next readable order code for today (Vietnam time): "DDMMYY-NNN", e.g.
@@ -737,11 +737,13 @@ const readAssignee = async (userId: unknown) => {
   return user
 }
 
-/** The florist who made a bouquet sold in the shop. */
+/** Who made a bouquet sold in the shop: a florist, or the owner (no commission). */
 const readMaker = async (userId: unknown) => {
   if (typeof userId !== 'string' || !userId) throw new ApiError(400, 'Chọn thợ đã làm bó hoa')
   const user = await db.user.findUnique({ where: { id: userId }, select: { id: true, name: true, status: true, role: true } })
-  if (!user || user.status !== 'active' || user.role !== 'florist') throw new ApiError(400, 'Người làm phải là thợ đang làm việc')
+  if (!user || user.status !== 'active' || (user.role !== 'florist' && user.role !== 'admin')) {
+    throw new ApiError(400, 'Người làm phải là thợ đang làm việc hoặc chủ cửa hàng')
+  }
   return user
 }
 

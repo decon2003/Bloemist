@@ -549,7 +549,7 @@ export default function NewOrderPage() {
                   .filter((u) => u.status === 'active')
                   .map((u) => (
                     <option key={u.id} value={u.id}>
-                      {u.role === 'admin' ? `${u.name} (chủ cửa hàng, không tính hoa hồng)` : u.name}
+                      {u.name}
                     </option>
                   ))}
               </select>

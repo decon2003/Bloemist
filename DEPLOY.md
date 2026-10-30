@@ -148,6 +148,7 @@ Bản đang chạy ở `noibo` **trở thành production luôn**: giữ project 
    - Mọi biến chỉ áp cho **Production**; xoá các giá trị của *Preview*, để bản preview không bao giờ chạm vào dữ liệu thật.
    - Xoá `GEMINI_API_KEY`, `GEMINI_MODEL`, `TELEGRAM_WEBHOOK_SECRET` (và thu hồi khoá Gemini).
    - **Settings → Deployment Protection:** bật cho bản preview.
+   - Bản preview không được build: `vercel.json` (`ignoreCommand`) bỏ qua mọi bản build không phải production.
 4. **Redeploy** (không dùng build cache). Log phải có `No pending migrations to apply`; mở `https://noibo.bloemistflorals.com/api/health?db=1` phải thấy `"ok":true`.
 5. **Kiểm tra:** đăng nhập admin; tạo một đơn đặt hoa, ghi tiền khách trả thêm, tạo một đơn bán tại cửa hàng, chấm công vào/ra; rồi xoá các đơn thử và bấm **Cập nhật dữ liệu mới** ở Bảng lương.
 6. **Sáng hôm sau:** tìm `Backup written` trong Logs; thêm monitor UptimeRobot (mục 8).

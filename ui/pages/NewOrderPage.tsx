@@ -46,6 +46,9 @@ export default function NewOrderPage() {
   const [deposit, setDeposit] = useState('')
   // Paid in full: the deposit follows the total as prices change.
   const [paidInFull, setPaidInFull] = useState(false)
+  // "Bán tại cửa hàng": the customer pays and takes the flowers now. No
+  // receiver, delivery or time to enter; the florist who made it is required.
+  const [walkIn, setWalkIn] = useState(false)
   const [deliveryType, setDeliveryType] = useState<'DELIVERY' | 'PICKUP'>('DELIVERY')
   const [deliveryAddress, setDeliveryAddress] = useState('')
   const [receiveTime, setReceiveTime] = useState(() => toDateTimeLocalValue(new Date()))
@@ -123,9 +126,9 @@ export default function NewOrderPage() {
     const basePriceValue = listedAmount
     const vatAmount = Math.round((basePriceValue * vatRate) / 100)
     const sellingPriceValue = basePriceValue + vatAmount
-    const deliveryChargeValue = deliveryType !== 'DELIVERY' || freeship ? 0 : deliveryAmount
+    const deliveryChargeValue = walkIn || deliveryType !== 'DELIVERY' || freeship ? 0 : deliveryAmount
     const orderTotalValue = sellingPriceValue + deliveryChargeValue
-    const depositAmount = paidInFull ? orderTotalValue : parseCurrencyToNumber(deposit)
+    const depositAmount = paidInFull || walkIn ? orderTotalValue : parseCurrencyToNumber(deposit)
     const remainingBalanceValue = Math.max(orderTotalValue - depositAmount, 0)
 
     return {
@@ -133,7 +136,7 @@ export default function NewOrderPage() {
       formattedOrderTotal: formatCurrencyFromNumber(orderTotalValue),
       formattedRemainingBalance: formatCurrencyFromNumber(remainingBalanceValue),
     }
-  }, [deliveryType, freeship, deliveryFee, deposit, paidInFull, listedPrice, vatPercent])
+  }, [deliveryType, freeship, deliveryFee, deposit, paidInFull, walkIn, listedPrice, vatPercent])
 
   // Names (and latest photo) of bouquets on recent orders, for suggestions.
   const [bouquetSuggestions, setBouquetSuggestions] = useState<BouquetSuggestion[]>([])
@@ -229,8 +232,12 @@ export default function NewOrderPage() {
       setSubmitError('Ảnh mẫu đang tải lên, đợi xong rồi tạo đơn.')
       return
     }
-    if (!receiveTime || Number.isNaN(new Date(receiveTime).getTime())) {
+    if (!walkIn && (!receiveTime || Number.isNaN(new Date(receiveTime).getTime()))) {
       setSubmitError('Vui lòng chọn ngày giờ nhận.')
+      return
+    }
+    if (walkIn && !assigneeId) {
+      setSubmitError('Chọn thợ đã làm bó hoa.')
       return
     }
     setIsSaving(true)
@@ -269,22 +276,24 @@ export default function NewOrderPage() {
         customerName,
         customerPhone,
         // Any of these may be left blank and filled in later on the order.
-        receiverName: receiverIsCustomer ? customerName : receiverName,
-        receiverPhone: receiverIsCustomer ? customerPhone : receiverPhone,
+        receiverName: walkIn ? '' : receiverIsCustomer ? customerName : receiverName,
+        receiverPhone: walkIn ? '' : receiverIsCustomer ? customerPhone : receiverPhone,
         bouquetName: primaryProduct.name,
         bouquetImage: primaryProduct.samplePhotoUrls[0] || matched?.image,
-        deliveryType,
-        deliveryAddress: deliveryType === 'DELIVERY' ? deliveryAddress : undefined,
-        receiveTime: new Date(receiveTime).toISOString(),
+        // A shop sale: the server sets pickup, now, paid in full and delivered.
+        walkIn,
+        deliveryType: walkIn ? 'PICKUP' : deliveryType,
+        deliveryAddress: !walkIn && deliveryType === 'DELIVERY' ? deliveryAddress : undefined,
+        receiveTime: walkIn ? new Date().toISOString() : new Date(receiveTime).toISOString(),
         status: assigneeId ? 'IN_PROGRESS' : 'NEW',
         listedPrice,
-        deliveryFee: deliveryType === 'DELIVERY' && !freeship ? deliveryFee : undefined,
-        deliveryCoveredByShop: deliveryType === 'DELIVERY' && freeship,
+        deliveryFee: !walkIn && deliveryType === 'DELIVERY' && !freeship ? deliveryFee : undefined,
+        deliveryCoveredByShop: !walkIn && deliveryType === 'DELIVERY' && freeship,
         vatPercent,
-        deposit: paidInFull ? orderTotalValue : deposit,
+        deposit: paidInFull || walkIn ? orderTotalValue : deposit,
         // Selling price, total and remaining balance are recomputed by the server.
-        notes,
-        cardMessage,
+        notes: walkIn ? '' : notes,
+        cardMessage: walkIn ? '' : cardMessage,
         createdById: user?.id,
         createdByName: user?.name,
         requestId,
@@ -340,11 +349,31 @@ export default function NewOrderPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
+          <div role="radiogroup" aria-label="Loại đơn" className="grid grid-cols-2 gap-1 rounded-2xl border border-border bg-white p-1 shadow-sm">
+            {([
+              [false, 'Đặt hoa', 'Giao hoặc hẹn lấy sau'],
+              [true, 'Bán tại cửa hàng', 'Khách trả tiền, lấy hoa luôn'],
+            ] as const).map(([value, label, hint]) => (
+              <button
+                key={label}
+                type="button"
+                role="radio"
+                aria-checked={walkIn === value}
+                onClick={() => setWalkIn(value)}
+                className={`rounded-xl px-3 py-2 text-left transition ${walkIn === value ? 'bg-primary text-white shadow-sm' : 'hover:bg-muted'}`}
+              >
+                <span className="block text-sm font-semibold">{label}</span>
+                <span className={`block text-xs ${walkIn === value ? 'text-white/80' : 'text-muted-foreground'}`}>{hint}</span>
+              </button>
+            ))}
+          </div>
           <section className="space-y-4 rounded-2xl border border-border bg-white p-5 shadow-sm">
             <div className="space-y-1">
               <h2 className="text-lg font-semibold text-foreground">{t('orders.new.orderInfo', 'Order info')}</h2>
               <p className="text-sm text-muted-foreground">
-                {t('orders.new.orderInfoHint', 'Capture who is buying, who is receiving, and when it is needed.')}
+                {walkIn
+                  ? 'Tên và số điện thoại khách có thể bỏ trống (ghi là "Khách lẻ").'
+                  : t('orders.new.orderInfoHint', 'Capture who is buying, who is receiving, and when it is needed.')}
               </p>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
@@ -402,6 +431,7 @@ export default function NewOrderPage() {
                   )}
                 </div>
               )}
+              {!walkIn && (<>
               <label className="col-span-1 flex items-center gap-2 text-sm font-medium text-foreground md:col-span-2">
                 <input
                   type="checkbox"
@@ -461,8 +491,10 @@ export default function NewOrderPage() {
                   className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </label>
+              </>)}
             </div>
 
+            {!walkIn && (
             <div className="grid gap-4 md:grid-cols-2">
               <label className="space-y-2 text-sm font-medium text-foreground">
                 <span>Nội dung thiệp</span>
@@ -485,11 +517,20 @@ export default function NewOrderPage() {
                 />
               </label>
             </div>
+            )}
             <label className="space-y-2 text-sm font-medium text-foreground">
-              <span>{t('orders.assignee', 'Người phụ trách')} (tuỳ chọn, thợ cũng có thể tự nhận đơn)</span>
+              <span>
+                {walkIn
+                  ? 'Thợ đã làm bó hoa (được tính hoa hồng làm đơn)'
+                  : `${t('orders.assignee', 'Người phụ trách')} (tuỳ chọn, thợ cũng có thể tự nhận đơn)`}
+              </span>
               <select
+                aria-label={walkIn ? 'Thợ đã làm bó hoa' : 'Người phụ trách'}
                 value={assigneeId}
-                onChange={(event) => setAssigneeId(event.target.value)}
+                onChange={(event) => {
+                  setAssigneeId(event.target.value)
+                  setSubmitError(null)
+                }}
                 className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               >
                 <option value="">{t('common.select', 'Select')}</option>
@@ -702,7 +743,7 @@ export default function NewOrderPage() {
                   ))}
                 </select>
               </label>
-              {deliveryType === 'DELIVERY' && (
+              {!walkIn && deliveryType === 'DELIVERY' && (
                 <div className="space-y-2 text-sm font-medium text-foreground">
                   <span>{t('orders.new.deliveryFee', 'Delivery fee')}</span>
                   <input
@@ -719,6 +760,7 @@ export default function NewOrderPage() {
                   </label>
                 </div>
               )}
+              {!walkIn && (
               <div className="space-y-2 text-sm font-medium text-foreground">
                 <label className="block space-y-2">
                   <span>{t('orders.new.deposit', 'Deposit')}</span>
@@ -735,12 +777,15 @@ export default function NewOrderPage() {
                   Khách đã thanh toán đủ
                 </label>
               </div>
+              )}
             </div>
 
             <div className="flex flex-col items-end gap-1 rounded-xl bg-muted/60 px-4 py-3">
-              <span className="text-sm text-muted-foreground">Tổng tiền</span>
+              <span className="text-sm text-muted-foreground">{walkIn ? 'Khách trả' : 'Tổng tiền'}</span>
               <span className="text-2xl font-bold text-foreground">{formattedOrderTotal}</span>
-              {paidInFull ? (
+              {walkIn ? (
+                <span className="text-sm font-medium text-green-700">Đã thanh toán đủ · đã giao</span>
+              ) : paidInFull ? (
                 <span className="text-sm font-medium text-green-700">Đã thanh toán đủ</span>
               ) : parseCurrencyToNumber(deposit) > 0 && (
                 <span className="text-sm text-muted-foreground">Còn phải thu: {formattedRemainingBalance}</span>
@@ -763,7 +808,7 @@ export default function NewOrderPage() {
               disabled={isSaving || uploading > 0}
               className="rounded-xl bg-primary px-6 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70"
             >
-              {uploading > 0 ? 'Đang tải ảnh…' : isSaving ? 'Đang tạo…' : t('orders.new.submit', 'Tạo đơn')}
+              {uploading > 0 ? 'Đang tải ảnh…' : isSaving ? 'Đang tạo…' : walkIn ? 'Lưu đơn bán tại cửa hàng' : t('orders.new.submit', 'Tạo đơn')}
             </button>
           </div>
         </form >

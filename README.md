@@ -12,7 +12,7 @@ Hệ thống quản lý vận hành nội bộ của tiệm hoa Bloemist.
 - **Đơn hàng**
   - Tạo đơn: thông tin khách có thể bổ sung sau; có ô "người nhận là khách".
   - Tính tiền: phí ship hoặc freeship, VAT chỉ khi nhập (mặc định 0%), tiền cọc.
-  - Bán tại quầy (khách lẻ trả tiền và lấy hoa luôn): nút "Bán tại quầy" ở màn Đơn hàng. Chỉ nhập sản phẩm, giá và thợ đã làm; đơn được ghi là đã thanh toán đủ, đã giao, tính doanh thu, KPI ca hiện tại, hoa hồng sale và hoa hồng làm đơn như đơn thường.
+  - Bán tại cửa hàng (khách lẻ trả tiền và lấy hoa luôn): chọn "Bán tại cửa hàng" ở đầu màn Tạo đơn. Chỉ nhập sản phẩm, giá và thợ đã làm; đơn được ghi là đã thanh toán đủ, đã giao, tính doanh thu, KPI ca hiện tại, hoa hồng sale và hoa hồng làm đơn như đơn thường.
   - Thu tiền: tiền cọc lúc tạo đơn là lần thu đầu (tích "Khách đã thanh toán đủ" nếu khách trả hết); khách trả nốt sau đó thì sale bấm "Ghi nhận khách trả thêm" (chỉ để theo dõi công nợ, không tính KPI). "Đã thu" và "Còn phải thu" tự cập nhật; chỉ quản lý xoá được một khoản thu.
   - Lời thiệp và ghi chú đặc biệt nhập riêng.
   - Huỷ đơn: đơn huỷ không tính doanh thu và hoa hồng. Chỉ quản lý được xoá đơn.

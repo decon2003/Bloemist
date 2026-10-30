@@ -354,7 +354,7 @@ export const createOrder = async (input: CreateOrderInput) => {
     if (existing) return mapOrder(existing)
   }
   assertTextLengths(input)
-  // "Bán tại quầy": a customer at the counter pays and takes the flowers at
+  // "Bán tại cửa hàng": a customer in the shop pays and takes the flowers at
   // once. The order is paid in full and delivered now, and its products are
   // made by the florist chosen (making commission as usual).
   const walkIn = input.walkIn === true
@@ -427,7 +427,7 @@ export const createOrder = async (input: CreateOrderInput) => {
           amount: money.deposit,
           recordedById: input.createdById ?? null,
           recordedByName: input.createdByName ?? null,
-          note: walkIn ? 'Bán tại quầy' : 'Tiền cọc khi tạo đơn',
+          note: walkIn ? 'Bán tại cửa hàng' : 'Tiền cọc khi tạo đơn',
         },
       })
     }
@@ -735,7 +735,7 @@ const readAssignee = async (userId: unknown) => {
   return user
 }
 
-/** The florist who made a bouquet sold at the counter. */
+/** The florist who made a bouquet sold in the shop. */
 const readMaker = async (userId: unknown) => {
   if (typeof userId !== 'string' || !userId) throw new ApiError(400, 'Chọn thợ đã làm bó hoa')
   const user = await db.user.findUnique({ where: { id: userId }, select: { id: true, name: true, status: true, role: true } })

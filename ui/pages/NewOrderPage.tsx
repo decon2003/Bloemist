@@ -338,7 +338,6 @@ export default function NewOrderPage() {
         <div className="flex items-center justify-between">
           <div className="space-y-2">
             <h1 className="text-3xl font-bold text-foreground">{t('orders.new.title', 'New order')}</h1>
-            <p className="text-muted-foreground">{t('orders.new.subtitle', 'Capture order basics to dispatch tasks quickly.')}</p>
           </div>
           <Link
             href={`/${lang}/orders`}
@@ -370,11 +369,9 @@ export default function NewOrderPage() {
           <section className="space-y-4 rounded-2xl border border-border bg-white p-5 shadow-sm">
             <div className="space-y-1">
               <h2 className="text-lg font-semibold text-foreground">{t('orders.new.orderInfo', 'Order info')}</h2>
-              <p className="text-sm text-muted-foreground">
-                {walkIn
-                  ? 'Tên và số điện thoại khách có thể bỏ trống (ghi là "Khách lẻ").'
-                  : t('orders.new.orderInfoHint', 'Capture who is buying, who is receiving, and when it is needed.')}
-              </p>
+              {walkIn && (
+                <p className="text-sm text-muted-foreground">Tên và số điện thoại khách có thể bỏ trống (ghi là &quot;Khách lẻ&quot;).</p>
+              )}
             </div>
             <div className="grid gap-4 md:grid-cols-2">
               <label className="space-y-2 text-sm font-medium text-foreground">
@@ -681,10 +678,7 @@ export default function NewOrderPage() {
                       placeholder={t('orders.new.productNotePlaceholder', 'Specific instructions for this product')}
                     />
                   </label>
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span className="rounded-full bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-700">
-                      {t('orders.new.arrangingBadge', 'Will create arranging task')}
-                    </span>
+                  <div className="flex items-center justify-end text-xs text-muted-foreground">
                     <button
                       type="button"
                       disabled={products.length === 1}
@@ -712,9 +706,6 @@ export default function NewOrderPage() {
           <section className="space-y-3 rounded-2xl border border-border bg-white p-5 shadow-sm">
             <div className="space-y-1">
               <h2 className="text-lg font-semibold text-foreground">{t('orders.new.paymentInfo', 'Payment info')}</h2>
-              <p className="text-sm text-muted-foreground">
-                {t('orders.new.paymentInfoHint', 'Log pricing, fees, and how much remains to collect.')}
-              </p>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
               <label className="space-y-2 text-sm font-medium text-foreground">

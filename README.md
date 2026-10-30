@@ -4,8 +4,8 @@ Hệ thống quản lý vận hành nội bộ của tiệm hoa Bloemist.
 
 | Môi trường | Địa chỉ | Trạng thái |
 |---|---|---|
-| **Devtest** | `devtest.bloemistflorals.com` | Thử nghiệm, được sửa dữ liệu. Tạm chạy ở `noibo` cho tới khi có production |
-| **Production** | `noibo.bloemistflorals.com` | Chưa dựng (xem [DEPLOY.md](DEPLOY.md#5-dựng-bản-production)) |
+| **Devtest** | Trên máy: `npm run devtest` | Chỉ chủ cửa hàng thử nghiệm; database riêng trên máy |
+| **Production** | `noibo.bloemistflorals.com` | Nhân viên dùng. Hiện vẫn nối với database thử cho tới ngày lên production (xem [DEPLOY.md](DEPLOY.md#5-dựng-bản-production)) |
 
 ## Chức năng
 
@@ -57,19 +57,13 @@ Next.js 16 (App Router), Prisma 5 với Postgres (Neon, Singapore), ảnh và b�
 
 ## Chạy trên máy
 
-**Không trỏ `.env` vào database của devtest hay production.** Dùng một database riêng: Postgres cài trên máy, hoặc một branch Neon tạo riêng cho việc này.
-
 ```bash
-cp .env.example .env   # điền DATABASE_URL của database thử; để trống các biến R2_*
 npm install
-npx prisma migrate deploy
-npx tsx --env-file=.env prisma/seed.ts
-node scripts/set-password.mjs admin@bloemist.com '<mat-khau>'
-npm run dev            # http://localhost:3000 (chỉ máy này truy cập được)
+npm run devtest              # http://localhost:3000, và http://<IP máy>:3000 cho điện thoại cùng Wi-Fi
+npm run devtest -- --reset   # xoá sạch dữ liệu thử, làm lại từ đầu
 ```
 
-- Không có `AUTH_SECRET` thì khi chạy dev, app tự tạo một khoá ngẫu nhiên. Khởi động lại server sẽ phải đăng nhập lại.
-- Để trống `R2_*` thì ảnh được lưu thẳng trong database.
+Lệnh này tự bật một database riêng trong `.devtest/`, chạy migration và tạo tài khoản mẫu (in ra màn hình). Nó **không bao giờ** dùng database trong `.env`. Chi tiết: [DEPLOY.md, mục 3](DEPLOY.md#3-devtest-trên-máy).
 
 ## Triển khai, sao lưu, khôi phục
 

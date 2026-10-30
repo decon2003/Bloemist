@@ -12,3 +12,4 @@ design-artifacts
 output*.txt
 server_log.txt
 tsconfig.tsbuildinfo
+.devtest

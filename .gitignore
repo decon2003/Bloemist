@@ -21,3 +21,6 @@ _bmad-output/
 *.log
 server_log.txt
 output*.txt
+
+# npm run devtest: local database and key
+.devtest/

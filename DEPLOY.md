@@ -2,20 +2,22 @@
 
 ## Môi trường
 
-| | Devtest (hiện có) | Production (sẽ dựng) |
-|---|---|---|
-| Mục đích | Thử nghiệm, được sửa hoặc xoá dữ liệu | Dữ liệu thật của cửa hàng |
-| Domain | `devtest.bloemistflorals.com` (xem [mục 3](#3-domain-của-devtest)) | `noibo.bloemistflorals.com` |
-| Vercel project | project hiện tại | project mới, cùng repo |
-| Neon | project `bloemist` (Singapore) | project mới, Singapore |
-| R2 bucket | `bloemist-photos` | bucket mới, token mới |
-| Secret | bộ hiện tại | **bộ mới hoàn toàn**, không dùng lại của devtest |
+Quyết định ngày 30/10/2026: chỉ chủ cửa hàng phát triển và thử nghiệm, nhân viên chỉ dùng bản production. Vì vậy **devtest chạy trên máy**, không còn một bản devtest trên mạng.
 
-Cả hai đều dùng gói miễn phí:
+| | Devtest | Production |
+|---|---|---|
+| Ở đâu | Máy của chủ cửa hàng: `npm run devtest` (mục 3) | `https://noibo.bloemistflorals.com` |
+| Dữ liệu | Database Postgres riêng trong `.devtest/`, tài khoản mẫu | Dữ liệu thật của cửa hàng |
+| Vercel | không dùng | project hiện tại (nhánh `main`) |
+| Neon | không dùng | **project mới**, Singapore (mục 5) |
+| R2 | không dùng (ảnh lưu trong database trên máy) | **bucket mới**, token mới (mục 5) |
+| Secret | tự tạo trong `.devtest/` | **bộ mới hoàn toàn** |
+
+Dịch vụ của production:
 
 | Thành phần | Dịch vụ | Ghi chú |
 |---|---|---|
-| Chạy app | Vercel Hobby | region `sin1` (`vercel.json`) |
+| Chạy app | Vercel (Hobby; nên lên Pro vì Hobby không cho dùng thương mại) | region `sin1` (`vercel.json`) |
 | Cơ sở dữ liệu | Neon Postgres Free | 0.5 GB, chỉ chứa dữ liệu chữ |
 | Ảnh và bản sao lưu | Cloudflare R2 Free | 10 GB, bucket riêng tư |
 | Việc chạy hằng đêm | Vercel Cron | 02:00 giờ VN: đóng ca quên chấm ra, rồi sao lưu |
@@ -56,17 +58,18 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
 2. Cập nhật hai biến `R2_ACCESS_KEY_ID` và `R2_SECRET_ACCESS_KEY` trên Vercel.
 3. Bấm Redeploy.
 
-> **Việc cần làm ngay trên devtest:** mật khẩu Neon và khoá R2 hiện tại từng bị dán vào chat. Hãy đổi cả hai theo hai bước trên.
+> Mật khẩu Neon và khoá R2 đang dùng (dữ liệu thử) từng bị dán vào chat. Ngày lên production chúng được thay hẳn bằng database, bucket và khoá mới (mục 5); trước đó, nếu còn dùng lâu, hãy đổi theo hai bước trên.
 
 ---
 
-## 2. Hiện trạng devtest
+## 2. Hiện trạng (trước khi lên production)
 
-Dựng ngày 05/10/2026:
+Project Vercel hiện tại đang chạy ở `noibo` nhưng nối với **database và bucket thử nghiệm** (dựng ngày 05/10/2026):
 
-- Neon project `bloemist`: AWS ap-southeast-1 (Singapore), Postgres 17.
+- Neon project `bloemist`: AWS ap-southeast-1 (Singapore), Postgres 17. Có dữ liệu thử.
 - R2 bucket `bloemist-photos`, riêng tư.
-- Vercel: functions ở `sin1`, đủ biến môi trường ở mục 1.
+
+Đến ngày lên production (mục 5), project này được chuyển sang database và bucket mới. Sau khi production chạy ổn, xoá Neon project `bloemist` và bucket `bloemist-photos` cũ.
 
 Migration tự chạy khi build production (`scripts/migrate-if-production.mjs`, chỉ khi `VERCEL_ENV=production`), nên database luôn khớp với code đã deploy.
 
@@ -78,19 +81,24 @@ Migration tự chạy khi build production (`scripts/migrate-if-production.mjs`,
 
 ---
 
-## 3. Domain của devtest
+## 3. Devtest trên máy
 
-Quyết định ngày 30/10/2026: **`noibo.bloemistflorals.com` dành cho production, `devtest.bloemistflorals.com` dành cho devtest.**
+```bash
+npm install
+npm run devtest              # dữ liệu được giữ giữa các lần chạy
+npm run devtest -- --reset   # xoá sạch, làm lại từ database trống
+```
 
-Cho tới khi dựng xong production, devtest vẫn đang chạy ở `noibo`. Đến ngày chuyển (mục 5, bước 7). Code không gắn cứng domain nào, nên chỉ cần thao tác trên Vercel và DNS:
+Lệnh này:
+- bật một Postgres riêng trong thư mục `.devtest/` (không đẩy lên GitHub, không bao giờ là database thật);
+- chạy migration, lần đầu tạo sẵn tài khoản mẫu (in ra màn hình): `admin@devtest.local`, `sale@devtest.local`, `tho@devtest.local`, `tho2@devtest.local`;
+- chạy app ở chế độ phát triển: sửa code là màn hình cập nhật ngay.
 
-1. Project devtest: **Settings → Domains → Add** `devtest.bloemistflorals.com`, thêm bản ghi DNS mà Vercel hiện ra. Làm việc này trước, để devtest có địa chỉ mới ngay.
-2. Project devtest: gỡ `noibo.bloemistflorals.com`.
-3. Project production: **Settings → Domains → Add** `noibo.bloemistflorals.com`.
+Mở ở `http://localhost:3000`. **Thử trên điện thoại:** cho điện thoại vào cùng Wi-Fi rồi mở địa chỉ `http://<IP máy>:3000` mà lệnh in ra.
 
 Ghi chú:
-- Khi gỡ domain, chỉ gỡ khỏi project. **Không** xoá `bloemistflorals.com` ở trang Domains của team.
-- Cookie đăng nhập gắn theo từng domain, nên khi đổi domain mọi người phải đăng nhập lại.
+- Biến môi trường của devtest được đặt sẵn trong lệnh và luôn thắng `.env`, nên dù `.env` có chuỗi kết nối nào, devtest cũng không chạm vào database thật.
+- Ảnh lưu thẳng trong database trên máy (không dùng R2). Việc chạy hằng đêm và sao lưu chỉ kiểm tra được trên production.
 
 ---
 
@@ -117,19 +125,16 @@ node scripts/migrate-photos-to-r2.mjs --apply  # chuyển thật, chạy lại n
 
 ## 5. Dựng bản production
 
-Làm khi bản devtest đã ổn. **Mọi thứ đều mới, không dùng lại secret, database hay bucket của devtest.**
+Dùng luôn **project Vercel hiện tại** và domain `noibo`, chỉ thay sang **database, bucket và secret mới**. Làm ngoài giờ bán.
 
-1. **Neon:** tạo project mới, region Singapore, Postgres 17. Lấy cả chuỗi pooled và chuỗi direct.
-2. **R2:** tạo bucket mới (ví dụ `bloemist-prod-photos`) và token mới chỉ có quyền trên bucket này (mục 4), kèm lifecycle rule cho `backups/`.
-3. **Vercel:** chọn **Add New → Project**, import cùng repo.
-   - Điền đủ biến ở mục 1, với giá trị mới. Chỉ chọn môi trường **Production**, không chọn *Preview*, để link preview không bao giờ chạm vào dữ liệu thật.
-   - Bật **Settings → Deployment Protection** cho các bản preview.
-4. **Nhánh deploy** (để thử trên devtest trước khi lên production):
-   - Project production lấy nhánh `main`.
-   - Project devtest đổi *Production Branch* sang nhánh `devtest` (**Settings → Git**).
-   - Quy trình: push lên `devtest`, thử trên devtest, rồi merge vào `main`.
-5. **Deploy lần đầu.** Bước build tự chạy migration lên database mới.
-6. **Tạo tài khoản quản lý đầu tiên.** Chạy trên máy; chuỗi direct của production chỉ đặt trong terminal, **không ghi vào `.env`**, và đóng terminal khi xong. Ví dụ với PowerShell:
+1. **Neon:** tạo **project mới**, region Singapore, Postgres 17. Lấy cả chuỗi pooled (host có `-pooler`) và chuỗi direct.
+2. **R2:** tạo bucket mới (ví dụ `bloemist-prod`) và token mới **chỉ có quyền trên bucket này** (mục 4), kèm lifecycle rule cho `backups/`.
+3. **Vercel → Settings → Environment Variables:** thay giá trị mới cho `DATABASE_URL`, `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `AUTH_SECRET`, `CRON_SECRET` (mục 1).
+   - Chỉ chọn môi trường **Production**. Xoá các giá trị đang đặt cho *Preview*, để bản preview không bao giờ chạm vào dữ liệu thật.
+   - Xoá các biến không dùng: `GEMINI_API_KEY`, `GEMINI_MODEL`, `TELEGRAM_WEBHOOK_SECRET` (và thu hồi khoá Gemini).
+   - Bật **Settings → Deployment Protection** cho bản preview.
+4. **Redeploy.** Bước build tự chạy toàn bộ migration lên database mới (đã thử dựng database trống từ đầu: 17 migration, khớp `schema.prisma`).
+5. **Tạo tài khoản quản lý đầu tiên.** Chạy trên máy; chuỗi direct của production chỉ đặt trong terminal, **không ghi vào `.env`**, và đóng terminal khi xong. Ví dụ với PowerShell:
 
    ```powershell
    $env:DATABASE_URL = "<chuỗi direct của production>"
@@ -137,23 +142,17 @@ Làm khi bản devtest đã ổn. **Mọi thứ đều mới, không dùng lại
    node scripts/set-password.mjs admin@bloemist.com '<mat-khau-tam>' --temporary
    ```
 
-   Sau đó đăng nhập, đổi email/tên admin cho đúng người thật, rồi tạo tài khoản cho nhân viên ở **Cài đặt**.
-7. **Domain:**
-   - thêm `devtest.bloemistflorals.com` vào project devtest (mục 3);
-   - gỡ `noibo.bloemistflorals.com` khỏi project devtest, rồi thêm vào project production (**Settings → Domains**);
-   - nếu Vercel yêu cầu thêm bản ghi DNS thì làm theo hướng dẫn trên màn hình.
-8. **Kiểm tra:**
+   Sau đó đăng nhập, đổi email/tên admin cho đúng người thật.
+6. **Cài đặt cửa hàng:** giờ mở cửa, ngày lễ, KPI theo ca; tạo tài khoản nhân viên (**Cài đặt**) và hồ sơ lương từng người (**Báo cáo nhân sự → Hồ sơ lương**).
+7. **Kiểm tra:**
    - `https://noibo.bloemistflorals.com/api/health?db=1` trả về ok.
-   - Đăng nhập được.
-   - Thử tạo một đơn, rồi huỷ nó.
-   - Ngày hôm sau, tìm `Backup written` trong Logs.
-9. **Cài đặt cửa hàng:** giờ mở cửa, ngày lễ, hồ sơ lương từng người (lương cứng, đơn giá giờ, giờ lễ, giờ online, % hoa hồng).
+   - Đăng nhập được; tạo một đơn đặt hoa, ghi tiền khách trả thêm, tạo một đơn bán tại cửa hàng, chấm công vào/ra; rồi huỷ/xoá các đơn thử.
+   - Sáng hôm sau, tìm `Backup written` trong Logs; thử khôi phục một lần vào một branch Neon trống (mục 6).
+8. **Dọn dẹp:** khi production đã chạy ổn, xoá Neon project `bloemist` và bucket `bloemist-photos` cũ (dữ liệu thử).
 
-**Nếu muốn mang dữ liệu devtest sang:**
-- Khôi phục bản sao lưu devtest vào database production đang trống (mục 6).
-- Copy thêm các thư mục `proofs/` và `samples/` từ bucket devtest sang bucket production, ví dụ bằng `rclone`. Nếu không copy, ảnh cũ sẽ không hiện.
+Production bắt đầu với dữ liệu trống: không mang dữ liệu thử sang.
 
-Thường thì nên bắt đầu production với dữ liệu trống.
+**Nếu có sự cố sau khi deploy:** Vercel → Deployments → bản trước → **Instant Rollback**. Các migration chỉ thêm cột và bảng, nên bản cũ vẫn chạy được trên database mới.
 
 ---
 
@@ -190,20 +189,20 @@ node scripts/restore-backup.mjs --date 2026-10-21 --apply  # khôi phục thật
 ## 7. Các bản cập nhật sau
 
 - **Đổi cấu trúc bảng:** sửa `prisma/schema.prisma`, viết migration SQL trong `prisma/migrations/<số>_<tên>/migration.sql`, thử trên database local, rồi commit.
-  - **Không chạy `prisma migrate dev` khi `DATABASE_URL` trỏ tới devtest hay production**, vì lệnh này có thể đề nghị xoá sạch database.
+  - Thử bằng `npm run devtest` trước khi đẩy lên `main`.
+  - **Không chạy `prisma migrate dev` khi `DATABASE_URL` trỏ tới production**, vì lệnh này có thể đề nghị xoá sạch database.
+  - Tên thư mục migration phải có 2 chữ số đầu (`17_…`, `18_…`): Prisma chạy theo thứ tự tên.
 - Bản build production tự chạy `prisma migrate deploy` **trước khi** code mới thay code cũ (khoảng 1 phút). Vì vậy:
   - **Thêm** cột hoặc bảng: làm thẳng được.
   - **Đổi kiểu** hoặc **xoá** cột: chia làm hai lần deploy. Lần 1 thêm cột mới và cho code ghi vào cả hai cột; lần 2 mới bỏ cột cũ.
   - Nếu bắt buộc đổi trực tiếp, làm ngoài giờ bán và chạy sao lưu trước.
-- Bản Preview không bao giờ chạy migration.
-  - Trên devtest, Preview dùng chung database devtest: thao tác trên link preview là sửa dữ liệu devtest.
-  - Trên production, Preview không có biến môi trường (mục 5, bước 3).
+- Bản Preview không bao giờ chạy migration, và không có biến môi trường của production (mục 5, bước 3).
 
 ---
 
 ## 8. Giám sát
 
-**Trang còn sống không:** tạo monitor HTTP(s) miễn phí trên [UptimeRobot](https://uptimerobot.com) cho từng môi trường, ít nhất là production:
+**Trang còn sống không:** tạo monitor HTTP(s) miễn phí trên [UptimeRobot](https://uptimerobot.com) cho production:
 
 - URL: `https://noibo.bloemistflorals.com/api/health`
 - Chu kỳ: 5 phút, cảnh báo qua email hoặc app điện thoại.

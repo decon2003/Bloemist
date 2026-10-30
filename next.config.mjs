@@ -9,6 +9,8 @@ const nextConfig = {
     unoptimized: true,
   },
   poweredByHeader: false,
+  // npm run devtest: let a phone on the same Wi-Fi load the dev build.
+  allowedDevOrigins: process.env.DEVTEST_ORIGINS ? process.env.DEVTEST_ORIGINS.split(',') : [],
   // Browser-side hardening for every page and API response: no framing by
   // other sites (clickjacking), no MIME sniffing, no full URLs sent to other
   // sites, and no camera/mic/location access from scripts (photos are taken
